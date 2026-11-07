@@ -17,13 +17,14 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   scoring a file of predictions does. A right answer with text around it then stays out of Rejects right answers and its
   findings stay low, as when this is inferred from Q5 and Q6; without the option it is still inferred. The note at the top of
   the report then says it was stated.
-- A line after the dataset checks, in the terminal and in `report.md`, names the third-party packages imported in the process
-  that ran the checker, with their versions, the first 8 by name, or `none`, such as
-  `Checker imports: antlr4-python3-runtime 4.11.0, mpmath 1.3.0, sympy 1.14.0`. Another version can change what a checker
-  decides: under antlr4-python3-runtime 4.13, sympy's `parse_latex` raises an ImportError, and a checker that catches it
-  rejects every answer it would have parsed. `report.json` has a new top-level key, `environment`, with `python`, `platform`
-  and `packages` (every package, name to version), as the workers reported them; from Python it is `result.environment`.
-  `schema_version` stays 1, since no existing key changed.
+- A line after the dataset checks, in the terminal and in `report.md`, names the third-party packages imported as the checker
+  loaded and scored, with their versions, the first 8 by name, or `none`, such as
+  `Checker imports: antlr4-python3-runtime 4.11.0, mpmath 1.3.0, sympy 1.14.0`. Packages imported to read the dataset, such
+  as pyarrow or datasets, do not count, nor does cloudpickle, which carries a function over from Python. Another version of a
+  package can change what a checker decides: under antlr4-python3-runtime 4.13, sympy's `parse_latex` raises an ImportError,
+  and a checker that catches it rejects every answer it would have parsed. `report.json` has a new top-level key,
+  `environment`, with `python`, `platform` and `packages` (every package, name to version), as the workers reported them;
+  from Python it is `result.environment`. `schema_version` stays 1, since no existing key changed.
 
 ## 0.2.0 - 2026-11-07
 

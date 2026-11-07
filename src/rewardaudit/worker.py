@@ -85,15 +85,20 @@ class _MarkerWatch:
         return seen
 
 
-def _environment(preloaded: set[str]) -> dict[str, Any]:
+def _top_level(modules: Any) -> set[str]:
+    return {name.partition(".")[0] for name in modules}
+
+
+def _environment(not_checker: set[str]) -> dict[str, Any]:
     """What the checker ran under: this Python, this platform, and {distribution: version} for the third-party modules
-    imported since the worker started. That leaves out the standard library, `preloaded` (this package, `__main__`, what
-    .pth files import at startup, and cloudpickle, which loads a function handed over from Python). A module no installed
-    distribution provides, such as the checker's own file, is not listed; one that several provide lists them all."""
+    imported in this worker as the checker loaded and scored. That leaves out the standard library and `not_checker`:
+    what was there before the checker loaded (this package, `__main__`, what .pth files import at startup), cloudpickle,
+    which carries a function over from Python, and what reading the rows imported. A module no installed distribution
+    provides, such as the checker's own file, is not listed; one that several provide lists them all."""
     import importlib.metadata
     import platform
 
-    names = {name.partition(".")[0] for name in list(sys.modules)} - preloaded - sys.stdlib_module_names  # a list: threads import too
+    names = _top_level(set(sys.modules)) - not_checker - sys.stdlib_module_names  # a copy made at once: threads import too
     packages: dict[str, str] = {}
     for dist in importlib.metadata.distributions():
         # the modules it provides: top_level.txt, or else the first part of each path in RECORD. packages_distributions()
@@ -106,7 +111,7 @@ def _environment(preloaded: set[str]) -> dict[str, Any]:
 
 
 def main() -> None:
-    preloaded = {name.partition(".")[0] for name in sys.modules} | {"cloudpickle"}  # not the checker's imports
+    not_checker = _top_level(sys.modules) | {"cloudpickle"}  # and reading_rows adds what reading the dataset imports
     out = sys.stdout
     sys.stdout = sys.stderr  # anything the checker prints must not corrupt the protocol
     # and anything it reads must not wait on the protocol: a load that asks a question gets end-of-file, not a hang
@@ -123,6 +128,14 @@ def main() -> None:
     def send(obj: dict[str, Any]) -> None:
         out.write(json.dumps(obj, ensure_ascii=False) + "\n")
         out.flush()
+
+    def reading_rows(call: Any, *args: Any) -> Any:
+        """What reading the dataset imports (pyarrow, datasets and theirs) is not the checker's."""
+        before = set(sys.modules)
+        try:
+            return call(*args)
+        finally:
+            not_checker.update(_top_level(set(sys.modules) - before))
 
     try:
         from rewardaudit.adapters import build_adapter
@@ -145,12 +158,12 @@ def main() -> None:
         op = req.get("op")
         try:
             if op == "tasks":
-                tasks = adapter.tasks(req["n"], int(req.get("seed", 0)))
+                tasks = reading_rows(adapter.tasks, req["n"], int(req.get("seed", 0)))
                 send({"ok": True, "tasks": [t.to_dict() for t in tasks], "meta": adapter.meta})
             elif op == "dataset_issues":
                 from rewardaudit.checks.dataset import run_dataset_checks
 
-                send({"ok": True, "issues": run_dataset_checks(adapter.all_tasks())})
+                send({"ok": True, "issues": run_dataset_checks(reading_rows(adapter.all_tasks))})
             elif op == "score":
                 task = Task.from_dict(req["task"])
                 guard.tripped = False
@@ -177,7 +190,7 @@ def main() -> None:
             elif op == "ping":
                 send({"ok": True})
             elif op == "exit":
-                send({"ok": True, **_environment(preloaded)})
+                send({"ok": True, **_environment(not_checker)})
                 break
             else:
                 send({"ok": False, "error": f"unknown op {op!r}"})

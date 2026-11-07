@@ -296,6 +296,16 @@ def test_a_checker_on_the_standard_library_imports_none(tmp_path):
     assert json.loads((tmp_path / "out" / "report.json").read_text(encoding="utf-8"))["environment"] == r.environment
 
 
+def test_what_reading_a_parquet_dataset_imports_is_not_the_checkers(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    (tmp_path / "reward.py").write_text("def score(completion, answer):\n    return float(completion.strip() == answer)\n")
+    pq.write_table(pa.Table.from_pylist(ROWS_OF_NUMBERS), tmp_path / "data.parquet")
+    r = audit(str(tmp_path / "reward.py"), str(tmp_path / "data.parquet"), n=8, workers=1, probes=["N"])
+    assert r.environment["packages"] == {} and "Checker imports: none" in screen(r)
+
+
 def test_cloudpickle_that_carries_a_function_from_python_is_not_its_import():
     def exact(completion, answer):  # defined here, so it travels by value and its module is not imported again
         return float(completion.strip() == answer)
