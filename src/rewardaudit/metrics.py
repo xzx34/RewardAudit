@@ -677,6 +677,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
         for f in findings:
             if f["probe_id"] in PROSE_PROBES and f["category"] == "right_rejected":
                 f["severity"] = "low"
+                f.pop("rated", None)  # low for what it is, not for a lack of calls: its defect may not count it higher
                 f["note"] = "; ".join(x for x in (f["note"], WHOLE_ANSWER) if x)
     findings += [f for s in stats.values() if (f := _timing_finding(s))]
     bad_scores = _bad_scores_finding(tally.robust)

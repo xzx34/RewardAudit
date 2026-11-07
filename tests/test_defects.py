@@ -206,6 +206,15 @@ def test_a_checker_that_compares_the_whole_reply_is_not_rated_on_text_around_the
     assert "compares the whole reply" in render_markdown(r)
 
 
+def test_text_around_the_answer_does_not_raise_the_defect_on_few_rows():
+    def field(completion, answer):
+        return float(completion == answer)
+
+    r = audit(field, ROWS[:9], workers=1, probes=["Q"])  # Q5 and Q22 have fewer than ten calls each here
+    assert r.metrics["compares_whole_reply"] and not any(f.get("rated") == "high" for f in r.findings)
+    assert next(d for d in r.defects if d["id"] == "D9")["severity"] != "high"
+
+
 def test_a_marked_format_that_rejects_text_around_the_answer_is_still_rated():
     def boxed_only(completion, answer):
         return float(completion == f"\\boxed{{{answer}}}")
