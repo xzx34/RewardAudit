@@ -6,6 +6,9 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
+MARKER_MODULE = "rewardaudit_probe_marker"  # the module probe P16 names; nothing else does, and it does not exist
+SCORE_NOT_A_NUMBER = "ScoreOutOfRange"  # what the error of a call says when the checker returned nan or inf
+
 
 class Kind(str, Enum):
     """Four-way outcome of one checker call (TRUE/FALSE are both SCORE with a value)."""
@@ -57,6 +60,7 @@ class Verdict:
     error: str | None = None
     elapsed_ms: float = 0.0
     network: bool = False
+    reached_import: bool = False  # the reply's text got as far as importing MARKER_MODULE
 
     @property
     def ok(self) -> bool:

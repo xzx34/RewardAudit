@@ -17,12 +17,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rewardaudit.contract import Contract
-from rewardaudit.defects import ABOVE_REFERENCE, BY_PROBE, DEFECTS, FIXED_ANSWER, ROBUSTNESS, WRONG_PARTIAL
+from rewardaudit.defects import (
+    ABOVE_REFERENCE,
+    BY_PROBE,
+    DEFECTS,
+    FIXED_ANSWER,
+    ROBUSTNESS,
+    RUN_AS_CODE,
+    WRONG_PARTIAL,
+)
 from rewardaudit.equiv import normalize
 from rewardaudit.goldtype import infer_gold_type, mcq_options
 from rewardaudit.labels import states_the_answer
 from rewardaudit.probes.base import Probe
-from rewardaudit.types import Kind, Label, Observation, Task
+from rewardaudit.types import MARKER_MODULE, SCORE_NOT_A_NUMBER, Kind, Label, Observation, Task, Verdict
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -60,6 +68,8 @@ class ProbeStats:
     variant_hits: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # [hits, scored]
     variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps: the first hit of each variant
     variant_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))  # sweeps: time of each scored call
+    reached_import: int = 0  # calls whose text got as far as importing MARKER_MODULE
+    import_example: Observation | None = None
 
     def most_accepted_variant(self) -> tuple[str, int, int]:
         """(variant, hits, scored) of the variant the checker accepts most often."""
@@ -156,6 +166,11 @@ def exception_type(error: str | None) -> str:
     return m.group(1).rsplit(".", 1)[-1] if m else "unknown"
 
 
+def _reached_import(v: Verdict) -> bool:
+    """Seen as it happened, or, from a process the worker cannot watch, in the error that came back."""
+    return v.reached_import or (exception_type(v.error) in ("ModuleNotFoundError", "ImportError") and MARKER_MODULE in (v.error or ""))
+
+
 def _failure_example(o: Observation) -> dict[str, Any]:
     return {"probe_id": o.probe_id, "variant": o.variant, "task_id": o.task_id, "completion": o.completion[:400],
             "error": (o.verdict.error or "")[-400:], "elapsed_ms": round(o.verdict.elapsed_ms, 1)}
@@ -185,6 +200,7 @@ class Robustness:
         self.total = 0
         self.timeouts, self.errors, self.crashes, self.network = _Failures(), _Failures(), _Failures(), _Failures()
         self.error_types: Counter[str] = Counter()
+        self.bad_scores, self.bad_score_rows = _Failures(), set()  # nan or inf instead of a score
 
     def add(self, o: Observation) -> None:
         self.total += 1
@@ -196,6 +212,9 @@ class Robustness:
         elif k == Kind.ERROR:
             self.errors.add(o)
             self.error_types[exception_type(o.verdict.error)] += 1
+            if exception_type(o.verdict.error) == SCORE_NOT_A_NUMBER:
+                self.bad_scores.add(o)
+                self.bad_score_rows.add(o.task_id)
         if o.verdict.network:
             self.network.add(o)
 
@@ -446,6 +465,9 @@ class Tally:
                     st.variant_examples.setdefault(o.variant, o)
                 if probe.sweep and o.verdict.ok:
                     st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
+                if _reached_import(o.verdict):
+                    st.reached_import += 1
+                    st.import_example = st.import_example or o
                 any_hit |= h
                 any_partial |= p
             if any_hit:
@@ -497,6 +519,27 @@ def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
     half = [v for v in order if s.variant_hits[v][1] and 2 * s.variant_hits[v][0] >= s.variant_hits[v][1]]
     variant = (half[0] if solving else half[-1]) if half else s.most_accepted_variant()[0]
     return variant, *s.variant_hits[variant], "accepted: " + ", ".join(shown)
+
+
+def _reached_import_finding(s: ProbeStats) -> dict[str, Any]:
+    """One such call settles it: a score, or a lack of one, says nothing that matters next to this."""
+    lo, hi = wilson(s.reached_import, s.n_obs)
+    return {"probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier, "category": "robustness",
+            "severity": "high", "rate": s.reached_import / s.n_obs, "ci": [lo, hi], "n": s.n_obs, "task_rate": 0.0, "n_tasks": s.n_tasks,
+            "example": s.import_example.to_dict(), "note": "the reply's text reached a Python import", "reached_import": True,
+            "meaning": "The checker runs what it reads: the text of a reply got as far as a Python import."}
+
+
+def _bad_scores_finding(rb: Robustness) -> dict[str, Any] | None:
+    k = rb.bad_scores.count
+    if not k:
+        return None
+    lo, hi = wilson(k, rb.total)
+    return _require_evidence(
+        {"probe_id": "S2", "name": "scores outside the range", "family": "S", "tier": "natural", "category": "robustness",
+         "severity": "medium", "rate": k / rb.total, "ci": [lo, hi], "n": rb.total, "task_rate": 0.0, "n_tasks": len(rb.bad_score_rows),
+         "example": None, "note": f"nan or inf instead of a score on {k:,} calls (probes: {', '.join(list(rb.bad_scores.probes)[:6])})",
+         "meaning": "The checker returned a score that is not a finite number."}, len(rb.bad_score_rows) >= MIN_TASKS)
 
 
 def _timing_finding(s: ProbeStats) -> dict[str, Any] | None:
@@ -602,7 +645,9 @@ def _summarize(tally: Tally) -> dict[str, Any]:
         }, s.n_scored >= MIN_CALLS and s.task_hits >= MIN_TASKS))
     for s in stats.values():
         bad = s.errors + s.timeouts + s.crashes
-        if bad:
+        if s.reached_import:
+            findings.append(_reached_import_finding(s))
+        elif bad:
             lo, hi = wilson(bad, s.n_obs)
             findings.append(_require_evidence({
                 "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
@@ -611,6 +656,8 @@ def _summarize(tally: Tally) -> dict[str, Any]:
                 "example": None, "note": f"{s.errors} errors, {s.timeouts} timeouts, {s.crashes} crashes",
             }, s.fail_tasks >= MIN_TASKS))
     findings += [f for s in stats.values() if (f := _timing_finding(s))]
+    bad_scores = _bad_scores_finding(tally.robust)
+    findings += [bad_scores] if bad_scores else []
     rejected_gold = _rejected_gold_finding(contract, tasks)
     if rejected_gold:
         findings.append(rejected_gold)
@@ -687,6 +734,8 @@ def _contract_evidence(contract: Contract) -> list[dict[str, Any]]:
 
 def _defect_of(f: dict[str, Any]) -> str | None:
     """The catalog entry a finding is evidence for. A fixed answer below what chance gives says nothing about the checker."""
+    if f.get("reached_import"):
+        return RUN_AS_CODE
     if f.get("above_gold"):
         return ABOVE_REFERENCE
     if f["category"] == "robustness" and f["probe_id"] != "S1":

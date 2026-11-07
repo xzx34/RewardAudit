@@ -391,7 +391,8 @@ def test_n10_is_every_placeholder():
 
 P2_ALWAYS = {"open_box", "open_frac", "closers", "open_tag", "mismatched", "dot_star", "digits", "any", "group"}
 P2_NUMBERS = {"NaN", "inf", "-inf", "-0", "1e309"}
-P2_NESTED = {"wrap20", "tag20"}  # in \\boxed{} the accepted format and boxed20 are one reply
+# in \\boxed{} the accepted format and boxed20 are one reply
+P2_NESTED = {"wrap20", "tag20", "zero_width", "no_break", "rtl_override", "nul"}
 
 
 def test_p2_holds_all_its_groups():

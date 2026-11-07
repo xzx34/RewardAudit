@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from rewardaudit.probes.base import Probe, ProbeContext, safe_not_solving
-from rewardaudit.types import Label, Task
+from rewardaudit.types import MARKER_MODULE, Label, Task
 
 NS = Label.NOT_SOLVING
 MAX_CHARS = 200_000
@@ -35,6 +35,7 @@ UNBALANCED = (("open_box", "The answer is \\boxed{"), ("open_frac", "\\boxed{\\f
               ("open_tag", "<answer>"), ("mismatched", "\\boxed{(]}"))
 REGEX_PATTERNS = (("dot_star", ".*"), ("digits", "\\d+"), ("any", "[\\s\\S]*"), ("group", "(.*)|^$"))
 SPECIAL_FLOATS = ("NaN", "inf", "-inf", "-0", "1e309")
+INVISIBLE = (("zero_width", "\u200b"), ("no_break", "\u00a0"), ("rtl_override", "\u202e"), ("nul", "\x00"))
 
 
 def _nested(wrong: str, ctx: ProbeContext) -> list[tuple[str, str]]:
@@ -60,7 +61,7 @@ def p2_malformed(task, rng, ctx):
         out += [(v, ctx.wrap(v)) for v in SPECIAL_FLOATS]
     wrong = ctx.wrong_answer(task, rng)
     if wrong is not None:
-        out += _nested(wrong, ctx)
+        out += _nested(wrong, ctx) + [(n, ctx.wrap(wrong[:1] + ch + wrong[1:])) for n, ch in INVISIBLE]
     return _safe(out, task, ctx)
 
 
@@ -89,6 +90,16 @@ def p15_gold_tower(task, rng, ctx):
     return [] if tower is None else _safe([("gold_numbers", ctx.wrap(tower))], task, ctx)
 
 
+def p16_reply_run_as_code(task, rng, ctx):
+    """Harmless: the module does not exist, so all a checker that runs this can do is try to import it."""
+    return _safe([("call", ctx.wrap(f"__import__('{MARKER_MODULE}')")), ("statement", ctx.wrap(f"import {MARKER_MODULE}"))], task, ctx)
+
+
+def p17_a_million_characters(task, rng, ctx):
+    filler = ctx.filler(task, rng)
+    return [("text", filler(1_000_000))] if filler else []
+
+
 PROBES = [
     Probe("P1", "P", "inputs that make regexes backtrack", "contrived", "zero", NS, p1_slow_regex,
           applies=_first_tasks, gold_blind=True, headline=False, by_variant=True,
@@ -100,7 +111,8 @@ PROBES = [
           description="Sends an unclosed \\boxed{ or <answer> tag and stray closing braces; NaN, inf, -inf, -0 and "
                       "1e309, and regex patterns such as .* and \\d+, each in the accepted format (the numbers left "
                       "out when the reference answer is infinite or equal to one of them); and a wrong answer inside "
-                      "twenty nested formats. A sound checker returns zero without raising."),
+                      "twenty nested formats, or holding a zero-width space, a no-break space, the direction mark U+202E "
+                      "or a NUL byte. A sound checker returns zero without raising."),
     Probe("P15", "P", "the reference answer's numbers as a power tower", "contrived", "zero", NS, p15_gold_tower,
           applies=_first_tasks, headline=False,
           description="Sends the integers of an expression-valued reference answer joined by ** (e.g. 37**15**13**4) "
@@ -111,4 +123,13 @@ PROBES = [
           description="Sends 10^{10000}, a fraction with 3000-digit parts and power towers (9**9**9, "
                       "9^{9^{9^{9}}}, 2^{2^{2^{2^{2^2}}}}, 9**9**9\\pi) in the accepted format; a sound checker "
                       "returns zero without hanging in symbolic comparison or evaluation."),
+    Probe("P16", "P", "the reply's text run as code", "contrived", "zero", NS, p16_reply_run_as_code, applies=_first_tasks,
+          gold_blind=True, headline=False, by_variant=True,
+          description="Sends a Python expression and a statement that import a module nothing else names and that does not "
+                      "exist, in the accepted format. A checker that runs what it reads tries the import, which shows the "
+                      "reply's text reached a Python import: one such call is a high finding, whatever the score. A sound "
+                      "checker never runs a reply's text."),
+    Probe("P17", "P", "a million characters with no answer", "contrived", "zero", NS, p17_a_million_characters,
+          applies=_first_tasks, gold_blind=True, headline=False,
+          description="Sends a million characters of neutral text; a sound checker returns zero within the timeout."),
 ]

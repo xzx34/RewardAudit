@@ -135,7 +135,7 @@ def test_parser_probes_cost_bounded():
     first = set(ctx.contract.passing_tasks()[:5])
     for _, probe, task, _, comp in _variants("boxed", ["P"]):
         assert task.id in first, probe.id
-        assert len(comp) <= 200_000 and probe.tier == "contrived" and not probe.headline
+        assert (probe.id == "P17" or len(comp) <= 200_000) and probe.tier == "contrived" and not probe.headline
 
 
 def test_every_probe_generates_for_some_task():
@@ -162,10 +162,10 @@ def test_the_probes():
         "O": ["O3", "O4", "O5", "O6", "O7", "O11", "O10", "O12", "O13", "O14", "O15"],
         "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M8", "M9", "M10", "M11", "M12", "M13", "M17"],
         "Q": ["Q1", "Q3", "Q5", "Q6", "Q22", "Q21", "Q8", "Q9", "Q2", "Q23", "Q24", "Q25", "Q26", "Q27", "Q28", "Q29", "Q30", "Q31", "Q10"],
-        "P": ["P1", "P2", "P15", "P5"],
+        "P": ["P1", "P2", "P15", "P5", "P16", "P17"],
     }
     assert {p.expect for p in all_probes()} == {"zero", "full"} and {p.label for p in all_probes()} == {Label.NOT_SOLVING, Label.SOLVING}
-    assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "M24", "Q28", "Q29"}
+    assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "P16", "P17", "M24", "Q28", "Q29"}
 
 
 @pytest.mark.parametrize("primary", PRIMARIES)

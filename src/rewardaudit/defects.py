@@ -16,7 +16,7 @@ class Defect:
     probes: tuple[str, ...] = ()
 
 
-FIXED_ANSWER, ROBUSTNESS, WRONG_PARTIAL, ABOVE_REFERENCE = "D11", "D13", "D14", "D18"
+FIXED_ANSWER, RUN_AS_CODE, ROBUSTNESS, WRONG_PARTIAL, ABOVE_REFERENCE = "D11", "D12", "D13", "D14", "D18"
 
 DEFECTS = (
     Defect("D1", "Signs and punctuation ignored",
@@ -43,9 +43,9 @@ DEFECTS = (
            ("L1", "L2", "L3", "L4", "L6", "E9")),
     Defect("D11", "A fixed answer pays", "One reply, whatever the task, earns credit more often than a fixed answer would by chance.",
            ("L5", "N1", "N2", "N3", "N5", "N9", "N10")),
-    Defect("D12", "Reply text run as code", "The reply's text reached a Python import, so the checker runs what it reads.", ("P16",)),
+    Defect("D12", "Reply text run as code", "The reply's text reached a Python import, so the checker runs what it reads."),
     Defect("D13", "Malformed or extreme replies mishandled",
-           "On unusual input the checker raises an error, hangs, crashes or gives credit.", ("P1", "P2", "P5", "P15", "P17")),
+           "On unusual input the checker raises an error, hangs, crashes or gives credit.", ("P1", "P2", "P5", "P15", "P16", "P17")),
     Defect("D14", "Wrong answers paid in part", "An answer with a definite error earns more than nothing."),
     Defect("D15", "Same input, different scores", "The same reply to the same row gets different scores, so every other number is one draw.",
            ("S1",)),

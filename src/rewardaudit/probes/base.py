@@ -135,6 +135,12 @@ def plain_number(s: str) -> bool:
     return bool(_PLAIN_NUMBER.fullmatch(s))
 
 
+# Neutral text: no numbers, no option letters, no yes or no, nothing a checker reads as an answer.
+_FILLER = ("Each step follows from the step before it.", "The reasoning here can be checked line by line.",
+           "Nothing in the earlier work needs to change.", "Going over the work again leads to the same place.",
+           "The conditions in the problem are all used along the way.", "It helps to write the quantities down before combining them.",
+           "Another reading of the problem gives the same outcome.", "The same idea applies when the problem is stated in other words.")
+
 OTHER_TASKS = 30
 FIRST_PASSING = 5
 
@@ -156,6 +162,12 @@ class ProbeContext:
         if self._first_passing is None:
             self._first_passing = frozenset(self.contract.passing_tasks()[:FIRST_PASSING])
         return self._first_passing
+
+    def filler(self, task: Task, rng: random.Random) -> Callable[[int], str] | None:
+        """A function giving `size` characters of neutral text that holds no reference answer of this task; None if every
+        sentence holds it."""
+        pool = [s for s in _FILLER if not contains_equiv(s, self.gold(task), self.gtype(task))]
+        return (lambda size: " ".join(rng.choices(pool, k=size // min(map(len, pool)) + 1))[:size]) if pool else None
 
     def most_common_gold(self) -> str:
         """The reference answer that most rows share, '' if no two rows share one."""

@@ -10,9 +10,9 @@ from rewardaudit.contract import Contract
 from rewardaudit.equiv import contains_equiv
 from rewardaudit.goldtype import infer_gold_type, option_texts
 from rewardaudit.metrics import _sweep_severity
-from rewardaudit.probes.base import ProbeContext
+from rewardaudit.probes.base import _FILLER, ProbeContext
 from rewardaudit.probes.registry import all_probes
-from rewardaudit.probes.rewrite import _FILLER, LENGTHS
+from rewardaudit.probes.rewrite import LENGTHS
 from rewardaudit.report import render_markdown
 from rewardaudit.types import Label, Task
 

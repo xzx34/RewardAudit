@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import subprocess
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from rewardaudit.errors import AuditError, MemoryLimitExceeded, WorkerError
-from rewardaudit.types import Kind, Task, Verdict
+from rewardaudit.types import SCORE_NOT_A_NUMBER, Kind, Task, Verdict
 
 SRC_ROOT = str(Path(__file__).resolve().parents[1])
 MAX_MEMORY_DEATHS = 3  # in a row; a restart reloads the dataset, so workers would go on being killed
@@ -382,8 +383,12 @@ class Runner:
                 error=str(resp.get("error", ""))[-2000:],
                 elapsed_ms=elapsed,
                 network=bool(resp.get("network")),
+                reached_import=bool(resp.get("reached_import")),
             )
         score = resp.get("score")
+        if score is not None and not math.isfinite(score):  # no later comparison means anything on these
+            return Verdict(Kind.ERROR, error=f"{SCORE_NOT_A_NUMBER}: the checker returned {score}", elapsed_ms=elapsed,
+                           network=bool(resp.get("network")))
         return Verdict(
             Kind.SCORE,
             score=float(score) if score is not None else None,
@@ -391,4 +396,5 @@ class Runner:
             parsed=resp.get("parsed"),
             elapsed_ms=float(resp.get("elapsed_ms", elapsed)),
             network=bool(resp.get("network")),
+            reached_import=bool(resp.get("reached_import")),
         )

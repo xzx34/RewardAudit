@@ -7,7 +7,7 @@ import unicodedata
 from datetime import date
 from decimal import Decimal
 
-from rewardaudit.equiv import NUMBER_WORDS, contains_equiv, to_letter, to_number
+from rewardaudit.equiv import NUMBER_WORDS, to_letter, to_number
 from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, option_texts
 from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
@@ -282,22 +282,13 @@ def q27_spelling(task, rng, ctx):
     return [(name, ctx.wrap(s)) for name, s in out.items() if s != g]
 
 
-# Neutral text: no numbers, no option letters, no yes or no, nothing a checker reads as an answer.
-_FILLER = ("Each step follows from the step before it.", "The reasoning here can be checked line by line.",
-           "Nothing in the earlier work needs to change.", "Going over the work again leads to the same place.",
-           "The conditions in the problem are all used along the way.", "It helps to write the quantities down before combining them.",
-           "Another reading of the problem gives the same outcome.", "The same idea applies when the problem is stated in other words.")
 LENGTHS = (("1k", 1_000), ("4k", 4_000), ("16k", 16_000), ("64k", 64_000))
-
-
-def _filler(size, pool, rng) -> str:
-    return " ".join(rng.choices(pool, k=size // min(map(len, pool)) + 1))[:size]
 
 
 def _long_text(task, rng, ctx):
     """Long text around the right answer, in the lengths of a reply, for the checker that reads only part of it."""
-    pool = [s for s in _FILLER if not contains_equiv(s, ctx.gold(task), ctx.gtype(task))]
-    return [(name, _filler(size, pool, rng)) for name, size in LENGTHS] if pool else []
+    filler = ctx.filler(task, rng)
+    return [(name, filler(size)) for name, size in LENGTHS] if filler else []
 
 
 def q28_long_text_after(task, rng, ctx):

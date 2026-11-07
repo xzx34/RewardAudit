@@ -12,11 +12,13 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import time
 import traceback
 from typing import Any
 
 from rewardaudit.errors import AuditError
+from rewardaudit.types import MARKER_MODULE
 
 
 class NetworkBlocked(RuntimeError):
@@ -65,6 +67,24 @@ class _NetworkGuard:
         socket.create_connection = create_connection  # type: ignore[assignment]
 
 
+class _MarkerWatch:
+    """Notices an import of MARKER_MODULE, in this process or a forked child, even if the checker swallows the ImportError
+    that follows: a checker that runs a reply's text usually sits inside a try. A file, since a child shares no memory."""
+
+    def __init__(self) -> None:
+        self.file = tempfile.TemporaryFile()
+
+    def find_spec(self, name: str, path: Any = None, target: Any = None) -> None:
+        if name == MARKER_MODULE:
+            os.write(self.file.fileno(), b"x")
+
+    def take(self) -> bool:
+        seen = os.fstat(self.file.fileno()).st_size > 0
+        if seen:
+            os.ftruncate(self.file.fileno(), 0)
+        return seen
+
+
 def main() -> None:
     out = sys.stdout
     sys.stdout = sys.stderr  # anything the checker prints must not corrupt the protocol
@@ -76,6 +96,8 @@ def main() -> None:
     spec = json.loads(requests.readline())
     guard = _NetworkGuard()
     guard.install()
+    marker = _MarkerWatch()
+    sys.meta_path.append(marker)
 
     def send(obj: dict[str, Any]) -> None:
         out.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -128,6 +150,7 @@ def main() -> None:
                         "parsed": raw.parsed,
                         "elapsed_ms": elapsed,
                         "network": guard.tripped or raw.network,
+                        "reached_import": marker.take(),
                     }
                 )
             elif op == "ping":
@@ -144,7 +167,7 @@ def main() -> None:
             send({"ok": False, "error": f"{type(e).__name__}: {e}", "network": True})
         except Exception:
             guard.active = False
-            send({"ok": False, "error": traceback.format_exc(limit=6), "network": guard.tripped})
+            send({"ok": False, "error": traceback.format_exc(limit=6), "network": guard.tripped, "reached_import": marker.take()})
 
 
 if __name__ == "__main__":

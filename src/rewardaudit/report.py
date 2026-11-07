@@ -389,7 +389,7 @@ def _md_finding(f: dict[str, Any], result: AuditResult) -> list[str]:
     ex = f.get("example")
     if ex:
         gold = next((t.answer for t in result.tasks if t.id == ex["task_id"]), "")
-        body = ex["completion"][:1500] if ex["completion"].strip() else _reply(ex["completion"])
+        body = ex["completion"][:1500].replace("\x00", "␀") if ex["completion"].strip() else _reply(ex["completion"])
         fence = "`````" if "```" in body else "```"
         L += [f"Example (row {_code(ex['task_id'])}, reference answer {_code(_reply(gold, 60))}, "
               f"{_example_scores(result.contract, ex)}):", "", fence, body, fence, ""]
