@@ -44,7 +44,7 @@ rewardaudit audit reward.py --dataset data.jsonl --n 100
 ```
 
 ```
-rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,717 calls · 1 s
+rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,739 calls · 1 s
 
 Result: problems found (2 high, 3 medium)
 
@@ -62,14 +62,19 @@ Reference answers accepted on 100% of rows. Replies were sent in the format \box
 Defects (6)
   HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
               \boxed{−34}
+              Sent 5 more times: 1.0 each.
   HIGH    D6  Hedged answers accepted  O11 100%
               The answer is either 35 or 34.
+              Sent 5 more times: 1.0 each. Shortest reply still accepted (1.0):
+              35 34.
   MEDIUM  D3  Numeric tolerance too wide  M24 75%, M25 38%
               \boxed{34.34}
   ...
 ```
 
 Here the checker takes the last run of digits in the reply, so `either 35 or 34` and `−34` earn full score and `34.0` earns nothing.
+Under each high defect, its reply is sent five more times and cut down to the shortest reply still accepted: `35 34.` shows
+that only the last number counts.
 `rewardaudit demo` shows three more examples without any files of yours.
 
 ## What it checks

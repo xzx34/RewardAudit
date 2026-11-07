@@ -6,6 +6,7 @@ import json
 import random
 import re
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -243,6 +244,19 @@ def _evidence_text(d: dict[str, Any]) -> str:
     return ", ".join(items[:MAX_EVIDENCE]) + (f", {len(items) - MAX_EVIDENCE} more" if len(items) > MAX_EVIDENCE else "")
 
 
+def _score(s: float | None) -> str:
+    return "no score" if s is None else str(round(s, 3))
+
+
+def _confirmation_text(c: dict[str, Any], quote: Callable[[str], str] = str, n: int = 120) -> str:
+    """A high defect's example sent again, and the shortest reply cut from it that is still accepted."""
+    scores = [_score(s) for s in c["resends"]]
+    text = f"Sent {len(scores)} more times: " + (f"{scores[0]} each." if len(set(scores)) == 1 else f"{', '.join(scores)}.")
+    if short := c.get("shortest_accepted"):
+        text += f" Shortest reply still accepted ({_score(short['score'])}): {quote(_reply(short['completion'], n))}"
+    return text
+
+
 def _issue_text(i: dict[str, Any]) -> str:
     parts = [_plural(i["count"], "row") if i.get("tasks") else "", i.get("note", "")]
     return i["name"] + (f" ({'; '.join(x for x in parts if x)})" if any(parts) else "")
@@ -276,6 +290,8 @@ def _print_defects(defects: list[dict[str, Any]], console: Console) -> None:
                   Text.assemble(d["name"], (f"  {_evidence_text(d)}", "dim")))
         if d["severity"] in SERIOUS and d["example"]:
             t.add_row("", "", Text(_reply(d["example"]["completion"], 60), style="dim"))
+        if d.get("confirmation"):
+            t.add_row("", "", Text(_confirmation_text(d["confirmation"], n=40), style="dim"))
     console.print(Padding(t, (0, 0, 0, 2), expand=False))
 
 
@@ -406,6 +422,7 @@ def _md_defects(result: AuditResult) -> list[str]:
         evidence = ", ".join(f"{e['probe_id']} {e['rate']:.0%} of {e['n']:,} {'rows' if e['unit'] == 'tasks' else 'calls'}" for e in d["evidence"])
         example = f" Example: {_code(_reply(d['example']['completion']))}." if d["example"] else ""
         L.append(f"- **{d['severity'].upper()}: {d['id']} {d['name']}.** {d['explanation']} Evidence: {evidence}.{example}")
+        L += [f"  - {_confirmation_text(d['confirmation'], _code)}"] if d.get("confirmation") else []
     return L + ([""] if result.defects else [])
 
 

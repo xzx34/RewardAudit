@@ -137,8 +137,11 @@ Result: problems found (2 high, 3 medium)
 Defects (6)
   HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
               \boxed{−34}
+              Sent 5 more times: 1.0 each.
   HIGH    D6  Hedged answers accepted  O11 100%
               The answer is either 35 or 34.
+              Sent 5 more times: 1.0 each. Shortest reply still accepted (1.0):
+              35 34.
   MEDIUM  D3  Numeric tolerance too wide  M24 75%, M25 38%
               \boxed{34.34}
   ...
@@ -150,7 +153,8 @@ reads the other way round: `yes` is good.
 The percentage is the share of calls that went that way, with a 95% interval. These are shares of the replies rewardaudit sends,
 not of what a model would write. They are for comparing runs and for `--fail-on`. A low rate can sit next to a high finding,
 since one kind of reply may be accepted every time and the others never, so read the defects to see what happens. The calls
-in the top line also count the wrong answers and repeats used before the probes, so that number is a little higher.
+in the top line also count the wrong answers and repeats used before the probes, and the calls that confirm a high defect
+after them, so that number is a little higher.
 
 - **Accepts non-answers:** the best reply built without reading the reference answer. It is chosen on part of the rows and
   measured on the others, so the choice does not inflate the rate. A reply that always says the most common answer is right
@@ -167,7 +171,11 @@ in the top line also count the wrong answers and repeats used before the probes,
 **Defects.** A defect says what the checker does, across the probes that show it: each line has its severity, its name, and the
 probes behind it with their rates. A defect takes the highest severity of its evidence. The names describe behaviour, since the
 checker's code is never read: a reply `-75` accepted for `75` shows that the sign was ignored, whether the checker strips it or
-looks for a substring.
+looks for a substring. Under a high defect, a line confirms its example: the scores of 5 more calls with it, and for a wrong
+answer, hedged answer or non-answer accepted each time, the shortest reply still accepted when sentences and then words are
+taken out of it, stopping short of the reference answer on its own, which it is right to accept. In `report.json` this is the
+defect's `confirmation`, with `resends` and, when something could be taken out, `shortest_accepted` with its
+`completion` and `score`; these calls count in no rate.
 
 | Id | Defect | Evidence |
 |---|---|---|
@@ -308,7 +316,7 @@ except AuditError as e:     # something to fix in the input
     print(e)
 
 result.print()              # the summary; print(full=True) for every finding
-result.defects              # a list of dicts, most severe first: id, name, explanation, severity, evidence, example
+result.defects              # a list of dicts, most severe first: id, name, explanation, severity, evidence, example, confirmation
 result.findings             # a list of dicts: probe_id, name, category, severity, rate, ci, n, example (the reply is in example["completion"])
 result.rates                # {"non_solving_accepted": 0.0, "wrong_accepted": 0.0, ...}
 result.save("out/")         # report.md and report.json

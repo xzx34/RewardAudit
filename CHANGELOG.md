@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). What stays the same across versions is listed in
 the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
+## Unreleased
+
+### Added
+
+- Each high defect is confirmed in a line under it, in the terminal and in `report.md`: its example is sent 5 more times, and
+  a wrong answer, hedged answer or non-answer accepted each time is cut down, sentences and then words taken out, to the
+  shortest reply still accepted, short of the reference answer on its own. In `report.json` this is
+  `defects[].confirmation`: `resends`, the scores of those calls, and `shortest_accepted`, with `completion` and `score`, left
+  out when nothing could be taken out. These calls count in no rate or finding; the calls in the top line include them.
+
 ## 0.2.0 - 2026-11-07
 
 ### Added

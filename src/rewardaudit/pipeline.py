@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from rewardaudit import __version__
+from rewardaudit.confirm import confirm
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
 from rewardaudit.gate import check_contract, check_loaded
 from rewardaudit.goldtype import infer_dataset_type, infer_task_type
@@ -57,7 +58,7 @@ class AuditResult:
     spec: dict[str, Any] = field(default_factory=dict)
     version: str = __version__
     observations: list[Observation] = field(default_factory=list)
-    defects: list[dict[str, Any]] = field(default_factory=list)  # most severe first: id, name, severity, evidence, example
+    defects: list[dict[str, Any]] = field(default_factory=list)  # most severe first: id, name, severity, evidence, example, confirmation
 
     @property
     def findings(self) -> list[dict[str, Any]]:
@@ -231,6 +232,8 @@ def run_audit(
         err_example = next((v.error for v in gold_calls if v.kind == Kind.ERROR and v.error), None)
         metrics["robustness"]["gold_error_example"] = (err_example or "")[-600:]
         issues = runner.dataset_issues()
+        defects = collect_defects(metrics, contract)
+        confirm(runner, defects, tasks, contract)
         env_name, meta = runner.name, dict(runner.meta)
         meta["worker_restarts"] = runner.restarts
         meta["checker_calls"] = runner.calls
@@ -241,7 +244,7 @@ def run_audit(
         dataset_issues=issues, determinism=determinism, latency_ms=latency,
         elapsed_s=time.perf_counter() - t_start, n_rows=n_rows,
         spec={k: v for k, v in spec.items() if k not in ("pickled", "sys_path")},
-        observations=kept, defects=collect_defects(metrics, contract),
+        observations=kept, defects=defects,
     )
 
 
