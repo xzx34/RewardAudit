@@ -90,6 +90,12 @@ rewardaudit audit reward.py --dataset data.jsonl --format '<solution>{answer}</s
 
 A format that is a mark and then the answer, such as `RESULT>> {answer}`, is mostly written on a line of its own.
 
+**A checker that takes only the answer.** Some checkers are given an answer already extracted from the reply, not the reply
+itself: the official scripts of DROP, SQuAD, TAT-QA and WikiTableQuestions score a file of predictions, one answer each. Add
+`--answer-field` for such a checker (`answer_field=True` from Python): a right answer with text around it then stays out of
+Rejects right answers, and its findings stay low. Without it, rewardaudit infers this from Q5 and Q6, when the bare answer
+passes and text before or after it mostly loses the score; where it infers right, the result is the same.
+
 ### Several accepted answers
 
 Many QA benchmarks accept any of several answers and keep them in a list. rewardaudit writes each reply from one answer and
@@ -211,10 +217,10 @@ thumb for what to look at first:
 | Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts, scores that are not numbers, wrong answers paid in part as the row above says, a number 1% off accepted on half of rows, a right answer lost to 4k characters of text or fewer. |
 | Low | The same less often, or about what chance would give, and errors the checker raised. Listed for completeness. |
 
-**A checker that compares the whole reply.** If the bare answer passes and text around it mostly loses the score, the
-checker takes a reply to be its answer field, as a script scoring a file of predictions does. The report says so at the top, the
-replies with text around the answer stay out of Rejects right answers, and their findings stay low. Put the extraction step of
-your harness in front of the checker if you want those replies measured.
+**A checker that compares the whole reply.** If the bare answer passes and text around it mostly loses the score, or you
+say so with `--answer-field`, the checker takes a reply to be its answer field, as a script scoring a file of predictions
+does. The report says so at the top, the replies with text around the answer stay out of Rejects right answers, and their
+findings stay low. Put the extraction step of your harness in front of the checker if you want those replies measured.
 
 A few calls say little, so a finding stays low, with the note "too few calls to rate", below ten scored calls or on one row only.
 Failed calls and rejected reference answers need two rows. A defect looks at its probes together: on a dataset with few numbers,
@@ -332,7 +338,8 @@ A finding's `category` is its summary row: `non_solving_accepted`, `wrong_accept
 `robustness`.
 
 Other arguments: `n` (a number, or `"all"`), `seed`, `prompt_col`, `answer_col`, `workers`, `timeout`, `probes` (such as
-`["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), and `verifiers`. For a function, also `style` (how it is
+`["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), `answer_field` (`True` for a checker that takes
+only the answer; see [above](#the-reply-format)), and `verifiers`. For a function, also `style` (how it is
 called, found from its parameters if not given: `bare`, `verl`, `trl`, `openrlhf`, `areal`, `rllm`, `easyr1` or `positional`),
 `kwargs` (extra keyword arguments), `reference_col` (a column to pass as the reference), `reference_template` (such as
 `"\\boxed{{{answer}}}"`), `ground_truth_json`, and `prompt_in_completion` (pass prompt and reply as one string).

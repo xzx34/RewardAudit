@@ -92,6 +92,7 @@ def audit(
     probes: str | None = typer.Option(None, help="probe families to run, such as N,E,O (default: all)"),
     fail_on: str | None = typer.Option(None, help='exit 1 only above these rates, such as "non_solving_accepted>0.05,right_rejected>0.1"'),
     reply_format: str | None = typer.Option(None, "--format", help="how the checker wants a reply written, if it is none of the common formats, such as '<sol>{answer}</sol>'"),
+    answer_field: bool = typer.Option(False, "--answer-field", help="the checker takes the reply to be its answer field, as a script scoring a file of predictions does; text around the answer is then not counted against it"),
     verifiers: str | None = typer.Option(None, help="for a Hub environment: constraint on the verifiers version, such as '<0.1.13'"),
     full: bool = typer.Option(False, "--full", help="also print the finding behind each defect, one per probe"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="print only the result"),
@@ -103,7 +104,8 @@ def audit(
         _fail(str(e))
     result = _execute(lambda **kw: run(target, dataset, n=size, seed=seed, prompt_col=prompt_col, answer_col=answer_col,
                                        workers=workers, timeout=timeout, probes=probes.split(",") if probes else None,
-                                       reference_col=reference_col, reply_format=reply_format, verifiers=verifiers, **kw), quiet)
+                                       reference_col=reference_col, reply_format=reply_format, answer_field=answer_field,
+                                       verifiers=verifiers, **kw), quiet)
     path = write_outputs(result, out) if out else None
     render_terminal(result, console, full=full, out=path)
     raise typer.Exit(exit_code(result, gates))

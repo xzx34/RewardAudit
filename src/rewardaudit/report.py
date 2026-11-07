@@ -166,9 +166,11 @@ def _top_lines(result: AuditResult) -> list[str]:
     pin = meta.get("verifiers_pin")  # findings hold on the verifiers they were measured on
     lines = [f"Measured on {pin}, not on the verifiers a fresh install of this package gets."] if pin else []
     lines += [line] if (line := direct_scoring_line(meta)) else []
+    flag = "answer_field=True" if _from_python(result) else "--answer-field"
+    whole_answer = WHOLE_ANSWER_LINE + (f" This was stated with {flag}, not inferred from the probes." if result.config.answer_field else "")
     return lines + ([no_discrimination_line(c, result.metrics)] if c.no_discrimination else
                     [WHOLE_REPLY_LINE] if c.whole_reply_similarity else
-                    [WHOLE_ANSWER_LINE] if result.metrics.get("compares_whole_reply") else [])
+                    [whole_answer] if result.metrics.get("compares_whole_reply") else [])
 
 
 def _formats(result: AuditResult) -> list[str]:

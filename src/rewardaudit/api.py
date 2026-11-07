@@ -91,6 +91,7 @@ def audit(
     timeout: float = 10.0,
     probes: list[str] | None = None,
     reply_format: str | None = None,
+    answer_field: bool = False,
     verifiers: str | None = None,
     log: Log | None = None,
     progress: Callable[[str, int, int], None] | None = None,
@@ -104,6 +105,8 @@ def audit(
     n: how many rows to draw at random from the whole dataset; `"all"` or None for every row.
     probes: probe families to run, such as ["N", "O"]; all of them by default.
     reply_format: how the checker wants a reply written, if it is none of the common formats: `<sol>{answer}</sol>`.
+    answer_field: the checker takes the reply to be its answer field, as a script scoring a file of predictions does, so
+      text around the answer is not counted against it. Left False, this is inferred from the probes.
     verifiers: for an environment, a constraint on the verifiers version, such as "<0.1.13".
     options: for a scoring function, one of style, kwargs, reference_col, reference_template, ground_truth_json,
       prompt_in_completion, split.
@@ -141,7 +144,7 @@ def audit(
                                  "function, as in reward.py --dataset data.jsonl")
             spec, python, pin = _environment_spec(checker, verifiers, log)
         config = AuditConfig(n_tasks=n, seed=seed, timeout_s=timeout, python=python, families=families,
-                             formats=[reply_format] if reply_format else [],
+                             formats=[reply_format] if reply_format else [], answer_field=answer_field,
                              workers=workers if workers is not None else min(4, os.cpu_count() or 1))
         result = run_audit(spec, config, log=log, progress=progress)
         if pin:

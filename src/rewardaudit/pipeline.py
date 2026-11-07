@@ -38,6 +38,7 @@ class AuditConfig:
     memory_limit_mb: float | None = 4096  # per worker while scoring; above it the call is a CRASH
     keep_observations: bool = False  # hold every probe call in `AuditResult.observations` (memory grows with the sample)
     formats: list[str] = field(default_factory=list)  # reply formats of the checker's own, such as "<sol>{answer}</sol>"
+    answer_field: bool = False  # the checker takes a reply to be its answer field; False: inferred from the probes
 
 
 @dataclass
@@ -217,7 +218,7 @@ def run_audit(
             tally.add(observations, _gold_controls(runner, observations, by_id, contract))
             if config.keep_observations:
                 kept.extend(observations)
-        metrics = tally.finish()
+        metrics = tally.finish(answer_field=config.answer_field)
         if not determinism["deterministic"]:
             metrics["findings"].append(nondeterminism_finding(determinism))
             metrics["findings"].sort(key=lambda f: f["severity"] != "high")  # stable: the mediums stay in order

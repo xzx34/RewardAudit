@@ -9,7 +9,7 @@ from rich.console import Console
 from rewardaudit import audit, cli
 from rewardaudit.contract import Contract
 from rewardaudit.defects import BY_PROBE, DEFECTS
-from rewardaudit.metrics import TOO_FEW, collect_defects, compute, nondeterminism_finding
+from rewardaudit.metrics import PROSE_PROBES, TOO_FEW, collect_defects, compute, nondeterminism_finding
 from rewardaudit.pipeline import exit_code
 from rewardaudit.probes.base import Probe
 from rewardaudit.probes.registry import all_probes
@@ -222,6 +222,36 @@ def test_a_marked_format_that_rejects_text_around_the_answer_is_still_rated():
     r = audit(boxed_only, ROWS, workers=1)
     assert not r.metrics["compares_whole_reply"]
     assert next(f for f in r.findings if f["probe_id"] == "Q5")["severity"] == "high" and exit_code(r) == 1
+
+
+def _first_line(completion, answer):
+    return float(completion.split("\n")[0].strip() == answer)  # text after the answer keeps the score, text before loses it
+
+
+def test_answer_field_says_what_the_probes_do_not_show():
+    inferred = audit(_first_line, ROWS, workers=1, probes=["Q"])
+    stated = audit(_first_line, ROWS, workers=1, probes=["Q"], answer_field=True)
+    assert not inferred.metrics["compares_whole_reply"] and stated.metrics["compares_whole_reply"]
+    before, after = ({f["probe_id"]: f for f in r.findings if f["category"] == "right_rejected"} for r in (inferred, stated))
+    assert before["Q5"]["severity"] == before["Q22"]["severity"] == "high" and exit_code(inferred) == 1
+    assert after["Q5"]["severity"] == after["Q22"]["severity"] == "low" and "compares the whole reply" in after["Q5"]["note"]
+    assert {pid: f["severity"] for pid, f in after.items() if pid not in PROSE_PROBES} == {
+        pid: f["severity"] for pid, f in before.items() if pid not in PROSE_PROBES}
+    rejected = [next(h for h in r.metrics["head"] if h["key"] == "right_rejected") for r in (inferred, stated)]
+    assert rejected[1]["n"] < rejected[0]["n"] and rejected[1]["k"] < rejected[0]["k"]
+    assert "compares the whole reply" not in render_markdown(inferred)
+    assert "stated with answer_field=True, not inferred" in render_markdown(stated)
+
+
+def test_answer_field_where_it_is_inferred_changes_only_the_note():
+    def field(completion, answer):
+        return float(completion == answer)
+
+    inferred, stated = (audit(field, ROWS, workers=1, probes=["Q"], answer_field=a) for a in (False, True))
+    assert inferred.metrics["compares_whole_reply"] and stated.metrics["compares_whole_reply"]
+    same = [[(f["probe_id"], f["category"], f["severity"], f["rate"], f["n"], f["note"]) for f in r.findings] for r in (inferred, stated)]
+    assert same[0] == same[1] and inferred.metrics["head"] == stated.metrics["head"]
+    assert "not inferred" not in render_markdown(inferred) and "not inferred" in render_markdown(stated)
 
 
 def test_only_a_high_defect_fails_the_audit():

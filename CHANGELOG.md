@@ -13,6 +13,10 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   `defects[].confirmation`: `resends`, the scores of those calls, and `shortest_accepted`, with `completion` and `score`, left
   out when nothing could be taken out. These calls count in no rate or finding; the calls in the top line include them.
   The progress bar shows them as a stage of its own, `confirming defects`.
+- `--answer-field`, and `audit(answer_field=True)`, state that the checker takes the reply to be its answer field, as a script
+  scoring a file of predictions does. A right answer with text around it then stays out of Rejects right answers and its
+  findings stay low, as when this is inferred from Q5 and Q6; without the option it is still inferred. The note at the top of
+  the report then says it was stated.
 
 ## 0.2.0 - 2026-11-07
 

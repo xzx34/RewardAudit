@@ -493,8 +493,9 @@ class Tally:
             self.paid_tasks.add(o.task_id)
             self.paid_example = self.paid_example or o
 
-    def finish(self) -> dict[str, Any]:
-        return _summarize(self)
+    def finish(self, answer_field: bool = False) -> dict[str, Any]:
+        """`answer_field`: the user says the checker takes a reply to be its answer field; else it is inferred."""
+        return _summarize(self, answer_field)
 
 
 def compute(
@@ -512,9 +513,12 @@ def compute(
     return tally.finish()
 
 
-def _compares_whole_reply(stats: dict[str, ProbeStats], contract: Contract) -> bool:
-    """The bare answer passes, and text before or after it mostly loses the score: the checker takes a reply to be
-    its answer field, as a script scoring a file of predictions does. Its protocol has no reasoning for a reply to lose."""
+def _compares_whole_reply(stats: dict[str, ProbeStats], contract: Contract, answer_field: bool) -> bool:
+    """The checker takes a reply to be its answer field, as a script scoring a file of predictions does: the user says so,
+    or the bare answer passes and text before or after it mostly loses the score. Its protocol has no reasoning for a
+    reply to lose."""
+    if answer_field:
+        return True
     if contract.primary != "bare" or contract.whole_reply_similarity:
         return False
     rates = [stats[p].rate for p in ("Q5", "Q6") if p in stats and stats[p].n_scored]
@@ -582,7 +586,7 @@ def _partial_head(tally: Tally, n: int) -> dict[str, Any]:
     return _require_evidence(h, n >= MIN_CALLS and len(tally.paid_tasks) >= MIN_TASKS)
 
 
-def _summarize(tally: Tally) -> dict[str, Any]:
+def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
     stats, probes, tasks, contract, gold_type = tally.stats, tally.probes, tally.tasks, tally.contract, tally.gold_type
     null_floor, passing, n_disc = tally.null_floor, tally.passing, tally.n_disc
 
@@ -621,7 +625,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
 
     hk, hn = pooled(lambda s: s.probe.family == "O" and s.probe.label == Label.NOT_SOLVING)
     wk, wn = pooled(lambda s: s.probe.family == "M")
-    whole_answer = _compares_whole_reply(stats, contract)
+    whole_answer = _compares_whole_reply(stats, contract, answer_field)
     rk, rn = pooled(lambda s: s.probe.label == Label.SOLVING and not (whole_answer and s.probe.id in PROSE_PROBES))
     head_hedge = _metric("hedging_accepted", "Hedged answers accepted", hk, hn,
                          "one right and one wrong answer in the same reply")

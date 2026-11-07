@@ -396,6 +396,15 @@ def test_the_command_line_takes_a_reply_format(tmp_path):
     _says_one_line(_run(str(reward), "--dataset", str(data), "--format", "<sol></sol>"), "holds {answer}")
 
 
+def test_the_command_line_takes_answer_field(tmp_path):
+    reward = tmp_path / "reward.py"
+    reward.write_text('def score(completion, answer):\n    return float(completion.split("\\n")[0].strip() == answer)\n')
+    args = (str(reward), "--dataset", str(_write(tmp_path / "data.jsonl", ROWS)), "--probes", "Q", "--workers", "1")
+    inferred, stated = _run(*args), _run(*args, "--answer-field")
+    assert inferred.exit_code == 1 and "compares the whole reply" not in inferred.output, inferred.output
+    assert stated.exit_code == 0 and "stated with --answer-field, not inferred" in stated.output, stated.output
+
+
 ALIASES = [{"question": f"Name the thing on card {i}.", "answers": {"text": [f"thing{i}", f"item{i}"]}} for i in range(12)]
 
 
