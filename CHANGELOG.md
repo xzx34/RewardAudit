@@ -3,7 +3,7 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). What stays the same across versions is listed in
 the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
-## 0.1.0 - Unreleased
+## 0.1.0 - 2026-11-06
 
 First public version.
 
