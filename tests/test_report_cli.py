@@ -8,6 +8,7 @@ import platform
 import re
 import subprocess
 import sys
+import time
 
 import pytest
 from rich.console import Console
@@ -17,6 +18,7 @@ from rewardaudit import audit, cli
 from rewardaudit.contract import Contract
 from rewardaudit.metrics import Robustness, exception_type
 from rewardaudit.pipeline import exit_code
+from rewardaudit.probes.base import Probe
 from rewardaudit.probes.registry import FAMILIES, all_probes
 from rewardaudit.report import (
     _code,
@@ -64,6 +66,13 @@ def noisy(completion, answer):
 def several_parts(completion, answer):
     right, formatted = float(completion.strip().endswith(answer)), float("####" in completion)
     return {"score": 0.8 * right + 0.2 * formatted, "correct": right, "format_ok": formatted}
+
+
+def slow_on_an_empty_reply(completion, answer):
+    if not completion:  # of the N probes, only N1 sends one, and it runs first
+        time.sleep(0.4)
+        return 1.0
+    return float(completion.strip().endswith(answer))
 
 
 def screen(result, *, full=False, out=None):
@@ -250,6 +259,41 @@ def test_lines_about_how_a_run_was_scored_come_before_the_numbers(substring):
     assert "direct rubric call" not in render_markdown(substring) and "Measured on" not in render_markdown(substring)
 
 
+def test_a_budget_stops_the_probes_and_the_report_lists_those_not_run(tmp_path):
+    r = audit(slow_on_an_empty_reply, ROWS_OF_NUMBERS[:6], probes=["N"], workers=1, budget_s=2.0)
+    assert r.meta["probes_not_run"] == ["N2", "N5", "N9", "N3", "N10"]  # N1 alone sleeps 2.4 s, 0.4 s on each of 6 rows
+    assert {f["probe_id"] for f in r.findings} == {p["id"] for p in r.metrics["probes"]} == {"N1"}
+    assert r.metrics["probes"][0]["n_obs"] == 6  # the probe running when the time ran out is counted in full
+    line = "Budget of 2s reached before N2, N5, N9, N3, N10 (5 probes not run); the rows below are measured on fewer probes."
+    text, md = flat(screen(r)), render_markdown(r)
+    assert line in text and text.index(line) < text.index("Accepts non-answers")
+    assert md.index(line) < md.index("## Summary") and "- Timeout: 10 s per call\n- Budget: 2s\n- Workers: 1\n" in md
+    write_outputs(r, tmp_path)
+    report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    assert report["meta"]["probes_not_run"] == r.meta["probes_not_run"] and report["config"]["budget_s"] == 2.0
+    r = audit(last_number, ROWS_OF_NUMBERS, probes=["N"], workers=1, budget_s=3600)  # time to spare: every probe runs
+    assert "probes_not_run" not in r.meta and len(r.metrics["probes"]) == 6
+    assert "Budget of" not in screen(r) and "- Budget: 1h\n" in render_markdown(r)
+
+
+def test_a_probe_whose_replies_take_long_to_build_is_not_sent_once_the_budget_is_reached(monkeypatch):
+    generate = Probe.generate
+
+    def slow(self, task, rng, ctx):
+        if self.id == "N2":  # 3 s for its 6 rows, the time ends while they are built
+            time.sleep(0.5)
+        return generate(self, task, rng, ctx)
+
+    monkeypatch.setattr(Probe, "generate", slow)
+    seen = []
+    r = audit(last_number, ROWS_OF_NUMBERS[:6], probes=["N"], workers=1, budget_s=2.0, progress=lambda *a: seen.append(a))
+    assert r.meta["probes_not_run"] == ["N2", "N5", "N9", "N3", "N10"]
+    assert [p["id"] for p in r.metrics["probes"]] == ["N1"]
+    # the probes' replies are not all built ahead to count them, so that stage of the progress bar has no total
+    assert {total for stage, _, total in seen if stage == "probes"} == {0}
+    assert all(total >= done for stage, done, total in seen if stage == "reference answers")
+
+
 def test_report_md_has_its_sections_in_order_and_nothing_removed(substring):
     md = render_markdown(substring)
     assert md.startswith("# rewardaudit report: demo/substring\n")
@@ -282,6 +326,7 @@ def test_how_this_was_run_names_checker_dataset_and_settings(tmp_path):
     for text in ("reward:score", str(tmp_path / "reward.py"), f"`{tmp_path / 'data.jsonl'}`, 16 rows",
                  "8 rows drawn at random, seed 3", "7 s per call", "Workers: 1", "Probe families: N", "`repro.py`"):
         assert text in section, text
+    assert "Budget" not in md  # no limit unless one is given
 
 
 def test_a_checker_on_the_standard_library_imports_none(tmp_path):

@@ -40,6 +40,7 @@ class AuditConfig:
     keep_observations: bool = False  # hold every probe call in `AuditResult.observations` (memory grows with the sample)
     formats: list[str] = field(default_factory=list)  # reply formats of the checker's own, such as "<sol>{answer}</sol>"
     answer_field: bool = False  # the checker takes a reply to be its answer field; False: inferred from the probes
+    budget_s: float | None = None  # seconds from the start of the audit; past them no further probe is sent. None: no limit
 
 
 @dataclass
@@ -145,9 +146,14 @@ def _gold_controls(runner: RunnerPool, observations: list[Observation], tasks_by
     return {key: s for key, v in zip(items, verdicts, strict=True) if (s := contract.signal(v)) is not None}
 
 
-def _variants(probe: Probe, tasks: list[Task], ctx: ProbeContext, seed: int) -> list[tuple[Task, str, str]]:
+def _variants(probe: Probe, tasks: list[Task], ctx: ProbeContext, seed: int,
+              deadline: float | None = None) -> list[tuple[Task, str, str]] | None:
+    """None when the deadline (a time.perf_counter() value) passes before every task has its replies: building them can
+    take longer than scoring them, as where telling a wrong answer from a long LaTeX reference takes seconds."""
     out: list[tuple[Task, str, str]] = []
     for task in tasks:
+        if deadline is not None and time.perf_counter() > deadline:
+            return None
         ctx.task = task
         rng = random.Random(f"{seed}:{probe.id}:{task.id}")
         out.extend((task, vname, comp) for vname, comp in probe.generate(task, rng, ctx))
@@ -155,14 +161,15 @@ def _variants(probe: Probe, tasks: list[Task], ctx: ProbeContext, seed: int) -> 
 
 
 def _stage(progress: Callable[[str, int, int], None] | None, stage: str, total: int) -> Callable[[int], None] | None:
-    """What `RunnerPool.score_many` calls with the calls just finished, as progress(stage, done, total). The total is an estimate."""
+    """What `RunnerPool.score_many` calls with the calls just finished, as progress(stage, done, total). The total is an
+    estimate, and 0 where there is none."""
     if progress is None:
         return None
     done = [0]
 
     def step(k: int) -> None:
         done[0] += k
-        progress(stage, done[0], max(total, done[0]))
+        progress(stage, done[0], max(total, done[0]) if total else 0)
 
     return step
 
@@ -209,13 +216,20 @@ def run_audit(
         probes: list[Probe] = sorted(all_probes(config.families), key=lambda p: TIER_RANK.get(p.tier, 9))
         passing = [t for t in tasks if contract.self_pass.get(t.id)]
         head = passing[:ESTIMATE_TASKS]
-        estimate = sum(len(_variants(p, head, ctx, config.seed)) for p in probes) * len(passing) // max(1, len(head))
+        deadline = None if config.budget_s is None else t_start + config.budget_s
+        # building every probe's replies ahead of the first call can take most of a budget: under one the bar has no total
+        estimate = 0 if deadline is not None else (
+            sum(len(_variants(p, head, ctx, config.seed)) for p in probes) * len(passing) // max(1, len(head)))
         step = _stage(progress, "probes", estimate)
         tally = Tally(probes, answerable, contract, gold_type)
         by_id = {t.id: t for t in answerable}
         kept: list[Observation] = []
-        for probe in probes:
-            pending = _variants(probe, passing, ctx, config.seed)
+        not_run: list[str] = []
+        for i, probe in enumerate(probes):
+            pending = _variants(probe, passing, ctx, config.seed, deadline)
+            if pending is None:  # out of time before this probe was sent: it and the rest are not; the calls made count as usual
+                not_run = [p.id for p in probes[i:]]
+                break
             verdicts = runner.score_many([(t, comp) for t, _, comp in pending], progress=step)
             observations = [Observation(probe.id, probe.family, vname, task.id, comp, v, probe.label, probe.expect, probe.tier)
                             for (task, vname, comp), v in zip(pending, verdicts, strict=True)]
@@ -243,6 +257,8 @@ def run_audit(
         env_name, meta = runner.name, dict(runner.meta)
         meta["worker_restarts"] = runner.restarts
         meta["checker_calls"] = runner.calls
+        if not_run:
+            meta["probes_not_run"] = not_run
 
     return AuditResult(
         env_name=env_name, meta=meta, config=config, tasks=tasks, gold_type=gold_type,

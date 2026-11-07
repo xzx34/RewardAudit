@@ -129,6 +129,13 @@ and about 400 MB with 4 workers. A slower checker sets the pace: at 10 ms per ca
 worker. `--workers` runs that many processes (4 by default, or your CPU count if lower). A progress bar shows the time left.
 `--probes N,O,M` runs only those families.
 
+**A slow checker.** `--budget 10m` (or `90s`, `1h`; `budget_s=600` from Python) limits the whole audit, counted from its
+start. Once that time has passed no further probe is sent: the probe whose calls are under way finishes, so the audit can
+run over by about as long as one probe takes, and every call made counts as usual. A line at the top of the report then
+names the probes that did not run, and `report.json` lists them under `meta.probes_not_run`. The summary rows are measured
+on the probes that ran, so a probe left out can hide a finding; to keep every probe, draw fewer rows instead. Under a budget
+the progress bar of the probes has no total, since counting their calls ahead means building every reply first.
+
 ## Read the result
 
 ```
@@ -349,7 +356,8 @@ A finding's `category` is its summary row: `non_solving_accepted`, `wrong_accept
 
 Other arguments: `n` (a number, or `"all"`), `seed`, `prompt_col`, `answer_col`, `workers`, `timeout`, `probes` (such as
 `["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), `answer_field` (`True` for a checker that takes
-only the answer; see [above](#the-reply-format)), and `verifiers`. For a function, also `style` (how it is
+only the answer; see [above](#the-reply-format)), `budget_s` (seconds the audit may take; see
+[above](#choose-how-many-rows)), and `verifiers`. For a function, also `style` (how it is
 called, found from its parameters if not given: `bare`, `verl`, `trl`, `openrlhf`, `areal`, `rllm`, `easyr1` or `positional`),
 `kwargs` (extra keyword arguments), `reference_col` (a column to pass as the reference), `reference_template` (such as
 `"\\boxed{{{answer}}}"`), `ground_truth_json`, and `prompt_in_completion` (pass prompt and reply as one string).

@@ -154,6 +154,14 @@ def imports_line(environment: dict[str, Any]) -> str | None:
     return f"Checker imports: {text or 'none'}"
 
 
+def _duration(s: float) -> str:
+    """A length of time as --budget takes it: 90s, 10m, 1h."""
+    for unit, k in (("h", 3600), ("m", 60)):
+        if s >= k and s % k == 0:
+            return f"{s / k:g}{unit}"
+    return f"{s:g}s"
+
+
 def _verdict(result: AuditResult) -> str:
     high, medium = (sum(d["severity"] == s for d in result.defects) for s in SERIOUS)
     found = f"problems found ({high} high, {medium} medium)" if high + medium else ""
@@ -176,6 +184,9 @@ def _top_lines(result: AuditResult) -> list[str]:
     pin = meta.get("verifiers_pin")  # findings hold on the verifiers they were measured on
     lines = [f"Measured on {pin}, not on the verifiers a fresh install of this package gets."] if pin else []
     lines += [line] if (line := direct_scoring_line(meta)) else []
+    if not_run := meta.get("probes_not_run"):
+        lines.append(f"Budget of {_duration(result.config.budget_s)} reached before {', '.join(not_run)} "
+                     f"({_plural(len(not_run), 'probe')} not run); the rows below are measured on fewer probes.")
     flag = "answer_field=True" if _from_python(result) else "--answer-field"
     whole_answer = WHOLE_ANSWER_LINE + (f" This was stated with {flag}, not inferred from the probes." if result.config.answer_field else "")
     return lines + ([no_discrimination_line(c, result.metrics)] if c.no_discrimination else
@@ -471,8 +482,9 @@ def _md_how_run(result: AuditResult) -> list[str]:
     data = f"`{data}`" if known else "rows passed in memory" if data else "the checker's own"
     L = [f"- Checker: {checker}", f"- Dataset: {data}, {result.n_rows:,} rows"]
     L += [f"- {line}"] if (line := imports_line(result.environment)) else []
-    L += [f"- Sample: {len(result.tasks):,} rows drawn at random, seed {cfg.seed}", f"- Timeout: {cfg.timeout_s:g} s per call",
-          f"- Workers: {cfg.workers}"]
+    L += [f"- Sample: {len(result.tasks):,} rows drawn at random, seed {cfg.seed}", f"- Timeout: {cfg.timeout_s:g} s per call"]
+    L += [f"- Budget: {_duration(cfg.budget_s)}"] if cfg.budget_s is not None else []
+    L += [f"- Workers: {cfg.workers}"]
     L += [f"- Probe families: {', '.join(cfg.families)}"] if cfg.families else []
     L += [f"- Framework: {meta['framework']}"] if meta.get("framework") else []
     return L + ([] if _from_python(result) else ["- `repro.py`, next to this report, re-scores the reply behind each finding"])

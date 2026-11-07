@@ -92,6 +92,7 @@ def audit(
     probes: list[str] | None = None,
     reply_format: str | None = None,
     answer_field: bool = False,
+    budget_s: float | None = None,
     verifiers: str | None = None,
     log: Log | None = None,
     progress: Callable[[str, int, int], None] | None = None,
@@ -107,6 +108,8 @@ def audit(
     reply_format: how the checker wants a reply written, if it is none of the common formats: `<sol>{answer}</sol>`.
     answer_field: the checker takes the reply to be its answer field, as a script scoring a file of predictions does, so
       text around the answer is not counted against it. Left False, this is inferred from the probes.
+    budget_s: seconds the audit may take, counted from its start. Past them no further probe is sent; the calls made so far
+      count as usual, and `result.meta["probes_not_run"]` lists the probes left out. None: no limit.
     verifiers: for an environment, a constraint on the verifiers version, such as "<0.1.13".
     options: for a scoring function, one of style, kwargs, reference_col, reference_template, ground_truth_json,
       prompt_in_completion, split.
@@ -119,6 +122,8 @@ def audit(
         n = None
     if n is not None and (not isinstance(n, int) or isinstance(n, bool) or n < 1):
         raise AuditError(f"n must be a positive whole number or 'all', got {n!r}")
+    if budget_s is not None and (not isinstance(budget_s, int | float) or isinstance(budget_s, bool) or not budget_s > 0):
+        raise AuditError(f"budget_s must be a number of seconds above 0, got {budget_s!r}")
     unknown = sorted(set(options) - set(_SPEC_OPTIONS))
     if unknown:
         raise AuditError(f"Unknown option {unknown[0]!r}; the options are {', '.join(_SPEC_OPTIONS)}")
@@ -144,7 +149,7 @@ def audit(
                                  "function, as in reward.py --dataset data.jsonl")
             spec, python, pin = _environment_spec(checker, verifiers, log)
         config = AuditConfig(n_tasks=n, seed=seed, timeout_s=timeout, python=python, families=families,
-                             formats=[reply_format] if reply_format else [], answer_field=answer_field,
+                             formats=[reply_format] if reply_format else [], answer_field=answer_field, budget_s=budget_s,
                              workers=workers if workers is not None else min(4, os.cpu_count() or 1))
         result = run_audit(spec, config, log=log, progress=progress)
         if pin:

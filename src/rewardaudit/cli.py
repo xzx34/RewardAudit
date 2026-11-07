@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, NoReturn
 
 import typer
@@ -36,6 +37,16 @@ def _sample_size(n: str) -> int | str:
     return size
 
 
+def _budget(s: str | None) -> float | None:
+    """Seconds from 90s, 10m, 1h, or a plain number of seconds."""
+    if s is None:
+        return None
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)([smh]?)", s.strip())
+    if not m or float(m[1]) <= 0:
+        raise AuditError(f"--budget must be a length of time such as 90s, 10m or 1h, got {s!r}")
+    return float(m[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[m[2]]
+
+
 def _fail_on(s: str | None) -> dict[str, float] | None:
     if not s:
         return None
@@ -63,7 +74,7 @@ def _execute(call: Any, quiet: bool) -> AuditResult:
         bar = prog.add_task("starting", total=None)
 
         def progress(stage: str, done: int, total: int) -> None:
-            prog.update(bar, description=stage, completed=done, total=max(total, 1))
+            prog.update(bar, description=stage, completed=done, total=total or None)  # None: no total, a pulsing bar
 
         def log(s: str) -> None:
             prog.console.print(Text(s, style="dim"))  # Text: third-party output is not console markup
@@ -89,6 +100,7 @@ def audit(
     out: str | None = typer.Option(None, help="directory for report.md, report.json and repro.py"),
     workers: int | None = typer.Option(None, help="parallel worker processes (default: 4, or the CPUs if fewer)"),
     timeout: float = typer.Option(10.0, help="seconds allowed per checker call"),
+    budget: str | None = typer.Option(None, help="time the whole audit may take, such as 90s, 10m or 1h; past it no further probe is sent (default: no limit)"),
     probes: str | None = typer.Option(None, help="probe families to run, such as N,E,O (default: all)"),
     fail_on: str | None = typer.Option(None, help='exit 1 only above these rates, such as "non_solving_accepted>0.05,right_rejected>0.1"'),
     reply_format: str | None = typer.Option(None, "--format", help="how the checker wants a reply written, if it is none of the common formats, such as '<sol>{answer}</sol>'"),
@@ -99,11 +111,12 @@ def audit(
 ) -> None:
     """Audit one checker. Exit code: 0 no high defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured."""
     try:
-        size, gates = _sample_size(n), _fail_on(fail_on)
+        size, gates, budget_s = _sample_size(n), _fail_on(fail_on), _budget(budget)
     except AuditError as e:
         _fail(str(e))
     result = _execute(lambda **kw: run(target, dataset, n=size, seed=seed, prompt_col=prompt_col, answer_col=answer_col,
-                                       workers=workers, timeout=timeout, probes=probes.split(",") if probes else None,
+                                       workers=workers, timeout=timeout, budget_s=budget_s,
+                                       probes=probes.split(",") if probes else None,
                                        reference_col=reference_col, reply_format=reply_format, answer_field=answer_field,
                                        verifiers=verifiers, **kw), quiet)
     path = write_outputs(result, out) if out else None

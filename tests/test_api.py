@@ -484,7 +484,28 @@ def test_other_values_of_n_from_the_command_line(files, n):
     _says_one_line(_run(files["reward"], "--dataset", files["data"], "--n", n), "--n must be a positive whole number or 'all'")
 
 
+@pytest.mark.parametrize("text, seconds", [("90s", 90), ("10m", 600), ("1h", 3600), ("45", 45), ("1.5m", 90), (" 2m ", 120)])
+def test_a_budget_is_a_length_of_time(text, seconds):
+    assert cli._budget(text) == seconds
+
+
+@pytest.mark.parametrize("text", ["10x", "0", "-5s", "m", "1 h", ""])
+def test_a_budget_that_is_no_length_of_time_is_one_line(files, text):
+    _says_one_line(_run(files["reward"], "--dataset", files["data"], "--budget", text),
+                   "--budget must be a length of time such as 90s, 10m or 1h", repr(text))
+
+
+def test_the_command_line_takes_a_budget(files, tmp_path):
+    out = tmp_path / "out"
+    res = _run(files["reward"], "--dataset", files["data"], "--budget", "1h", "--probes", "N", "--workers", "1", "--out", str(out))
+    assert res.exit_code != 2 and "Budget of" not in res.output, res.output  # an hour is plenty: every probe ran
+    assert json.loads((out / "report.json").read_text(encoding="utf-8"))["config"]["budget_s"] == 3600
+    assert "- Budget: 1h\n" in (out / "report.md").read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("call, says", [
+    (lambda: audit(EXACT, ROWS, budget_s=0), "budget_s must be a number of seconds above 0"),
+    (lambda: audit(EXACT, ROWS, budget_s="10m"), "budget_s must be a number of seconds above 0, got '10m'"),
     (lambda: audit(EXACT), "needs a dataset"),
     (lambda: audit(EXACT, 7), "Cannot read a dataset from int"),
     (lambda: audit(EXACT, ["a line", "another"]), "Cannot read a dataset from list"),

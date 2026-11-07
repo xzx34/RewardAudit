@@ -36,6 +36,13 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   under Rejects right answers, outside its rate, medium from one in ten; its note names some of them. D16 now reads "The
   dataset's own reference answer, or one of its other accepted answers, is treated like a wrong one." `rewardaudit probes G`
   lists G1 there too. 78 probes in all.
+- `--budget`, such as `90s`, `10m`, `1h` or a number of seconds, and `audit(budget_s=...)` in seconds, limit the time of the
+  whole audit, counted from its start. Once it has passed no further probe is sent; the probe whose calls are under way
+  finishes, and the calls made count as usual. A line at the top of the report, in the terminal and in `report.md`, then
+  names the probes that did not run: `Budget of 1m reached before ... (12 probes not run); the rows below are measured on
+  fewer probes.` `report.json` lists them under `meta.probes_not_run`, a key that is there only then, and `report.md` gives
+  the budget under How this was run. Under a budget the progress bar of the probes has no total. There is no limit by
+  default.
 
 ## 0.2.0 - 2026-11-07
 
