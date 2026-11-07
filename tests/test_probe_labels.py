@@ -235,7 +235,9 @@ def test_m5_swaps_two_digits_or_two_letters_of_a_word():
     assert sorted(strip_wrappers(swap)) == sorted("Paris") and strip_wrappers(swap) != "Paris"
     for task in MATH:
         for comp in _gen(ctx, "M5", task).values():
-            assert sorted(strip_wrappers(comp)) == sorted(task.answer) and "," not in comp.replace(task.answer, "")
+            inner = strip_wrappers(comp)
+            assert sorted(inner) == sorted(task.answer)
+            assert [i for i, c in enumerate(inner) if not c.isalnum()] == [i for i, c in enumerate(task.answer) if not c.isalnum()]  # punctuation stays
 
 
 def test_equivalent_tex_forms():
