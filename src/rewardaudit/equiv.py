@@ -396,7 +396,7 @@ def equiv(a: str, b: str, gold_type: str | None = None) -> bool:
     if gold_type in ("latex", "fraction", "float", "int", None):
         if _mv_equiv(a, b):
             return True
-    if len(na) >= 8 and len(nb) >= 8:
+    if len(na) >= 8 and len(nb) >= 8 and re.findall(r"\d+", na) == re.findall(r"\d+", nb):  # one digit changed is another answer
         return difflib.SequenceMatcher(None, na, nb).ratio() >= 0.92
     return False
 

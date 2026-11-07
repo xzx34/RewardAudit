@@ -6,6 +6,7 @@ import pytest
 
 from rewardaudit import audit
 from rewardaudit.contract import Contract
+from rewardaudit.equiv import equiv
 from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.metrics import Tally, _sweep_severity
 from rewardaudit.probes.base import ProbeContext
@@ -51,6 +52,13 @@ def test_m21_attaches_letters_and_a_word_from_another_row():
 @pytest.mark.parametrize("answer", ["yes", "B", "\\frac{1}{2}"])
 def test_m21_leaves_other_kinds_of_answer_alone(answer):
     assert _gen("M21", answer) == {}
+
+
+def test_one_digit_changed_in_a_long_answer_is_another_answer():
+    gold = "E_1 = \\\\frac{\\\\sqrt{3}}{8}Mc^2 + \\\\frac{\\\\sqrt{5}}{7}"
+    assert equiv(gold.replace("{8}", "{9}"), gold, "latex") is False
+    assert equiv("the treaty of 1982 between them", "the treaty of 1983 between them", "long_text") is False
+    assert equiv("a long sentence about the river", "a long sentence about the rivers", "long_text") is True
 
 
 def test_m22_writes_a_positive_number_with_a_unicode_minus():

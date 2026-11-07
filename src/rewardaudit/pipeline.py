@@ -13,7 +13,7 @@ from typing import Any
 from rewardaudit import __version__
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
 from rewardaudit.gate import check_contract, check_loaded
-from rewardaudit.goldtype import infer_dataset_type, infer_gold_type
+from rewardaudit.goldtype import infer_dataset_type, infer_task_type
 from rewardaudit.metrics import EPS, Tally, collect_defects, nondeterminism_finding
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import all_probes
@@ -177,7 +177,7 @@ def run_audit(
         n_rows = int(runner.meta.get("n_rows") or len(tasks))
         log(f"sampled {len(tasks):,} of {n_rows:,} rows (seed {config.seed})")
         gold_type, counts = infer_dataset_type(tasks)
-        gold_types = {t.id: infer_gold_type(t.answer) for t in tasks}
+        gold_types = {t.id: infer_task_type(t) for t in tasks}
         check_loaded(runner.meta, tasks)
 
         answerable = [t for t in tasks if t.answer.strip()] or tasks  # an empty gold is a dataset issue, not a rejection

@@ -174,6 +174,14 @@ def asks_percent(prompt: str) -> bool:
     return bool(_ASKS_PERCENT.search(question_part(prompt)))
 
 
+def infer_task_type(task: Task) -> str:
+    """The kind of this row's answer, with its prompt to go by: T and F are true and false, unless they are option letters
+    listed there (with ten options, F is one)."""
+    kind = infer_gold_type(task.answer)
+    letter = strip_wrappers(task.answer).strip().upper()
+    return "mcq" if kind == "bool" and letter in mcq_options(task.prompt) else kind
+
+
 def infer_dataset_type(tasks: list[Task]) -> tuple[str, Counter[str]]:
     counts: Counter[str] = Counter(infer_gold_type(t.answer) for t in tasks)
     major, _ = counts.most_common(1)[0]

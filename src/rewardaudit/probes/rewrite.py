@@ -311,7 +311,7 @@ def q30_option_text(task, rng, ctx):
     if letter not in texts:
         return []
     out = [("letter_and_text", ctx.wrap(f"{letter}) {texts[letter]}"))]
-    return out if re.search(r"\bletter\b", task.prompt, re.I) else [("text", ctx.wrap(texts[letter])), *out]
+    return out if re.search(r"\bletter\b|\(X\)", task.prompt, re.I) else [("text", ctx.wrap(texts[letter])), *out]
 
 
 def q31_latex_markup(task, rng, ctx):

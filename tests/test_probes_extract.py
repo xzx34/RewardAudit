@@ -8,7 +8,7 @@ import pytest
 from rewardaudit import audit
 from rewardaudit.contract import Contract
 from rewardaudit.equiv import contains_equiv
-from rewardaudit.goldtype import infer_gold_type, option_texts
+from rewardaudit.goldtype import infer_gold_type, infer_task_type, option_texts
 from rewardaudit.metrics import _sweep_severity
 from rewardaudit.probes.base import _FILLER, ProbeContext
 from rewardaudit.probes.registry import all_probes
@@ -24,7 +24,7 @@ def _gen(probe_id, answer, prompt="What is the answer?", primary="boxed", accept
     task = Task("t", prompt, answer)
     contract = Contract(full_score=1.0, accepted=[primary, *accepted], primary=primary, wrapper_rates={primary: 1.0},
                         self_pass={"t": True}, gold_score={"t": 1.0}, task_wrappers={"t": [primary]})
-    ctx = ProbeContext(contract=contract, gold_type="int", tasks=[task], gold_types={"t": infer_gold_type(answer)})
+    ctx = ProbeContext(contract=contract, gold_type="int", tasks=[task], gold_types={"t": infer_task_type(task)})
     ctx.task = task
     return dict(PROBES[probe_id].generate(task, random.Random(0), ctx))
 
@@ -73,6 +73,14 @@ def test_o14_needs_options_with_different_texts(answer, prompt):
     assert _gen("O14", answer, prompt) == {}
 
 
+def test_an_option_letter_f_is_a_letter_where_the_prompt_lists_it():
+    ten = "\n".join(f"{c}. option {c}" for c in "ABCDEFGHIJ")
+    assert infer_task_type(Task("t", f"Pick one.\n{ten}", "F")) == "mcq"
+    assert infer_task_type(Task("t", "True or false: the sky is green.", "F")) == "bool"
+    variants = _gen("O7", "F", f"Pick one.\n{ten}")
+    assert not any("T" in re.sub(r"\\text\{ or \}|The answer is either|\\boxed", "", v) for v in variants.values())
+
+
 def test_option_texts_takes_the_last_question_of_a_prompt_with_examples():
     assert option_texts("A. 1\nB. 2\nAnswer: B\n\nA. 3\nB. 4") == {"A": "3", "B": "4"}
     assert option_texts("No options here.") == option_texts("A. only one") == {}
@@ -112,6 +120,10 @@ def test_q30_sends_the_option_text_unless_the_prompt_asks_for_a_letter():
     assert _gen("Q30", "B", MCQ) == {"text": "\\boxed{42}", "letter_and_text": "\\boxed{B) 42}"}
     assert _gen("Q30", "B", MCQ + "\nAnswer with the letter.") == {"letter_and_text": "\\boxed{B) 42}"}
     assert _gen("Q30", "B", "Pick B or C.") == {}
+
+
+def test_q30_reads_a_template_that_asks_for_a_letter():
+    assert "text" not in _gen("Q30", "B", MCQ + '\nEnd with "The answer is (X)".')
 
 
 def test_q31_writes_latex_markup_inside_a_box():
