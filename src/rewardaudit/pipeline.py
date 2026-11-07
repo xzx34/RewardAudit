@@ -14,7 +14,7 @@ from rewardaudit import __version__
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
 from rewardaudit.gate import check_contract, check_loaded
 from rewardaudit.goldtype import infer_dataset_type, infer_gold_type
-from rewardaudit.metrics import EPS, Tally, nondeterminism_finding
+from rewardaudit.metrics import EPS, Tally, collect_defects, nondeterminism_finding
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.runner import RunnerPool
@@ -56,6 +56,7 @@ class AuditResult:
     spec: dict[str, Any] = field(default_factory=dict)
     version: str = __version__
     observations: list[Observation] = field(default_factory=list)
+    defects: list[dict[str, Any]] = field(default_factory=list)  # most severe first: id, name, severity, evidence, example
 
     @property
     def findings(self) -> list[dict[str, Any]]:
@@ -64,7 +65,7 @@ class AuditResult:
 
     @property
     def rates(self) -> dict[str, float]:
-        """The share of calls on each headline: non_solving_accepted, wrong_accepted, hedging_accepted, right_rejected.
+        """The share of calls on each headline: non_solving_accepted, wrong_accepted, hedging_accepted, right_rejected, wrong_partial.
         A headline no call measured is left out, since 0.0 would read as nothing accepted."""
         return {h["key"]: h["value"] for h in self.metrics["head"] if h["n"] and not h.get("not_measured")}
 
@@ -94,6 +95,7 @@ class AuditResult:
             "contract": self.contract.to_dict(),
             "determinism": self.determinism,
             "latency_ms": self.latency_ms,
+            "defects": self.defects,
             "metrics": self.metrics,
             "dataset_issues": self.dataset_issues,
         }
@@ -235,15 +237,15 @@ def run_audit(
         dataset_issues=issues, determinism=determinism, latency_ms=latency,
         elapsed_s=time.perf_counter() - t_start, n_rows=n_rows,
         spec={k: v for k, v in spec.items() if k not in ("pickled", "sys_path")},
-        observations=kept,
+        observations=kept, defects=collect_defects(metrics, contract),
     )
 
 
 def exit_code(result: AuditResult, fail_on: dict[str, float] | None = None) -> int:
-    """0 clean, 1 findings above thresholds (default: any high/medium), 2 the checker cannot tell the reference answer
+    """0 clean, 1 above the thresholds (default: any high or medium defect), 2 the checker cannot tell the reference answer
     from a wrong one, so the headline rates were not measured."""
     if result.contract.no_discrimination:
         return 2
     if fail_on:
         return int(any(result.rates.get(key, 0.0) > thr for key, thr in fail_on.items()))
-    return int(any(f["severity"] in ("high", "medium") for f in result.findings))
+    return int(any(d["severity"] in ("high", "medium") for d in result.defects))

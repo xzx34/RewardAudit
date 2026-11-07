@@ -125,21 +125,29 @@ worker. `--workers` runs that many processes (4 by default, or your CPU count if
 ## Read the result
 
 ```
-Result: problems found (1 high, 2 medium)
+Result: problems found (1 high, 1 medium)
 
-  Accepts non-answers     no     0%  [0%, 14%]
-  Accepts wrong answers   no     1%  [0%, 3%]
-  Accepts hedged answers  yes   23%  [20%, 27%]
-  Rejects right answers   yes   19%  [16%, 22%]
-  Runs reliably           yes  no errors, timeouts or crashes in 3,727 calls
+  Accepts non-answers         no     0%  [0%, 14%]
+  Accepts wrong answers       no     1%  [0%, 3%]
+  Accepts hedged answers      yes   23%  [20%, 27%]
+  Rejects right answers       yes   19%  [16%, 22%]
+  Pays wrong answers in part  no     0%  [0%, 1%]
+  Runs reliably               yes  no errors, timeouts or crashes in 3,727 calls
+
+Defects (3)
+  HIGH    D6  Hedged answers accepted  O11 100%
+              The answer is either 35 or 34.
+  MEDIUM  D9  Equivalent rewrites rejected  Q8 67%, Q6 33%
+              \boxed{34.0}
+  LOW     D1  Signs and punctuation ignored  M3 4%
 ```
 
-Each row answers a question about the checker. On the first four rows, `yes` means the row has a high or medium finding. **Runs
-reliably** reads the other way round: `yes` is good.
+Each row answers a question about the checker. On the first five rows, `yes` means a high or medium problem. **Runs reliably**
+reads the other way round: `yes` is good.
 
 The percentage is the share of calls that went that way, with a 95% interval. These are shares of the replies rewardaudit sends,
 not of what a model would write. They are for comparing runs and for `--fail-on`. A low rate can sit next to a high finding,
-since one kind of reply may be accepted every time and the others never, so read the findings to see what happens. The calls
+since one kind of reply may be accepted every time and the others never, so read the defects to see what happens. The calls
 in the top line also count the wrong answers and repeats used before the probes, so that number is a little higher.
 
 - **Accepts non-answers:** the best reply built without reading the reference answer. It is chosen on part of the rows and
@@ -148,16 +156,52 @@ in the top line also count the wrong answers and repeats used before the probes,
 - **Accepts wrong answers:** the reference answer with a definite error.
 - **Accepts hedged answers:** a reply stating two answers, of which one is right, or stating the right one and taking it back.
 - **Rejects right answers:** the reference answer written another way, still correct.
+- **Pays wrong answers in part:** the reference answer with a definite error, earning more than nothing and less than the
+  reference answer. The row says `yes` from one call in ten. A score such as F1 does this by design; whether that is what you
+  want is your call.
 - **Runs reliably:** errors, timeouts, crashes and network attempts, and whether repeating a call gives the same score.
 
-**Findings.** Each finding is one probe, with an example reply and a rate. Where a probe sends distinct kinds of reply, the rate
-is that of the kind that went that way most often. Severity is a rule of thumb for what to look at first:
+**Defects.** A defect says what the checker does, across the probes that show it: each line has its severity, its name, and the
+probes behind it with their rates. A defect takes the highest severity of its evidence. The names describe behaviour, since the
+checker's code is never read: a reply `-75` accepted for `75` shows that the sign was ignored, whether the checker strips it or
+looks for a substring.
+
+| Id | Defect | Evidence |
+|---|---|---|
+| D1 | Signs and punctuation ignored | M2, M3, M22 |
+| D2 | Substring match | M21, M18, E1, E5, O6 |
+| D3 | Numeric tolerance too wide | M24, M1 |
+| D4 | One of several answers is read | O5, O12, O4, E6 |
+| D5 | Reads the thinking block | O10, O13 |
+| D6 | Hedged answers accepted | O7, O11, O14, O15, E2, E3, E8 |
+| D7 | Negation ignored | O3 |
+| D8 | Only a fixed-length window is read | Q28, Q29 |
+| D9 | Equivalent rewrites rejected | the other Q probes |
+| D10 | Copying the prompt pays | L1, L2, L3, L4, L6, E9 |
+| D11 | A fixed answer pays | L5 and the N family, above what a fixed answer gets by chance |
+| D12 | Reply text run as code | P16 |
+| D13 | Malformed or extreme replies mishandled | P1, P2, P5, P15, P17, and any probe's errors, timeouts and crashes |
+| D14 | Wrong answers paid in part | the row of that name |
+| D15 | Same input, different scores | S1, the same reply sent again |
+| D16 | Reference answer rejected | G1 |
+| D17 | Units ignored | M23 |
+| D18 | Score does not follow the answer | any wrong answer earning the reference answer's score, or a reply that should earn nothing scoring above it |
+| D19 | Close answers accepted | M5, M6, M7 |
+| D20 | Parts of a structured answer ignored | M8, M9, M10, M11, M12, M13, M17 |
+| D21 | A different answer accepted | M16, M19, M20 |
+
+**Findings.** Each finding is one probe, with an example reply and a rate; `--full` prints them, and `report.md` always has them.
+Where a probe sends distinct kinds of reply, the rate is that of the kind that went that way most often. Severity is a rule of
+thumb for what to look at first:
 
 | Severity | Meaning |
 |---|---|
 | High | Non-answers, wrong answers or hedged answers accepted on about half of calls or more, or right answers losing the score just for the reasoning before them on one call in five or more. |
-| Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts. |
+| Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts, wrong answers paid in part on one call in ten or more. |
 | Low | The same less often, or about what chance would give, and errors the checker raised. Listed for completeness. |
+
+A few calls say little, so a finding stays low, with the note "too few calls to rate", below ten scored calls or on one row only.
+Failed calls and rejected reference answers need two rows.
 
 **A finding is about behaviour.** rewardaudit does not know what you intended. If your task demands an exact format, then
 `34.0` being rejected may be right. Read the example, and run `repro.py` if you want to re-score it.
@@ -168,9 +212,9 @@ format credit does not count as accepted.
 
 **Saving the report.** `--out DIR` writes:
 
-- `report.md`: the summary, every finding with an example, what to fix, accepted formats, the dataset checks, how it was run.
-- `report.json`: the same results for scripts: `metrics.findings`, `metrics.head` for the summary rows, and `metrics.probes` for
-  the rate of every probe.
+- `report.md`: the summary, the defects, every finding with an example, what to fix, accepted formats, the dataset checks, how it was run.
+- `report.json`: the same results for scripts: `defects`, `metrics.findings`, `metrics.head` for the summary rows, and
+  `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
 **Probes.** `rewardaudit probes` lists them; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
@@ -225,7 +269,7 @@ The report says which version the results were measured on. Delete the environme
 | Exit code | Meaning |
 |---|---|
 | 0 | No high or medium finding |
-| 1 | At least one high or medium finding, or a rate above `--fail-on` |
+| 1 | At least one high or medium defect, or a rate above `--fail-on` |
 | 2 | The audit could not be done, or the rates could not be measured |
 
 ```yaml
@@ -234,7 +278,7 @@ The report says which version the results were measured on. Delete the environme
 ```
 
 With `--fail-on`, only the rates named decide the exit code. The names are `non_solving_accepted`, `wrong_accepted`,
-`hedging_accepted` and `right_rejected`.
+`hedging_accepted`, `right_rejected` and `wrong_partial`.
 
 ## Use it from Python
 
@@ -254,6 +298,7 @@ except AuditError as e:     # something to fix in the input
     print(e)
 
 result.print()              # the summary; print(full=True) for every finding
+result.defects              # a list of dicts, most severe first: id, name, explanation, severity, evidence, example
 result.findings             # a list of dicts: probe_id, name, category, severity, rate, ci, n, example (the reply is in example["completion"])
 result.rates                # {"non_solving_accepted": 0.0, "wrong_accepted": 0.0, ...}
 result.save("out/")         # report.md and report.json

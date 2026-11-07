@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rewardaudit.contract import Contract
+from rewardaudit.defects import ABOVE_REFERENCE, BY_PROBE, DEFECTS, FIXED_ANSWER, ROBUSTNESS, WRONG_PARTIAL
 from rewardaudit.equiv import normalize
 from rewardaudit.goldtype import infer_gold_type, mcq_options
 from rewardaudit.labels import states_the_answer
@@ -38,6 +39,7 @@ class ProbeStats:
     probe: Probe
     n_tasks: int = 0
     task_hits: int = 0  # tasks where any variant hit
+    fail_tasks: int = 0  # tasks where any call returned no score
     n_obs: int = 0  # all calls
     n_scored: int = 0  # calls that returned a score; rates use these, failed calls go to robustness
     obs_hits: int = 0
@@ -55,6 +57,7 @@ class ProbeStats:
     variants: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0, 0, 0]))
     # per variant: [disc_hits, disc_n, conf_hits, conf_n]
     variant_hits: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # [hits, scored]
+    variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps: the first hit of each variant
 
     def most_accepted_variant(self) -> tuple[str, int, int]:
         """(variant, hits, scored) of the variant the checker accepts most often."""
@@ -112,6 +115,15 @@ def floor_estimate(tasks: list[Task], gold_type: str) -> tuple[float, str]:
 
 
 EPS = 1e-9
+MIN_CALLS, MIN_TASKS = 10, 2  # below these a finding is not rated above low: one or two calls say too little
+TOO_FEW = "too few calls to rate"
+
+
+def _require_evidence(f: dict[str, Any], enough: bool) -> dict[str, Any]:
+    if f["severity"] != "low" and not enough:
+        f["severity"] = "low"
+        f["note"] = "; ".join(x for x in (f["note"], TOO_FEW) if x)
+    return f
 
 
 def _hit(o: Observation, contract: Contract, gold_blind: bool = False, eps: float = EPS) -> tuple[bool, bool]:
@@ -219,7 +231,7 @@ REJECTED_GOLD_NAME = "reference answer rejected in every format tried"
 
 
 def _not_measured(h: dict[str, Any], why: str) -> dict[str, Any]:
-    out = {k: v for k, v in h.items() if k != "strategy"}
+    out = {k: v for k, v in h.items() if k not in ("strategy", "severity", "note", "example")}
     out.update(_metric(h["key"], h["title"], 0, 0, why), not_measured=True)
     if "above_floor" in out:
         out["above_floor"] = False
@@ -265,13 +277,13 @@ def _above_gold_findings(stats: dict[str, ProbeStats], floor: float, contract: C
         lo, hi = wilson(k, n)
         category, sev = _non_solving_finding(s.probe, rate, lo, floor)
         ex = s.above_example
-        out.append({
+        out.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,
             "task_rate": s.above_tasks / s.n_tasks if s.n_tasks else 0.0, "n_tasks": s.n_tasks,
             "gold_blind": s.probe.gold_blind, "example": ex.to_dict() if ex else None, "above_gold": True,
             "note": _above_gold_note(ex, contract, s.above_bar) if ex else "",
-        })
+        }, s.n_compared >= MIN_CALLS and s.above_tasks >= MIN_TASKS))
     return out
 
 
@@ -299,10 +311,11 @@ def _rejected_gold_finding(contract: Contract, tasks: list[Task]) -> dict[str, A
         example = Observation(REJECTED_GOLD_ID, "G", best[0], tid, best[1], best[2], Label.SOLVING, "full", "natural").to_dict()
         example |= {"gold": gold, "best_score": contract.gold_score[tid], "wrappers_tried": tried}
     lo, hi = wilson(k, n)
-    return {"probe_id": REJECTED_GOLD_ID, "name": REJECTED_GOLD_NAME, "family": "G", "tier": "natural",
-            "category": "right_rejected", "severity": _rejected_severity(REJECTED_GOLD_ID, k / n), "rate": k / n,
-            "ci": [lo, hi], "n": n, "unit": "tasks", "task_rate": k / n, "n_tasks": n, "gold_blind": False,
-            "example": example, "note": note}
+    return _require_evidence(
+        {"probe_id": REJECTED_GOLD_ID, "name": REJECTED_GOLD_NAME, "family": "G", "tier": "natural",
+         "category": "right_rejected", "severity": _rejected_severity(REJECTED_GOLD_ID, k / n), "rate": k / n,
+         "ci": [lo, hi], "n": n, "unit": "tasks", "task_rate": k / n, "n_tasks": n, "gold_blind": False,
+         "example": example, "note": note}, k >= MIN_TASKS)
 
 
 def nondeterminism_finding(determinism: dict[str, Any]) -> dict[str, Any]:
@@ -347,6 +360,7 @@ class Tally:
         self.stats: dict[str, ProbeStats] = {}
         self.robust = Robustness()
         self.null_floor = 0.0
+        self.paid_calls, self.paid_share, self.paid_tasks, self.paid_example = 0, 0.0, set(), None  # M calls paid in part
 
     def add(self, observations: list[Observation], controls: dict[tuple[str, str], float] | None = None) -> None:
         contract, disc_ids, stats = self.contract, self.disc_ids, self.stats
@@ -365,11 +379,12 @@ class Tally:
             probe = self.by_id[pid]
             st = stats.setdefault(pid, ProbeStats(probe))
             st.n_tasks += 1
-            any_hit = any_partial = any_above = False
+            any_hit = any_partial = any_above = any_fail = False
             example = None
             for o in obs:
                 st.n_obs += 1
                 k = o.verdict.kind
+                any_fail |= k != Kind.SCORE
                 if k == Kind.ERROR:
                     st.errors += 1
                 elif k == Kind.TIMEOUT:
@@ -377,6 +392,8 @@ class Tally:
                 elif k == Kind.CRASH:
                     st.crashes += 1
                 h, p = _hit(o, contract, probe.gold_blind)
+                if p and probe.family == "M":
+                    self._add_paid(o)
                 if probe.family == "N" and o.verdict.ok:
                     self.null_floor = max(self.null_floor, contract.signal(o.verdict) or 0.0)
                 slot = st.variants[o.variant]
@@ -407,6 +424,8 @@ class Tally:
                 counted[1] += int(o.verdict.ok)
                 if h and example is None:
                     example = o
+                if h and probe.sweep:
+                    st.variant_examples.setdefault(o.variant, o)
                 any_hit |= h
                 any_partial |= p
             if any_hit:
@@ -416,6 +435,15 @@ class Tally:
             if any_partial:
                 st.partial += 1
             st.above_tasks += int(any_above)
+            st.fail_tasks += int(any_fail)
+
+    def _add_paid(self, o: Observation) -> None:
+        signal, gold = self.contract.signal(o.verdict), self.contract.gold_score.get(o.task_id, self.contract.full_score)
+        if signal < gold - EPS:
+            self.paid_calls += 1
+            self.paid_share += signal / gold
+            self.paid_tasks.add(o.task_id)
+            self.paid_example = self.paid_example or o
 
     def finish(self) -> dict[str, Any]:
         return _summarize(self)
@@ -434,6 +462,31 @@ def compute(
     tally = Tally(probes, tasks, contract, gold_type, discovery_frac)
     tally.add(observations, controls)
     return tally.finish()
+
+
+def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
+    """(variant, hits, scored, note) of a probe whose variants grow along one scale. The note gives the acceptance rate of each.
+    The variant reported is where the behaviour ends: the widest error accepted at least half the time, or for a right
+    answer, the shortest text that loses the score at least half the time."""
+    order = sorted(s.variant_hits, key=lambda v: float(re.search(r"\d+(?:\.\d+)?", v).group()))
+    solving = s.probe.label == Label.SOLVING
+    shown = []
+    for v in order:
+        k, n = s.variant_hits[v]
+        shown.append(f"{v} {(n - k if solving else k) / n:.0%}" if n else f"{v} no score")
+    half = [v for v in order if s.variant_hits[v][1] and 2 * s.variant_hits[v][0] >= s.variant_hits[v][1]]
+    variant = (half[0] if solving else half[-1]) if half else s.most_accepted_variant()[0]
+    return variant, *s.variant_hits[variant], "accepted: " + ", ".join(shown)
+
+
+def _partial_head(tally: Tally, n: int) -> dict[str, Any]:
+    """Wrong answers paid more than nothing and less than the reference answer earns."""
+    k = tally.paid_calls
+    earned = f", earning {tally.paid_share / k:.0%} of its score on average" if k else ""
+    h = _metric("wrong_partial", "Wrong answers paid in part", k, n, f"the reference answer with a definite error{earned}")
+    h |= {"severity": "medium" if h["value"] >= 0.1 else "low", "note": "",
+          "example": tally.paid_example.to_dict() if tally.paid_example else None}
+    return _require_evidence(h, n >= MIN_CALLS and len(tally.paid_tasks) >= MIN_TASKS)
 
 
 def _summarize(tally: Tally) -> dict[str, Any]:
@@ -488,9 +541,14 @@ def _summarize(tally: Tally) -> dict[str, Any]:
     for s in stats.values():
         if s.obs_hits == 0:
             continue
-        rate, n, example = s.rate, s.n_scored, s.examples[0] if s.examples else None
+        rate, n, example, note = s.rate, s.n_scored, s.examples[0] if s.examples else None, ""
         lo, hi = s.ci
-        if s.probe.by_variant:  # distinct replies under one probe: the checker may accept only one of them
+        if s.probe.sweep:
+            variant, k, n, note = _sweep(s)
+            rate = k / n
+            lo, hi = wilson(k, n)
+            example = s.variant_examples.get(variant, example)
+        elif s.probe.by_variant:  # distinct replies under one probe: the checker may accept only one of them
             variant, k, n = s.most_accepted_variant()
             rate = k / n
             lo, hi = wilson(k, n)
@@ -499,22 +557,22 @@ def _summarize(tally: Tally) -> dict[str, Any]:
             category, sev = "right_rejected", _rejected_severity(s.probe.id, rate)
         else:
             category, sev = _non_solving_finding(s.probe, rate, lo, floor)
-        findings.append({
+        findings.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,
-            "task_rate": s.task_rate, "n_tasks": s.n_tasks, "gold_blind": s.probe.gold_blind,
-            "example": example.to_dict() if example else None, "note": "",
-        })
+            "task_rate": s.task_rate, "n_tasks": s.n_tasks, "gold_blind": s.probe.gold_blind, "above_floor": lo > floor,
+            "example": example.to_dict() if example else None, "note": note,
+        }, s.n_scored >= MIN_CALLS and s.task_hits >= MIN_TASKS))
     for s in stats.values():
         bad = s.errors + s.timeouts + s.crashes
         if bad:
             lo, hi = wilson(bad, s.n_obs)
-            findings.append({
+            findings.append(_require_evidence({
                 "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
                 "category": "robustness", "severity": "medium" if (s.crashes or s.timeouts) else "low",
                 "rate": bad / s.n_obs, "ci": [lo, hi], "n": s.n_obs, "task_rate": 0.0, "n_tasks": s.n_tasks,
                 "example": None, "note": f"{s.errors} errors, {s.timeouts} timeouts, {s.crashes} crashes",
-            })
+            }, s.fail_tasks >= MIN_TASKS))
     rejected_gold = _rejected_gold_finding(contract, tasks)
     if rejected_gold:
         findings.append(rejected_gold)
@@ -525,7 +583,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
             return 0 if f.get("gold_blind") else 2
         return {"wrong_accepted": 1, "right_rejected": 3}.get(f["category"], 4)
 
-    heads = [head1, head2, head3, head_hedge]
+    heads = [head1, head2, head3, head_hedge, _partial_head(tally, wn)]
     withheld: list[dict[str, Any]] = []
     k_above, n_above = sum(s.above_gold for s in stats.values()), sum(s.n_compared for s in stats.values())
     discrimination = None
@@ -561,3 +619,61 @@ def _summarize(tally: Tally) -> dict[str, Any]:
         "n_passing": len(passing),
         "discovery_n": n_disc,
     }
+
+
+def _evidence(f: dict[str, Any]) -> dict[str, Any]:
+    return {"probe_id": f["probe_id"], "name": f["name"], "severity": f["severity"], "rate": f["rate"], "n": f["n"],
+            "unit": f.get("unit", "calls"), "note": f.get("note", "")}
+
+
+def _wrong_answer_example(contract: Contract) -> dict[str, Any] | None:
+    return next((Observation("wrong_answer", "G", "wrong_answer", tid, comp, v, Label.NOT_SOLVING, "zero", "natural").to_dict()
+                 for wid, tid, comp, v in contract.observations if wid == "wrong_answer" and contract.accepted_verdict(v, tid)), None)
+
+
+def _contract_evidence(contract: Contract) -> list[dict[str, Any]]:
+    """What the calls with the reference answers and the wrong answers show on their own, with no probe involved."""
+    n, out = contract.wrong_checked, []
+    if contract.format_only:
+        out.append(_require_evidence(
+            {"probe_id": "format_only", "name": "any answer in the right format earns the reference answer's score",
+             "severity": "high", "rate": contract.wrong_same / n, "n": n, "note": contract.discrimination_note,
+             "example": _wrong_answer_example(contract)}, n >= MIN_CALLS and contract.wrong_same >= MIN_TASKS))
+    if contract.no_discrimination and contract.wrong_above:
+        out.append(_require_evidence(
+            {"probe_id": "wrong_above", "name": "wrong answers above the reference answer",
+             "severity": _wrong_severity(contract.wrong_above / n), "rate": contract.wrong_above / n, "n": n, "note": "",
+             "example": None}, n >= MIN_CALLS and contract.wrong_above >= MIN_TASKS))
+    return out
+
+
+def _defect_of(f: dict[str, Any]) -> str | None:
+    """The catalog entry a finding is evidence for. A fixed answer below what chance gives says nothing about the checker."""
+    if f.get("above_gold"):
+        return ABOVE_REFERENCE
+    if f["category"] == "robustness" and f["probe_id"] != "S1":
+        return ROBUSTNESS
+    defect = BY_PROBE.get(f["probe_id"])
+    return None if defect == FIXED_ANSWER and not f.get("above_floor") else defect
+
+
+def collect_defects(metrics: dict[str, Any], contract: Contract) -> list[dict[str, Any]]:
+    """One record per defect with evidence, most severe first: its severity is the highest of its evidence."""
+    found: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for f in metrics["findings"]:
+        if (defect := _defect_of(f)) is not None:
+            found[defect].append(f)
+    found[ABOVE_REFERENCE] += _contract_evidence(contract)
+    partial = next(h for h in metrics["head"] if h["key"] == "wrong_partial")
+    if partial["k"]:
+        found[WRONG_PARTIAL].append({"probe_id": partial["key"], "name": partial["title"], "severity": partial["severity"],
+                                     "rate": partial["value"], "n": partial["n"], "note": partial["note"], "example": partial["example"]})
+    rank = {"high": 0, "medium": 1, "low": 2}
+    out = []
+    for d in DEFECTS:
+        evidence = sorted(found.get(d.id, []), key=lambda f: (rank[f["severity"]], -f["rate"]))
+        if evidence:
+            out.append({"id": d.id, "name": d.name, "explanation": d.explanation, "severity": evidence[0]["severity"],
+                        "evidence": [_evidence(f) for f in evidence],
+                        "example": next((f["example"] for f in evidence if f.get("example")), None)})
+    return sorted(out, key=lambda d: rank[d["severity"]])

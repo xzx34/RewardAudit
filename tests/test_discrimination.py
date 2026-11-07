@@ -241,7 +241,7 @@ def test_a_non_solving_reply_above_the_gold_is_a_finding(tmp_path):
     assert "E1 integer sweep: scored above the reference answer on 100% of calls (high)" in md
     screen = " ".join(_terminal(r).split())
     assert "Non-answers outrank the reference answer" in screen and "Not counted" in screen
-    assert "No findings" not in screen and "Accepts non-answers yes see Findings" in screen and "Accepts wrong answers not measured" in screen
+    assert "No defects" not in screen and "Accepts non-answers yes see Defects" in screen and "Accepts wrong answers not measured" in screen
     assert "0.955 against 0.155" in " ".join(_terminal(r, full=True).split())
     data = json.loads(write_outputs(r, tmp_path / "out").with_name("report.json").read_text(encoding="utf-8"))
     assert data["metrics"]["discrimination"]["case"] == "outranks" and data["metrics"]["above_gold"]["probes"]["E1"] == 24
@@ -348,7 +348,7 @@ def test_whole_reply_similarity_counts_no_rewrite_as_rejected(tmp_path):
     assert heads["wrong_accepted"]["value"] == 0.0 and r.rates["wrong_accepted"] == 0.0 and "right_rejected" not in r.rates
     assert not [f for f in r.metrics["findings"] if f["category"] == "right_rejected"]
     assert {"Q5", "Q6", "Q22", "Q3"} <= {f["probe_id"] for f in r.metrics["withheld_findings"]}
-    assert exit_code(r) == 0
+    assert heads["wrong_partial"]["value"] > 0.5 and exit_code(r) == 1  # similarity pays a wrong answer part of the score
     assert "grades the whole reply" in render_markdown(r).split("## Summary")[0]
     assert "grades the whole reply" in " ".join(_terminal(r).split())
     probes = {p["id"]: p for p in r.metrics["probes"]}

@@ -29,7 +29,7 @@ from rewardaudit.types import Kind, Label, Observation, Verdict
 
 runner = CliRunner()
 INTERNAL_WORDS = re.compile(r"\b(gold|wrapper|contract|floor|self-pass|primary|tier|signal|threat)s?\b", re.I)
-SECTIONS = ["## Summary", "## Findings", "## What to fix", "## Answer formats", "## Reliability", "## Dataset", "## How this was run"]
+SECTIONS = ["## Summary", "## Defects", "## Findings", "## What to fix", "## Answer formats", "## Reliability", "## Dataset", "## How this was run"]
 ROWS_OF_NUMBERS = [{"prompt": f"What is {i} + 10? End with #### and the answer.", "answer": str(i + 10)} for i in range(16)]
 ROWS_OF_WORDS = [{"prompt": f"Rewrite item {i} with a dash.", "answer": f"it-em{i} num-ber{i}"} for i in range(16)]
 
@@ -103,14 +103,15 @@ def test_the_command_line_prints_the_first_screen_at_80_columns(tmp_path, monkey
 def test_first_screen_says_what_was_found(substring):
     text = screen(substring)
     assert text.startswith(f"rewardaudit {substring.version} · demo/substring · 12 of 12 rows (seed 0) · ")
-    high = sum(f["severity"] == "high" for f in substring.findings)
-    medium = sum(f["severity"] == "medium" for f in substring.findings)
+    high = sum(d["severity"] == "high" for d in substring.defects)
+    medium = sum(d["severity"] == "medium" for d in substring.defects)
     assert f"Result: problems found ({high} high, {medium} medium)" in text
     assert "Reference answers accepted on 100% of rows. Replies were sent in the format " in text
     assert "shares of calls, with 95% intervals" in text
-    assert f"Findings (top 5 of {len(substring.findings)}; --full for all)" in text
-    for f in substring.findings[:5]:  # nothing important is cut off
-        assert f["severity"].upper() in text and flat(f["name"]) in flat(text)
+    assert f"Defects ({len(substring.defects)})" in text and "Findings (" not in text
+    for d in substring.defects:  # nothing is cut off
+        assert d["severity"].upper() in text and flat(d["name"]) in flat(text) and d["evidence"][0]["probe_id"] in text
+    assert f"--full prints the {len(substring.findings)} findings behind this" in text
     assert "Add --out DIR to save report.md, report.json and repro.py." in text
     assert not INTERNAL_WORDS.search(text), INTERNAL_WORDS.search(text)
 
@@ -139,7 +140,7 @@ def test_no_problems_found_and_a_row_nothing_was_sent_for():
     r = audit(last_number, ROWS_OF_NUMBERS, probes=["N"], workers=1)
     assert not r.findings
     text = screen(r)
-    assert "Result: no problems found" in text and "No findings." in text
+    assert "Result: no problems found" in text and "No defects." in text
     assert row_line(text, "Accepts wrong answers").split() == ["Accepts", "wrong", "answers", "not", "measured"]
     assert exit_code(r) == 0
 
@@ -176,8 +177,9 @@ def test_a_reply_above_the_reference_answer_is_a_yes_without_a_rate():
     assert r.contract.no_discrimination and [f for f in r.findings if f.get("above_gold")]
     text = screen(r)
     assert "Result: problems found (" in text and "the rates could not be measured" in text
-    assert re.fullmatch(r"Accepts non-answers\s+yes\s+see Findings", row_line(text, "Accepts non-answers"))
-    assert "scored above the reference answer" in flat(text)
+    assert re.fullmatch(r"Accepts non-answers\s+yes\s+see Defects", row_line(text, "Accepts non-answers"))
+    assert "Score does not follow the answer" in flat(text)
+    assert "scored above the reference answer" in flat(screen(r, full=True))
 
 
 def test_a_whole_reply_grader_says_which_row_cannot_be_measured():

@@ -3,6 +3,21 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). What stays the same across versions is listed in
 the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
+## Unreleased
+
+### Added
+
+- Defects: the report now says what the checker does across probes, from a catalog of 21 kinds of defect, each with the probes
+  behind it, its rates and an example. They are in `result.defects` and under `defects` in `report.json`.
+- A sixth question, `wrong_partial`: how often a definite error earns more than nothing. `--fail-on` takes it.
+
+### Changed
+
+- A finding stays low below ten scored calls or on one row, with the note "too few calls to rate". Failed calls and rejected
+  reference answers need two rows.
+- The terminal lists defects. The findings, one per probe, are under `--full` and in `report.md`.
+- Exit code 1 now means a high or medium defect, which includes wrong answers paid in part on one call in ten or more.
+
 ## 0.1.0 - 2026-11-06
 
 First public version.

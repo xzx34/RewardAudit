@@ -21,7 +21,7 @@ app = typer.Typer(add_completion=False, no_args_is_help=True, help="Test the che
 console = Console()
 errors = Console(stderr=True)
 USAGE_ERROR = 2
-RATES = ("non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected")
+RATES = ("non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected", "wrong_partial")
 
 
 def _sample_size(n: str) -> int | str:
@@ -93,10 +93,10 @@ def audit(
     fail_on: str | None = typer.Option(None, help='exit 1 only above these rates, such as "non_solving_accepted>0.05,right_rejected>0.1"'),
     reply_format: str | None = typer.Option(None, "--format", help="how the checker wants a reply written, if it is none of the common formats, such as '<sol>{answer}</sol>'"),
     verifiers: str | None = typer.Option(None, help="for a Hub environment: constraint on the verifiers version, such as '<0.1.13'"),
-    full: bool = typer.Option(False, "--full", help="print every finding, not only the top five"),
+    full: bool = typer.Option(False, "--full", help="also print the finding behind each defect, one per probe"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="print only the result"),
 ) -> None:
-    """Audit one checker. Exit code: 0 no high or medium finding, 1 such a finding, 2 the audit could not be done or the rates could not be measured."""
+    """Audit one checker. Exit code: 0 no high or medium defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured."""
     try:
         size, gates = _sample_size(n), _fail_on(fail_on)
     except AuditError as e:
@@ -113,7 +113,7 @@ def audit(
 def demo(
     n: int = typer.Option(20, help="tasks per checker"),
     out: str | None = typer.Option(None, help="directory; one sub-directory per checker"),
-    full: bool = typer.Option(False, "--full", help="print every finding"),
+    full: bool = typer.Option(False, "--full", help="also print the finding behind each defect"),
 ) -> None:
     """Audit three small built-in checkers that have deliberate defects."""
     from rewardaudit.demo import DEMOS

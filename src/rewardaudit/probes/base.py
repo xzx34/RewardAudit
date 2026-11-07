@@ -282,6 +282,7 @@ class Probe:
     headline: bool = True  # its calls count in the summary's rates (False: an accepted reply is still a finding)
     description: str = ""
     by_variant: bool = False  # distinct replies under one id: its finding reports the reply accepted most often
+    sweep: bool = False  # variants grow along one scale: its finding gives the rate of each and where the behaviour ends
 
     def generate(self, task: Task, rng: random.Random, ctx: ProbeContext) -> list[Variant]:
         """The probe's variants for one task. M variants that are malformed LaTeX are dropped: a grader may

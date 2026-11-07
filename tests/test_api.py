@@ -12,7 +12,7 @@ from rewardaudit import AuditError, NotAuditable, audit, cli
 from rewardaudit.pipeline import exit_code
 
 ROWS = [{"prompt": f"Add the numbers on card {i}.", "answer": str(1000 + 7 * i)} for i in range(12)]
-RATES = {"non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected"}
+RATES = {"non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected", "wrong_partial"}
 
 
 def ends_with_gold(completion, answer):

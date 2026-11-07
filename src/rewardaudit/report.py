@@ -24,7 +24,7 @@ from rewardaudit.probes.registry import FAMILIES
 from rewardaudit.types import Label, Task
 
 SCHEMA_VERSION = "1"
-TOP_FINDINGS, MAX_FORMATS = 5, 8
+MAX_FORMATS, MAX_EVIDENCE = 8, 6
 SERIOUS = ("high", "medium")
 SEV_STYLE = {"high": "bold red", "medium": "yellow", "low": "dim"}
 RELIABLE_ROW = "Runs reliably"
@@ -42,6 +42,9 @@ ROWS = {
     "right_rejected": (
         "Rejects right answers", "Right answers rejected", "A correct answer lost the score when written differently.",
         "A sound checker accepts a final answer equivalent to the reference answer, whatever surrounds it and however it is spelled."),
+    "wrong_partial": (
+        "Pays wrong answers in part", "Wrong answers paid in part", "An answer with a definite error earned more than nothing.",
+        "Unless partial credit is what the benchmark intends, a sound checker gives a wrong final answer nothing."),
 }
 WHOLE_REPLY_LINE = ("The checker grades the whole reply by similarity to the reference answer: only the bare reference answer "
                     "earns full score, and the same answer in other formats earns part of it. So Rejects right answers "
@@ -139,13 +142,13 @@ def no_discrimination_line(c: Contract, m: dict[str, Any]) -> str:
 
 
 def _verdict(result: AuditResult) -> str:
-    high, medium = (sum(f["severity"] == s for f in result.findings) for s in SERIOUS)
+    high, medium = (sum(d["severity"] == s for d in result.defects) for s in SERIOUS)
     found = f"problems found ({high} high, {medium} medium)" if high + medium else ""
     if result.contract.no_discrimination:
         return f"{found}; the rates could not be measured" if found else "the rates could not be measured"
     if found:
         return found
-    return "no serious problems found" if result.findings or not _reliability(result)[0] else "no problems found"
+    return "no serious problems found" if result.defects or not _reliability(result)[0] else "no problems found"
 
 
 def _run_line(result: AuditResult, *, name: bool = True) -> str:
@@ -218,16 +221,23 @@ def _summary(result: AuditResult) -> list[tuple[str, str, str, str, int, bool]]:
     """(label, yes or no, rate, interval, calls, whether the word is bad news) for each row."""
     heads = {h["key"]: h for h in result.metrics["head"]}
     flagged = {_row_of(f) for f in result.findings if f["severity"] in SERIOUS}
+    flagged |= {key for key, h in heads.items() if h.get("severity") in SERIOUS}
     rows = []
     for key, (label, *_) in ROWS.items():
         h, yes = heads[key], key in flagged
         if h["n"] and not h.get("not_measured"):
             rows.append((label, "yes" if yes else "no", f"{h['value']:.0%}", _ci(h["ci"]), h["n"], yes))
         else:  # never a plain "no": nothing was measured, though a finding may still stand
-            rows.append((label, "yes" if yes else "", "see Findings" if yes else "not measured", "", 0, yes))
+            rows.append((label, "yes" if yes else "", "see Defects" if yes else "not measured", "", 0, yes))
     ok, _, failed, calls = _reliability(result)
     return [*rows, (RELIABLE_ROW, "yes" if ok else "no", f"{failed / calls if calls else 0:.0%} of calls failed",
                     _ci(wilson(failed, calls)), calls, not ok)]
+
+
+def _evidence_text(d: dict[str, Any]) -> str:
+    """The probes behind a defect and their rates."""
+    items = [f"{e['probe_id']} {e['rate']:.0%}" for e in d["evidence"]]
+    return ", ".join(items[:MAX_EVIDENCE]) + (f", {len(items) - MAX_EVIDENCE} more" if len(items) > MAX_EVIDENCE else "")
 
 
 def _issue_text(i: dict[str, Any]) -> str:
@@ -252,18 +262,29 @@ def _print_summary(result: AuditResult, console: Console) -> None:
         t.add_row(Text(label), Text(word, style="red" if bad else "green"), Text(body))
     console.print(Padding(t, (0, 0, 1, 2), expand=False))
     if any(h["n"] and not h.get("not_measured") for h in result.metrics["head"]):
-        _say(console, "Rates are shares of calls, with 95% intervals. Yes on the first four rows: a high or medium finding.\n", "dim")
+        _say(console, "Rates are shares of calls, with 95% intervals. Yes on the first five rows: a high or medium problem.\n", "dim")
 
 
-def _print_findings(findings: list[dict[str, Any]], console: Console, full: bool) -> None:
+def _print_defects(defects: list[dict[str, Any]], console: Console) -> None:
+    """One line each: severity, name, the probes behind it. A serious defect adds a line with an example."""
+    t = _grid()
+    for d in defects:
+        t.add_row(Text(d["severity"].upper(), style=SEV_STYLE[d["severity"]]), Text(d["id"]),
+                  Text.assemble(d["name"], (f"  {_evidence_text(d)}", "dim")))
+        if d["severity"] in SERIOUS and d["example"]:
+            t.add_row("", "", Text(_reply(d["example"]["completion"], 60), style="dim"))
+    console.print(Padding(t, (0, 0, 0, 2), expand=False))
+
+
+def _print_findings(findings: list[dict[str, Any]], console: Console) -> None:
     t = _grid()
     t.add_column(no_wrap=True, justify="right")
     for f in findings:
         t.add_row(Text(f["severity"].upper(), style=SEV_STYLE[f["severity"]]), Text(f["probe_id"]), Text(f["name"]),
                   Text(f"{f['rate']:.0%}"))
         details = [_reply(f["example"]["completion"])] if f.get("example") else []
-        details += [f["note"]] if f.get("note") and (full or not details or f.get("above_gold")) else []
-        details += [f"95% interval {_ci(f['ci'])}, {f['n']:,} {'rows' if f.get('unit') == 'tasks' else 'calls'}"] if full else []
+        details += [f["note"]] if f.get("note") else []
+        details += [f"95% interval {_ci(f['ci'])}, {f['n']:,} {'rows' if f.get('unit') == 'tasks' else 'calls'}"]
         for line in details:
             t.add_row("", "", Text(line, style="dim"), "")
     console.print(Padding(t, (0, 0, 0, 2), expand=False))
@@ -287,19 +308,23 @@ def render_terminal(result: AuditResult, console: Console | None = None, *, full
         for text in _formats(result):
             _say(console, f"  {text}")
     console.print()
-    if findings:
-        more = "full=True" if _from_python(result) else "--full"
-        top = f"top {TOP_FINDINGS} of {len(findings)}; {more} for all"
-        _say(console, f"Findings ({len(findings) if full or len(findings) <= TOP_FINDINGS else top})", "bold")
-        _print_findings(findings if full else findings[:TOP_FINDINGS], console, full)
+    if result.defects:
+        _say(console, f"Defects ({len(result.defects)})", "bold")
+        _print_defects(result.defects, console)
     elif not withheld:
-        _say(console, "No findings.", "green")
+        _say(console, "No defects.", "green")
     if withheld:
         _say(console, f"Not counted, for the reason above: {_plural(len(withheld), 'more finding')} (see report.json).", "dim")
     console.print()
+    if full and findings:
+        _say(console, f"Findings ({len(findings)})", "bold")
+        _print_findings(findings, console)
+        console.print()
     for text in [_issue_text(i) for i in result.dataset_issues] or ["no issues"]:
         _say(console, f"Dataset: {text}")
     console.print()
+    if findings and not full:
+        _say(console, f"{'full=True' if _from_python(result) else '--full'} prints the {_plural(len(findings), 'finding')} behind this, one per probe.", "dim")
     files = "report.md and report.json" if _from_python(result) else "report.md, report.json and repro.py"
     if out:
         console.print(Text(f"Saved {files} in {Path(out).parent}", style="dim"), soft_wrap=True)
@@ -327,6 +352,10 @@ def advice(result: AuditResult) -> list[tuple[str, list[str]]]:
                  f"{f['rate']:.0%} of {'rows' if f.get('unit') == 'tasks' else 'calls'} ({f['severity']})" for f in fs[:6]]
         items += [f"{len(fs) - 6} more under Findings"] if len(fs) > 6 else []
         out += [(f"**{title}.** {meaning} {sound}", items)] if fs else []
+    partial = next(h for h in result.metrics["head"] if h["key"] == "wrong_partial")
+    if partial.get("severity") in SERIOUS:
+        _, title, meaning, sound = ROWS["wrong_partial"]
+        out.append((f"**{title}.** {meaning} {sound}", [f"{partial['value']:.0%} of calls: {partial['detail']}"]))
     ok, phrase, *_ = _reliability(result)
     if not ok:
         out.append((f"**Reliability.** {phrase[0].upper()}{phrase[1:]}. A sound checker returns a score for every reply (zero "
@@ -364,6 +393,16 @@ def _md_finding(f: dict[str, Any], result: AuditResult) -> list[str]:
         L += [f"Example (row {_code(ex['task_id'])}, reference answer {_code(_reply(gold, 60))}, "
               f"{_example_scores(result.contract, ex)}):", "", fence, body, fence, ""]
     return L
+
+
+def _md_defects(result: AuditResult) -> list[str]:
+    L = ["## Defects", ""]
+    L += [] if result.defects else ["None.", ""]
+    for d in result.defects:
+        evidence = ", ".join(f"{e['probe_id']} {e['rate']:.0%} of {e['n']:,} {'rows' if e['unit'] == 'tasks' else 'calls'}" for e in d["evidence"])
+        example = f" Example: {_code(_reply(d['example']['completion']))}." if d["example"] else ""
+        L.append(f"- **{d['severity'].upper()}: {d['id']} {d['name']}.** {d['explanation']} Evidence: {evidence}.{example}")
+    return L + ([""] if result.defects else [])
 
 
 def _md_reliability(result: AuditResult) -> list[str]:
@@ -413,13 +452,14 @@ def render_markdown(result: AuditResult) -> str:
           "| Check | Result | Rate | 95% interval | Calls |", "|---|---|---|---|---|"]
     L += [f"| {label} | {word} | {rate} | {ci} | {n:,} |" for label, word, rate, ci, n, _ in _summary(result)]
     best = next(h for h in result.metrics["head"] if h["key"] == "non_solving_accepted").get("strategy") or {}
-    L += ["", "Rates are shares of calls, and the interval is a 95% Wilson interval. The first four rows say yes when they have a high or "
-          "medium finding." + (f" Accepts non-answers is the rate of the best such reply, {best['probe']}, measured on rows other than "
+    L += ["", "Rates are shares of calls, and the interval is a 95% Wilson interval. The first five rows say yes when they have a high or "
+          "medium problem." + (f" Accepts non-answers is the rate of the best such reply, {best['probe']}, measured on rows other than "
                         "those it was chosen on." if (best.get("confirm") or [0, 0])[1] else ""), ""]
     for line in _notes(result):
         L += [line, ""]
     L += [SEVERAL_TERMS, ""] if len(result.contract.signal_keys or []) > 1 else []
 
+    L += _md_defects(result)
     L += ["## Findings", ""]
     L += [] if findings else ["None that can be claimed." if withheld else "None.", ""]
     for f in findings:

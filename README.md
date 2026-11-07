@@ -105,7 +105,8 @@ from rewardaudit import audit
 
 result = audit(score, "data.jsonl", n=200)  # or a list of dicts, a DataFrame, a Hugging Face Dataset
 result.print()
-result.findings      # every finding, most severe first
+result.defects       # what the checker does wrong, most severe first
+result.findings      # every finding, one per probe
 result.rates         # the rate behind each row of the summary
 result.save("out/")  # report.md, report.json
 ```
@@ -131,7 +132,7 @@ would. Only do this with packages you would run anyway.
 
 ## In CI
 
-The exit code is 0 with no high or medium finding, 1 with one, and 2 if the audit could not be done or the rates could not
+The exit code is 0 with no high or medium defect, 1 with one, and 2 if the audit could not be done or the rates could not
 be measured.
 `--fail-on "right_rejected>0.1,wrong_accepted>0.01"` fails only above the rates you choose.
 
