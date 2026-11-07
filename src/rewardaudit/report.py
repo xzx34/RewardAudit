@@ -49,6 +49,8 @@ ROWS = {
 WHOLE_REPLY_LINE = ("The checker grades the whole reply by similarity to the reference answer: only the bare reference answer "
                     "earns full score, and the same answer in other formats earns part of it. So Rejects right answers "
                     "cannot be measured: any added text lowers such a score.")
+WHOLE_ANSWER_LINE = ("The checker compares the whole reply with the reference answer, as a script scoring a file of predictions "
+                     "does. Text around an answer loses the score, so those replies stay out of Rejects right answers.")
 SEVERAL_TERMS = ("A reply counts as accepted when it reaches the reference answer's value on all of these parts on that row. A "
                  "reply built without reading the reference answer also counts when it reaches it on one of them and earns "
                  "more than half of the reference answer's total.")
@@ -164,7 +166,8 @@ def _top_lines(result: AuditResult) -> list[str]:
     lines = [f"Measured on {pin}, not on the verifiers a fresh install of this package gets."] if pin else []
     lines += [line] if (line := direct_scoring_line(meta)) else []
     return lines + ([no_discrimination_line(c, result.metrics)] if c.no_discrimination else
-                    [WHOLE_REPLY_LINE] if c.whole_reply_similarity else [])
+                    [WHOLE_REPLY_LINE] if c.whole_reply_similarity else
+                    [WHOLE_ANSWER_LINE] if result.metrics.get("compares_whole_reply") else [])
 
 
 def _formats(result: AuditResult) -> list[str]:
@@ -410,8 +413,8 @@ def _md_reliability(result: AuditResult) -> list[str]:
     ok, phrase, *_ = _reliability(result)
     rb, d = result.metrics["robustness"], result.determinism
     if ok:
-        return [f"Every call returned a score: {phrase}, and no network attempts. A reference answer scored {d['repeats']} times "
-                f"got the same score each time, on all {d['checked']} rows checked.", ""]
+        return [f"Every call returned a score: {phrase}, and no network attempts. A reference answer and a reply with no answer, "
+                f"each sent several times, got the same score each time, on all {d['checked']} rows checked.", ""]
     L = [f"{phrase[0].upper()}{phrase[1:]}.", ""]
     for title, key in (("Errors", "exceptions"), ("Timeouts", "timeouts"), ("Crashes", "crashes"), ("Network attempts", "network")):
         g = rb[key]
@@ -424,7 +427,7 @@ def _md_reliability(result: AuditResult) -> list[str]:
             L.append(f"  - Example: probe {ex['probe_id']}, row {_code(ex['task_id'])}, reply {_code(_reply(ex['completion']))}"
                      + (f", error {_code(short_error(ex['error']))}" if ex.get("error") else ""))
     if not d["deterministic"]:
-        L.append(f"- **Different scores for the same reply**: rows {', '.join(d['inconsistent_tasks'])}, scored {d['repeats']} times each.")
+        L.append(f"- **Different scores for the same reply**: rows {', '.join(d['inconsistent_tasks'])}, with the reference answer or a reply with no answer sent several times.")
     return L + [""]
 
 

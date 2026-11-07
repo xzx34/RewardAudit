@@ -3,7 +3,7 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). What stays the same across versions is listed in
 the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
-## Unreleased
+## 0.2.0 - 2026-11-07
 
 ### Added
 
@@ -26,12 +26,18 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - A finding stays low below ten scored calls or on one row, with the note "too few calls to rate". Failed calls and rejected
   reference answers need two rows.
 - The terminal lists defects. The findings, one per probe, are under `--full` and in `report.md`.
-- Exit code 1 now means a high or medium defect, which includes wrong answers paid in part.
+- Exit code 1 now means a high defect. Before, any high or medium finding did, which on real checkers was nearly always: of 56,
+  51 had one and 20 have a high defect. `--fail-on` still sets a limit on any rate.
+- A checker that compares the whole reply with the reference answer is reported as such: replies with text around the answer
+  stay out of Rejects right answers and their findings stay low.
+- The check that a repeated call gets the same score also sends a reply with no answer, since a checker may guess when it finds none.
 
 ### Fixed
 
 - A fixed answer that happens to be right on a row now stays out of the rate on checkers that read the bare reply.
 - A reference answer with a percent sign is now recognized inside a reply.
+- An option letter F or T is a letter where the prompt lists it, not false or true.
+- A long answer with one digit changed no longer compares equal by similarity, so wrong answers on long LaTeX are sent.
 
 ## 0.1.0 - 2026-11-06
 

@@ -348,7 +348,8 @@ def test_whole_reply_similarity_counts_no_rewrite_as_rejected(tmp_path):
     assert heads["wrong_accepted"]["value"] == 0.0 and r.rates["wrong_accepted"] == 0.0 and "right_rejected" not in r.rates
     assert not [f for f in r.metrics["findings"] if f["category"] == "right_rejected"]
     assert {"Q5", "Q6", "Q22", "Q3"} <= {f["probe_id"] for f in r.metrics["withheld_findings"]}
-    assert heads["wrong_partial"]["value"] > 0.5 and exit_code(r) == 1  # similarity pays a wrong answer part of the score
+    assert heads["wrong_partial"]["value"] > 0.5 and heads["wrong_partial"]["severity"] == "medium"  # similarity pays part
+    assert exit_code(r) == 0  # only a high defect fails the audit
     assert "grades the whole reply" in render_markdown(r).split("## Summary")[0]
     assert "grades the whole reply" in " ".join(_terminal(r).split())
     probes = {p["id"]: p for p in r.metrics["probes"]}

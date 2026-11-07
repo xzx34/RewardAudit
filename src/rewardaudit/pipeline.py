@@ -22,6 +22,7 @@ from rewardaudit.types import Kind, Observation, Task
 
 TIER_RANK = {"natural": 0, "amplified": 1, "contrived": 2}
 DETERMINISM_REPEATS = 3
+NO_ANSWER, NO_ANSWER_REPEATS = "There is no answer here.", 8  # no lone letter a checker could read as an option
 ESTIMATE_TASKS = 20  # tasks whose probe calls are counted ahead, to tell how long the rest will take
 
 
@@ -105,12 +106,15 @@ Log = Callable[[str], None]
 
 
 def _check_determinism(runner: RunnerPool, tasks: list[Task], contract: Contract, repeats: int) -> dict[str, Any]:
+    """The reference answer, and a reply with no answer in it, each sent several times. A checker may guess at random only
+    when it finds no answer."""
     sample = [t for t in tasks if contract.self_pass.get(t.id)][:5]
     inconsistent: list[str] = []
     for t in sample:
         comp = contract.wrap(t.answer, t.id)
-        scores = [runner.score(t, comp).score for _ in range(repeats)]
-        if len({s for s in scores}) > 1:
+        scores = {runner.score(t, comp).score for _ in range(repeats)}
+        guesses = {runner.score(t, NO_ANSWER).score for _ in range(NO_ANSWER_REPEATS)}
+        if len(scores) > 1 or len(guesses) > 1:
             inconsistent.append(t.id)
     return {"checked": len(sample), "repeats": repeats, "inconsistent_tasks": inconsistent,
             "deterministic": not inconsistent}
@@ -242,10 +246,10 @@ def run_audit(
 
 
 def exit_code(result: AuditResult, fail_on: dict[str, float] | None = None) -> int:
-    """0 clean, 1 above the thresholds (default: any high or medium defect), 2 the checker cannot tell the reference answer
-    from a wrong one, so the headline rates were not measured."""
+    """0 clean, 1 above the thresholds (default: any high defect), 2 the checker cannot tell the reference answer from a
+    wrong one, so the headline rates were not measured."""
     if result.contract.no_discrimination:
         return 2
     if fail_on:
         return int(any(result.rates.get(key, 0.0) > thr for key, thr in fail_on.items()))
-    return int(any(d["severity"] in ("high", "medium") for d in result.defects))
+    return int(any(d["severity"] == "high" for d in result.defects))

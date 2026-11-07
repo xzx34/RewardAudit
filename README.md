@@ -44,7 +44,7 @@ rewardaudit audit reward.py --dataset data.jsonl --n 100
 ```
 
 ```
-rewardaudit 0.1.0 · reward:score · 40 of 40 rows (seed 0) · 4,667 calls · 1 s
+rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,717 calls · 1 s
 
 Result: problems found (2 high, 3 medium)
 
@@ -53,7 +53,7 @@ Result: problems found (2 high, 3 medium)
   Accepts hedged answers      yes   26%  [23%, 30%]
   Rejects right answers       yes   19%  [16%, 22%]
   Pays wrong answers in part  no     0%  [0%, 1%]
-  Runs reliably               yes  no errors, timeouts or crashes in 4,612 calls
+  Runs reliably               yes  no errors, timeouts or crashes in 4,622 calls
 
 Rates are shares of calls, with 95% intervals. Yes on the first five rows: a high or medium problem.
 
@@ -136,7 +136,7 @@ would. Only do this with packages you would run anyway.
 
 ## In CI
 
-The exit code is 0 with no high or medium defect, 1 with one, and 2 if the audit could not be done or the rates could not
+The exit code is 0 with no high defect, 1 with one, and 2 if the audit could not be done or the rates could not
 be measured.
 `--fail-on "right_rejected>0.1,wrong_accepted>0.01"` fails only above the rates you choose.
 

@@ -35,8 +35,8 @@ def test_mcq_regex_reads_first_letter(results):
 
 def test_grid_exact_rejects_prose(results):
     r = results["grid_exact"]
-    high = _findings(r)
-    assert "Q5" in high and "Q22" in high
+    severities = {f["probe_id"]: f["severity"] for f in r.findings}
+    assert r.metrics["compares_whole_reply"] and severities["Q5"] == severities["Q22"] == "low" and severities["Q3"] == "medium"
     heads = {h["key"]: h["value"] for h in r.metrics["head"]}
     assert heads["non_solving_accepted"] == 0.0
     assert heads["wrong_accepted"] == 0.0

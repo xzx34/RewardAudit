@@ -1,6 +1,7 @@
 """The probes on how answers are compared: attached characters, units, tolerance, other spellings, fixed answers."""
 
 import random
+import re
 
 import pytest
 
@@ -59,6 +60,20 @@ def test_one_digit_changed_in_a_long_answer_is_another_answer():
     assert equiv(gold.replace("{8}", "{9}"), gold, "latex") is False
     assert equiv("the treaty of 1982 between them", "the treaty of 1983 between them", "long_text") is False
     assert equiv("a long sentence about the river", "a long sentence about the rivers", "long_text") is True
+
+
+def test_m6_leaves_the_number_of_a_line_alone():
+    gold = "(1) Zoey is a knave\n(2) Oliver is a knight"
+    assert _gen("M6", gold) == {}
+    assert re.fullmatch(r"(1\. Sam has )\d( apples)", next(iter(_gen("M6", "1. Sam has 5 apples").values())))
+    task = Task("t", "What is it?", "20.09369")  # a decimal point is not a line number: every digit can change
+    ctx = _ctx([task])
+    ctx.task = task
+    positions = set()
+    for seed in range(60):
+        for _, reply in PROBES["M6"].generate(task, random.Random(seed), ctx):
+            positions |= {i for i, (a, b) in enumerate(zip(reply, task.answer, strict=True)) if a != b}
+    assert {0, 1} <= positions
 
 
 def test_m22_writes_a_positive_number_with_a_unicode_minus():

@@ -160,7 +160,7 @@ def test_a_checker_that_loses_the_answer_next_to_any_text_has_no_window():
     rows = [{"prompt": f"Add {i} and 10.", "answer": str(i + 10)} for i in range(12)]
     r = audit(whole_reply, rows, workers=1, probes=["Q"])
     f = next(f for f in r.findings if f["probe_id"] == "Q28")
-    assert f["example"]["variant"] == "0.1k" and f["severity"] == "medium"
+    assert f["example"]["variant"] == "0.1k" and f["severity"] == "low"  # it takes a reply to be its answer field
     assert "D8" not in {d["id"] for d in r.defects} and "Q28" in {e["probe_id"] for d in r.defects if d["id"] == "D9" for e in d["evidence"]}
 
 

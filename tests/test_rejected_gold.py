@@ -161,7 +161,7 @@ def test_the_finding_and_where_it_shows(tmp_path):
     head = {h["key"]: h for h in r.metrics["head"]}["right_rejected"]
     assert head["k"] == sum(p["obs_hits"] for p in r.metrics["probes"] if p["label"] == "solving" and p["headline"])
     assert "G1" not in {p["id"] for p in r.metrics["probes"]}
-    assert exit_code(r) == 1
+    assert exit_code(r) == 0  # medium: only a high defect fails the audit
 
     md = render_markdown(r)
     assert f"### MEDIUM: G1 {REJECTED_GOLD_NAME}" in md and "Rate 17% of 12 rows" in md
@@ -180,7 +180,7 @@ def test_below_a_tenth_of_the_tasks_it_is_low(tmp_path):
     golds = ["7 apples"] + [f"{i} plums" for i in range(19)]
     r = run_audit(_spec(tmp_path, REJECTS_TWO, golds), AuditConfig(n_tasks=20, families=["N"]))
     assert _g1(r)["severity"] == "low" and _g1(r)["rate"] == pytest.approx(0.05)
-    assert exit_code(r) == 0  # a low finding does not fail the audit
+    assert exit_code(r) == 0
 
 
 def test_partial_credit_is_only_mentioned(tmp_path):

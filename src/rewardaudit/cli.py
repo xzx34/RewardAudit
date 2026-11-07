@@ -96,7 +96,7 @@ def audit(
     full: bool = typer.Option(False, "--full", help="also print the finding behind each defect, one per probe"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="print only the result"),
 ) -> None:
-    """Audit one checker. Exit code: 0 no high or medium defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured."""
+    """Audit one checker. Exit code: 0 no high defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured."""
     try:
         size, gates = _sample_size(n), _fail_on(fail_on)
     except AuditError as e:

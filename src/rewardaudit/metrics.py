@@ -250,6 +250,8 @@ def _metric(key: str, title: str, k: int, n: int, detail: str = "") -> dict[str,
 NO_DISCRIMINATION = "not measured: reference and wrong answers score the same"
 WHOLE_REPLY = "not measured: the checker grades the whole reply by similarity to the reference answer"
 OUTRANKS, FORMAT_ONLY, SAME_SCORE = "outranks", "format_only", "same"  # the three no_discrimination cases
+WHOLE_ANSWER = "the checker compares the whole reply with the reference answer, so any text around an answer loses the score"
+PROSE_PROBES = ("Q5", "Q6", "Q21", "Q22", "Q28", "Q29", "O4")  # the right answer with text around it
 REJECTED_GOLD_ID = "G1"
 REJECTED_GOLD_NAME = "reference answer rejected in every format tried"
 
@@ -366,7 +368,7 @@ def nondeterminism_finding(determinism: dict[str, Any]) -> dict[str, Any]:
     return {"probe_id": "S1", "name": "different scores for the same reply", "family": "S", "tier": "natural",
             "category": "robustness", "severity": "medium", "rate": k / n, "ci": [lo, hi], "n": n, "task_rate": k / n,
             "n_tasks": n, "gold_blind": False, "example": None,
-            "note": f"the reference answer, sent {determinism['repeats']} times, got different scores on {k} of {n} rows"}
+            "note": f"the same reply, sent several times, got different scores on {k} of {n} rows"}
 
 
 def _discrimination(contract: Contract, above_findings: list[dict[str, Any]], k: int, n: int) -> dict[str, str]:
@@ -510,6 +512,15 @@ def compute(
     return tally.finish()
 
 
+def _compares_whole_reply(stats: dict[str, ProbeStats], contract: Contract) -> bool:
+    """The bare answer passes, and text before or after it mostly loses the score: the checker takes a reply to be
+    its answer field, as a script scoring a file of predictions does. Its protocol has no reasoning for a reply to lose."""
+    if contract.primary != "bare" or contract.whole_reply_similarity:
+        return False
+    rates = [stats[p].rate for p in ("Q5", "Q6") if p in stats and stats[p].n_scored]
+    return len(rates) == 2 and min(rates) >= 0.75
+
+
 def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
     """(variant, hits, scored, note) of a probe whose variants grow along one scale. The note gives the acceptance rate of each.
     The variant reported is where the behaviour ends: the widest error accepted at least half the time, or for a right
@@ -610,7 +621,8 @@ def _summarize(tally: Tally) -> dict[str, Any]:
 
     hk, hn = pooled(lambda s: s.probe.family == "O" and s.probe.label == Label.NOT_SOLVING)
     wk, wn = pooled(lambda s: s.probe.family == "M")
-    rk, rn = pooled(lambda s: s.probe.label == Label.SOLVING)
+    whole_answer = _compares_whole_reply(stats, contract)
+    rk, rn = pooled(lambda s: s.probe.label == Label.SOLVING and not (whole_answer and s.probe.id in PROSE_PROBES))
     head_hedge = _metric("hedging_accepted", "Hedged answers accepted", hk, hn,
                          "one right and one wrong answer in the same reply")
     head2 = _metric("wrong_accepted", "Wrong answers accepted", wk, wn, "the reference answer with a definite error")
@@ -661,6 +673,11 @@ def _summarize(tally: Tally) -> dict[str, Any]:
                 "rate": bad / s.n_obs, "ci": [lo, hi], "n": s.n_obs, "task_rate": 0.0, "n_tasks": s.n_tasks,
                 "example": None, "note": f"{s.errors} errors, {s.timeouts} timeouts, {s.crashes} crashes",
             }, s.fail_tasks >= MIN_TASKS))
+    if whole_answer:
+        for f in findings:
+            if f["probe_id"] in PROSE_PROBES and f["category"] == "right_rejected":
+                f["severity"] = "low"
+                f["note"] = "; ".join(x for x in (f["note"], WHOLE_ANSWER) if x)
     findings += [f for s in stats.values() if (f := _timing_finding(s))]
     bad_scores = _bad_scores_finding(tally.robust)
     findings += [bad_scores] if bad_scores else []
@@ -706,6 +723,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
                                              key=lambda x: -x[1])),
                        "wrong_above": contract.wrong_above, "wrong_checked": contract.wrong_checked},
         "discrimination": discrimination,  # {"case", "reason"} when contract.no_discrimination, else None
+        "compares_whole_reply": whole_answer,
         "n_tasks": len(tasks),
         "n_passing": len(passing),
         "discovery_n": n_disc,

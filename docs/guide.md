@@ -132,7 +132,7 @@ Result: problems found (2 high, 3 medium)
   Accepts hedged answers      yes   26%  [23%, 30%]
   Rejects right answers       yes   19%  [16%, 22%]
   Pays wrong answers in part  no     0%  [0%, 1%]
-  Runs reliably               yes  no errors, timeouts or crashes in 4,612 calls
+  Runs reliably               yes  no errors, timeouts or crashes in 4,622 calls
 
 Defects (6)
   HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
@@ -161,7 +161,8 @@ in the top line also count the wrong answers and repeats used before the probes,
 - **Pays wrong answers in part:** the reference answer with a definite error, earning more than nothing and less than the
   reference answer. The row says `yes` from one call in ten, when they earn a fifth of its score or more on average: less is
   usually a bonus for the format. A score such as F1 does this by design; whether that is what you want is your call.
-- **Runs reliably:** errors, timeouts, crashes and network attempts, and whether repeating a call gives the same score.
+- **Runs reliably:** errors, timeouts, crashes and network attempts, and whether repeating a call gives the same score, for the
+  reference answer and for a reply with no answer, since a checker may guess when it finds none.
 
 **Defects.** A defect says what the checker does, across the probes that show it: each line has its severity, its name, and the
 probes behind it with their rates. A defect takes the highest severity of its evidence. The names describe behaviour, since the
@@ -201,6 +202,11 @@ thumb for what to look at first:
 | High | A reply's text reaching a Python import, on one call. Non-answers, wrong answers or hedged answers accepted on about half of calls or more, a number 5% off accepted on half of rows, or right answers losing the score just for the reasoning before them on one call in five or more. |
 | Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts, scores that are not numbers, wrong answers paid in part as the row above says, a number 1% off accepted on half of rows, a right answer lost to 4k characters of text or fewer. |
 | Low | The same less often, or about what chance would give, and errors the checker raised. Listed for completeness. |
+
+**A checker that compares the whole reply.** If the bare answer passes and text around it mostly loses the score, the
+checker takes a reply to be its answer field, as a script scoring a file of predictions does. The report says so at the top, the
+replies with text around the answer stay out of Rejects right answers, and their findings stay low. Put the extraction step of
+your harness in front of the checker if you want those replies measured.
 
 A few calls say little, so a finding stays low, with the note "too few calls to rate", below ten scored calls or on one row only.
 Failed calls and rejected reference answers need two rows. A defect looks at its probes together: on a dataset with few numbers,
@@ -273,7 +279,7 @@ The report says which version the results were measured on. Delete the environme
 | Exit code | Meaning |
 |---|---|
 | 0 | No high or medium finding |
-| 1 | At least one high or medium defect, or a rate above `--fail-on` |
+| 1 | At least one high defect, or a rate above `--fail-on` |
 | 2 | The audit could not be done, or the rates could not be measured |
 
 ```yaml

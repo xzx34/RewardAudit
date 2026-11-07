@@ -12,7 +12,7 @@ from typing import Any
 
 from rewardaudit.errors import AuditError, NotAuditable
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["AuditError", "NotAuditable", "__version__", "audit"]
 

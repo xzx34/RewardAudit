@@ -192,3 +192,44 @@ def test_the_terminal_lists_defects_first_and_keeps_findings_for_full(tmp_path):
 
 def test_fail_on_knows_the_new_rate():
     assert cli._fail_on("wrong_partial>0.1") == {"wrong_partial": 0.1}
+
+
+def test_a_checker_that_compares_the_whole_reply_is_not_rated_on_text_around_the_answer():
+    def field(completion, answer):
+        return float(completion == answer)
+
+    r = audit(field, ROWS, workers=1)
+    severities = {f["probe_id"]: f["severity"] for f in r.findings if f["category"] == "right_rejected"}
+    assert r.metrics["compares_whole_reply"] and severities["Q5"] == severities["Q22"] == severities["Q6"] == "low"
+    head = next(h for h in r.metrics["head"] if h["key"] == "right_rejected")
+    assert head["n"] < sum(p["n_scored"] for p in r.metrics["probes"] if p["label"] == "solving" and p["headline"])
+    assert "compares the whole reply" in render_markdown(r)
+
+
+def test_a_marked_format_that_rejects_text_around_the_answer_is_still_rated():
+    def boxed_only(completion, answer):
+        return float(completion == f"\\boxed{{{answer}}}")
+
+    r = audit(boxed_only, ROWS, workers=1)
+    assert not r.metrics["compares_whole_reply"]
+    assert next(f for f in r.findings if f["probe_id"] == "Q5")["severity"] == "high" and exit_code(r) == 1
+
+
+def test_only_a_high_defect_fails_the_audit():
+    def rejects_a_period(completion, answer):
+        return float(completion.strip().split()[-1] == answer)  # reads the last word: no period, but no high defect either
+
+    r = audit(rejects_a_period, ROWS, workers=1, probes=["Q"])
+    assert {d["severity"] for d in r.defects} <= {"medium", "low"} and r.defects and exit_code(r) == 0
+
+
+def test_a_checker_that_guesses_when_it_finds_no_answer_is_not_deterministic():
+    def guesses(completion, answer):
+        import random
+
+        return float(completion == answer) if any(c.isdigit() for c in completion) else float(random.random() < 0.5)
+
+    r = audit(guesses, ROWS, workers=1, probes=["M"])
+    assert not r.determinism["deterministic"]
+    assert next(d for d in r.defects if d["id"] == "D15")["severity"] == "medium"
+    assert "the same reply, sent several times" in next(f for f in r.findings if f["probe_id"] == "S1")["note"]
