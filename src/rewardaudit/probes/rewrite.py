@@ -7,8 +7,8 @@ import unicodedata
 from datetime import date
 from decimal import Decimal
 
-from rewardaudit.equiv import NUMBER_WORDS, to_number
-from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity
+from rewardaudit.equiv import NUMBER_WORDS, contains_equiv, to_letter, to_number
+from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, option_texts
 from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
 
@@ -282,6 +282,55 @@ def q27_spelling(task, rng, ctx):
     return [(name, ctx.wrap(s)) for name, s in out.items() if s != g]
 
 
+# Neutral text: no numbers, no option letters, no yes or no, nothing a checker reads as an answer.
+_FILLER = ("Each step follows from the step before it.", "The reasoning here can be checked line by line.",
+           "Nothing in the earlier work needs to change.", "Going over the work again leads to the same place.",
+           "The conditions in the problem are all used along the way.", "It helps to write the quantities down before combining them.",
+           "Another reading of the problem gives the same outcome.", "The same idea applies when the problem is stated in other words.")
+LENGTHS = (("1k", 1_000), ("4k", 4_000), ("16k", 16_000), ("64k", 64_000))
+
+
+def _filler(size, pool, rng) -> str:
+    return " ".join(rng.choices(pool, k=size // min(map(len, pool)) + 1))[:size]
+
+
+def _long_text(task, rng, ctx):
+    """Long text around the right answer, in the lengths of a reply, for the checker that reads only part of it."""
+    pool = [s for s in _FILLER if not contains_equiv(s, ctx.gold(task), ctx.gtype(task))]
+    return [(name, _filler(size, pool, rng)) for name, size in LENGTHS] if pool else []
+
+
+def q28_long_text_after(task, rng, ctx):
+    answer = ctx.wrap(ctx.gold(task))
+    return [(name, f"{answer}\n\n{text}") for name, text in _long_text(task, rng, ctx)]
+
+
+def q29_long_text_before(task, rng, ctx):
+    pre, mark = ctx.split_wrap()
+    return [(name, f"{pre}{text}\n\n{mark(ctx.gold(task))}") for name, text in _long_text(task, rng, ctx)]
+
+
+def _few_with_prose(task, ctx) -> bool:
+    return task.id in ctx.first_passing() and _prose_allowed(task, ctx)
+
+
+def q30_option_text(task, rng, ctx):
+    """Only the text is not what a prompt that asks for a letter wants; the letter with its text always is."""
+    letter, texts = to_letter(ctx.gold(task)), option_texts(task.prompt)
+    if letter not in texts:
+        return []
+    out = [("letter_and_text", ctx.wrap(f"{letter}) {texts[letter]}"))]
+    return out if re.search(r"\bletter\b", task.prompt, re.I) else [("text", ctx.wrap(texts[letter])), *out]
+
+
+def q31_latex_markup(task, rng, ctx):
+    g = ctx.gold(task)
+    out = [("text", ctx.wrap(f"\\text{{{g}}}"))] if "\\boxed{" in ctx.wrap("x") and "\\" not in g else []
+    if plain_number(g) and re.search(r"\b(?:angle|degrees?)\b", _question(task.prompt), re.I):
+        out.append(("degrees", ctx.wrap(f"{g}^\\circ")))
+    return out
+
+
 PROBES = [
     Probe("Q1", "Q", "extra whitespace", "natural", "full", SOL, q1_whitespace,
           description="Sends the reference answer with extra spaces and newlines around it and inside the format, "
@@ -340,4 +389,21 @@ PROBES = [
     Probe("Q27", "Q", "other spellings of a word", "natural", "full", SOL, q27_spelling, applies=_words,
           description="Sends a short answer in words without accents, with or without a leading article, with a hyphen "
                       "and a space swapped, and with & and 'and' swapped; a sound checker gives full credit."),
+    Probe("Q28", "Q", "long text after the answer", "natural", "full", SOL, q28_long_text_after, applies=_few_with_prose,
+          headline=False, sweep=True,
+          description="Sends the reference answer followed by 1k, 4k, 16k and 64k characters of neutral text. Its finding "
+                      "gives the acceptance rate of each and the shortest that loses the score; a sound checker gives "
+                      "full credit. Sent on five rows, not when the prompt asks for only the answer."),
+    Probe("Q29", "Q", "long text before the answer", "natural", "full", SOL, q29_long_text_before, applies=_few_with_prose,
+          headline=False, sweep=True,
+          description="Sends 1k, 4k, 16k and 64k characters of neutral text and then the reference answer. Its finding gives "
+                      "the acceptance rate of each and the shortest that loses the score; a sound checker gives full "
+                      "credit. Sent on five rows, not when the prompt asks for only the answer."),
+    Probe("Q30", "Q", "an option's text with or without its letter", "natural", "full", SOL, q30_option_text,
+          applies=lambda t, c: c.gtype(t) == "mcq",
+          description="Sends the right option's letter with its text, and its text alone unless the prompt asks for a "
+                      "letter; a sound checker gives full credit."),
+    Probe("Q31", "Q", "an answer in LaTeX markup", "natural", "full", SOL, q31_latex_markup,
+          description="Inside \\boxed{} sends the reference answer in \\text{}, and with ^\\circ when the question is about "
+                      "an angle; a sound checker gives full credit."),
 ]

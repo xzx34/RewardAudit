@@ -19,7 +19,7 @@ def test_substring_accepts_shotgun(results):
     r = results["substring"]
     heads = {h["key"]: h["value"] for h in r.metrics["head"]}
     assert heads["non_solving_accepted"] >= 0.9
-    assert heads["hedging_accepted"] >= 0.9
+    assert heads["hedging_accepted"] >= 0.8  # below 1: a range such as 'between 74 and 76' does not hold the answer
     assert "E1" in _findings(r)
     assert {f["probe_id"] for f in r.findings if f["category"] == "right_rejected"} == {"Q23"}  # it looks for the digits
 

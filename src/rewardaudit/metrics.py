@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+import statistics
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any
@@ -58,6 +59,7 @@ class ProbeStats:
     # per variant: [disc_hits, disc_n, conf_hits, conf_n]
     variant_hits: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # [hits, scored]
     variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps: the first hit of each variant
+    variant_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))  # sweeps: time of each scored call
 
     def most_accepted_variant(self) -> tuple[str, int, int]:
         """(variant, hits, scored) of the variant the checker accepts most often."""
@@ -115,6 +117,7 @@ def floor_estimate(tasks: list[Task], gold_type: str) -> tuple[float, str]:
 
 
 EPS = 1e-9
+SLOW_MS = 500
 MIN_CALLS, MIN_TASKS = 10, 2  # below these a finding is not rated above low: one or two calls say too little
 TOO_FEW = "too few calls to rate"
 
@@ -257,10 +260,19 @@ def _non_solving_finding(probe: Probe, rate: float, lo: float, floor: float) -> 
     return "non_solving_accepted", "medium" if probe.tier == "contrived" and sev == "high" else sev
 
 
-def _tolerance_severity(variant: str, rate: float) -> str:
-    """How wide the accepted error is decides: rounding explains 0.1%, not 5%. Below half the rows it is the rows, not a rule."""
-    width = float(variant.rstrip("%"))
-    return "low" if rate < 0.5 or width < 1 else "medium" if width < 5 else "high"
+def _variant_size(name: str) -> float:
+    return float(re.search(r"\d+(?:\.\d+)?", name).group())
+
+
+def _sweep_severity(label: Label, variant: str, rate: float) -> str:
+    """Where the behaviour ends decides. Rounding explains an error of 0.1%, not 5%. A reply of 1k or 4k characters is an
+    ordinary one, and 64k is not. Below half the rows, it is about those rows and not a rule."""
+    size = _variant_size(variant)
+    if rate < 0.5:
+        return "low"
+    if label == Label.SOLVING:
+        return "medium" if size <= 4 else "low"
+    return "high" if size >= 5 else "medium" if size >= 1 else "low"
 
 
 def _above_gold_note(ex: Observation, contract: Contract, gold: float) -> str:
@@ -430,8 +442,10 @@ class Tally:
                 counted[1] += int(o.verdict.ok)
                 if h and example is None:
                     example = o
-                if h and probe.sweep:
+                if probe.sweep and h:
                     st.variant_examples.setdefault(o.variant, o)
+                if probe.sweep and o.verdict.ok:
+                    st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
                 any_hit |= h
                 any_partial |= p
             if any_hit:
@@ -474,7 +488,7 @@ def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
     """(variant, hits, scored, note) of a probe whose variants grow along one scale. The note gives the acceptance rate of each.
     The variant reported is where the behaviour ends: the widest error accepted at least half the time, or for a right
     answer, the shortest text that loses the score at least half the time."""
-    order = sorted(s.variant_hits, key=lambda v: float(re.search(r"\d+(?:\.\d+)?", v).group()))
+    order = sorted(s.variant_hits, key=_variant_size)
     solving = s.probe.label == Label.SOLVING
     shown = []
     for v in order:
@@ -483,6 +497,20 @@ def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
     half = [v for v in order if s.variant_hits[v][1] and 2 * s.variant_hits[v][0] >= s.variant_hits[v][1]]
     variant = (half[0] if solving else half[-1]) if half else s.most_accepted_variant()[0]
     return variant, *s.variant_hits[variant], "accepted: " + ", ".join(shown)
+
+
+def _timing_finding(s: ProbeStats) -> dict[str, Any] | None:
+    """Scored all the same, but much slower on a long reply: a cost of its own in training."""
+    short, long = s.variant_ms.get("1k"), s.variant_ms.get("64k")
+    if not short or not long:
+        return None
+    a, b = statistics.median(short), statistics.median(long)
+    if b <= SLOW_MS or b < 10 * a:
+        return None
+    return {"probe_id": s.probe.id, "name": "scoring time grows with reply length", "family": s.probe.family, "tier": s.probe.tier,
+            "category": "robustness", "severity": "medium", "rate": 1.0, "ci": list(wilson(len(long), len(long))), "n": len(long),
+            "task_rate": 0.0, "n_tasks": s.n_tasks, "example": None, "note": f"median {a:,.0f} ms at 1k characters, {b:,.0f} ms at 64k",
+            "meaning": "The checker takes much longer on a long reply."}
 
 
 def _partial_head(tally: Tally, n: int) -> dict[str, Any]:
@@ -563,7 +591,9 @@ def _summarize(tally: Tally) -> dict[str, Any]:
             category, sev = "right_rejected", _rejected_severity(s.probe.id, rate)
         else:
             category, sev = _non_solving_finding(s.probe, rate, lo, floor)
-            sev = _tolerance_severity(variant, rate) if s.probe.sweep else sev
+        sev = _sweep_severity(s.probe.label, variant, rate) if s.probe.sweep else sev
+        if s.probe.id == "O13" and "</think>" not in contract.wrap("x"):  # no thinking block in its format: it reads the whole reply
+            sev = "low"
         findings.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,
@@ -580,6 +610,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
                 "rate": bad / s.n_obs, "ci": [lo, hi], "n": s.n_obs, "task_rate": 0.0, "n_tasks": s.n_tasks,
                 "example": None, "note": f"{s.errors} errors, {s.timeouts} timeouts, {s.crashes} crashes",
             }, s.fail_tasks >= MIN_TASKS))
+    findings += [f for s in stats.values() if (f := _timing_finding(s))]
     rejected_gold = _rejected_gold_finding(contract, tasks)
     if rejected_gold:
         findings.append(rejected_gold)

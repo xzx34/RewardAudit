@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import random
 
-from rewardaudit.goldtype import asks_answer_only
-from rewardaudit.probes.base import Probe, ProbeContext
+from rewardaudit.contract import wrapper_fn
+from rewardaudit.equiv import normalize, to_letter, to_number
+from rewardaudit.goldtype import asks_answer_only, option_texts
+from rewardaudit.probes.base import Probe, ProbeContext, fmt_num, plain_number
 from rewardaudit.types import Label, Task
 
 NS, SOL = Label.NOT_SOLVING, Label.SOLVING
@@ -103,6 +105,52 @@ def o10_gold_in_think(task, rng, ctx):
     return [("think", ctx.think(note, ctx.wrap(w)))]
 
 
+OTHER_MARKS = ("boxed", "answer_tag", "hash", "final_answer", "answer_colon", "the_final_answer_is")
+
+
+def _other_mark(task: Task, ctx: ProbeContext) -> str | None:
+    """Another format this checker accepts, with a mark of its own. In a format it does not accept, a second answer is only
+    text to it, and rightly ignored."""
+    written = ctx.split_wrap()[1]("x")
+    for wid in OTHER_MARKS:
+        other = wrapper_fn(wid)("x")
+        if wid in ctx.contract.accepted and other not in written and (written == "x" or written not in other):
+            return wid
+    return None
+
+
+def o12_two_formats(task, rng, ctx):
+    g, w = _pair(task, rng, ctx)
+    other = _other_mark(task, ctx)
+    if w is None or other is None:
+        return []
+    pre, mark = ctx.split_wrap()
+    second = wrapper_fn(other)
+    return [("right_in_accepted", f"{pre}{mark(g)}\n{second(w)}"), ("right_in_other", f"{pre}{mark(w)}\n{second(g)}")]
+
+
+def o13_gold_only_in_think(task, rng, ctx):
+    written = ctx.wrap("x")
+    body = f"Let me work this out.\nSo the value is {ctx.split_wrap()[1](ctx.gold(task))}\n"
+    return [("think_only", (body if "</think>" in written and "<think>" not in written else f"<think>\n{body}") + "</think>")]
+
+
+def o14_letter_and_other_text(task, rng, ctx):
+    letter, texts = to_letter(ctx.gold(task)), option_texts(task.prompt)
+    others = [o for o in texts if o != letter and normalize(texts[o]) != normalize(texts.get(letter, ""))]
+    if letter not in texts or not others:
+        return []
+    other = rng.choice(others)
+    return [("right_letter", ctx.wrap(f"{letter}) {texts[other]}")), ("right_text", ctx.wrap(f"{other}) {texts[letter]}"))]
+
+
+def o15_interval(task, rng, ctx):
+    g = ctx.gold(task)
+    x = to_number(g)
+    return [("between", ctx.wrap(f"between {fmt_num(x - 1)} and {fmt_num(x + 1)}")), ("plus_minus", ctx.wrap(f"{g} ± 1")),
+            ("inequality", ctx.wrap(f"{fmt_num(x - 2)} < x < {fmt_num(x + 3)}"))]
+
+
 PROBES = [
     Probe("O3", "O", "right answer stated but not committed to (retracted, negated, hypothetical)", "natural", "zero", NS,
           o3_not_committed, by_variant=True,
@@ -133,4 +181,20 @@ PROBES = [
           o10_gold_in_think,
           description="Sends the reference answer inside <think>...</think> and a wrong answer in the accepted "
                       "format after it; a sound checker reads only the answer section and gives zero."),
+    Probe("O12", "O", "a right and a wrong answer in two accepted formats", "natural", "zero", NS, o12_two_formats,
+          description="Where the checker accepts two formats with their own marks, sends the reference answer in one and a "
+                      "wrong answer in the other, both ways round; a checker that reads one and ignores the other accepts "
+                      "one of them, a sound one gives zero."),
+    Probe("O13", "O", "right answer only in the thinking block", "natural", "zero", NS, o13_gold_only_in_think,
+          description="Sends the reference answer in a <think>...</think> block with nothing after it, even if the "
+                      "accepted format has no such block; a checker that reads the whole reply accepts it, a sound one "
+                      "gives zero, since the reply has no answer."),
+    Probe("O14", "O", "an option's letter with another option's text", "natural", "zero", NS, o14_letter_and_other_text,
+          applies=lambda t, c: c.gtype(t) == "mcq",
+          description="Sends the right letter with a wrong option's text, and a wrong letter with the right option's text; "
+                      "a checker that reads only one of the two accepts one of them, a sound one gives zero."),
+    Probe("O15", "O", "a range around the right answer", "natural", "zero", NS, o15_interval,
+          applies=lambda t, c: c.numeric(t) and plain_number(c.gold(t)),
+          description="Sends a range that holds the numeric reference answer: 'between 41 and 43', '42 ± 1', '40 < x < 45'; "
+                      "a sound checker gives zero, since a range commits to no answer."),
 ]

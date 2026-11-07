@@ -298,8 +298,11 @@ class Contract:
         return wrapper_fn(self.wrapper_for(task_id))(answer)
 
     def with_answer(self, completion: str, answer: str, task_id: str | None = None) -> str | None:
-        """The same reply with its final answer replaced: its reasoning stays, word for word. None when it does not end
-        in an answer in the accepted format, as a sweep of numbers or a refusal does: there is no answer to replace."""
+        """The same reply with its final answer replaced: its reasoning stays, word for word. A reply that stops at the end
+        of its thinking block gets one. None when it does not end in an answer in the accepted format, as a sweep of numbers
+        or a refusal does: there is no answer to replace."""
+        if completion.rstrip().endswith("</think>"):
+            return f"{completion.rstrip()}\n{self.wrap(answer, task_id).rpartition('</think>')[2].lstrip()}"
         head, _, tail = self.wrap(_ANSWER_SLOT, task_id).partition(_ANSWER_SLOT)
         mark = head[head.rfind("\n") + 1:]  # what opens the answer on its line; nothing for a plain answer on its own line
         body, tail = completion.rstrip(), tail.rstrip()

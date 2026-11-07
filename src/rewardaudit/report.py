@@ -378,7 +378,8 @@ def _example_scores(c: Contract, ex: dict[str, Any]) -> str:
 
 def _md_finding(f: dict[str, Any], result: AuditResult) -> list[str]:
     key = _row_of(f)
-    meaning = ("A reply that should earn nothing scored above the reference answer on the same row." if f.get("above_gold")
+    meaning = (f["meaning"] if f.get("meaning")
+               else "A reply that should earn nothing scored above the reference answer on the same row." if f.get("above_gold")
                else "The checker treats the dataset's own reference answer like a wrong one, in every format tried."
                if f["probe_id"] == REJECTED_GOLD_ID else ROWS[key][2] if key else "The checker returned no score on these replies.")
     over = f"{f['n']:,} rows" if f.get("unit") == "tasks" else f"{f['n']:,} calls on {f['n_tasks']:,} rows"
@@ -558,7 +559,7 @@ def _row_label(p: Probe) -> str:
 
 def sample_context() -> ProbeContext:
     ids = [t.id for t in SAMPLE_TASKS]
-    contract = Contract(full_score=1.0, accepted=["boxed"], primary="boxed", wrapper_rates={"boxed": 1.0},
+    contract = Contract(full_score=1.0, accepted=["boxed", "answer_tag"], primary="boxed", wrapper_rates={"boxed": 1.0},
                         self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
                         task_wrappers={i: ["boxed"] for i in ids})
     ctx = ProbeContext(contract=contract, gold_type="int", tasks=SAMPLE_TASKS,

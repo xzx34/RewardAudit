@@ -1,6 +1,7 @@
 """A gold the checker treats like a wrong answer in every format is a finding (G1), apart from the head metrics."""
 
 import json
+import re
 
 import pytest
 from rich.console import Console
@@ -172,7 +173,7 @@ def test_the_finding_and_where_it_shows(tmp_path):
     assert '"probe_id": "G1"' in (out / "repro.py").read_text(encoding="utf-8")
     console = Console(width=120, record=True, force_terminal=False)
     render_terminal(r, console, full=True)
-    assert f"G1  {REJECTED_GOLD_NAME}" in console.export_text()
+    assert re.search(rf"G1 +{REJECTED_GOLD_NAME}", console.export_text())
 
 
 def test_below_a_tenth_of_the_tasks_it_is_low(tmp_path):

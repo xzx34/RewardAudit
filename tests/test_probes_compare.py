@@ -7,7 +7,7 @@ import pytest
 from rewardaudit import audit
 from rewardaudit.contract import Contract
 from rewardaudit.goldtype import infer_gold_type
-from rewardaudit.metrics import Tally, _tolerance_severity
+from rewardaudit.metrics import Tally, _sweep_severity
 from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.probes.rewrite import parse_date
@@ -82,7 +82,7 @@ def test_m24_sweeps_and_skips_what_prints_the_same():
     ("0.1%", 1.0, "low"), ("1%", 1.0, "medium"), ("2%", 0.5, "medium"), ("5%", 1.0, "high"), ("10%", 0.5, "high"), ("10%", 0.4, "low"),
 ])
 def test_how_wide_the_accepted_error_is_decides_its_severity(variant, rate, severity):
-    assert _tolerance_severity(variant, rate) == severity
+    assert _sweep_severity(Label.NOT_SOLVING, variant, rate) == severity
 
 
 def test_a_tolerance_is_reported_as_the_widest_error_accepted_and_stays_out_of_the_rate():

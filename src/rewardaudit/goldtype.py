@@ -180,3 +180,9 @@ def mcq_options(prompt: str) -> list[str]:
         if ch not in seen:
             seen.append(ch)
     return seen if len(seen) >= 2 else []
+
+
+def option_texts(prompt: str) -> dict[str, str]:
+    """Letter -> text of the options listed in the prompt. With few-shot examples above it, the last question's options win."""
+    found = {letter: text for letter, text in re.findall(r"(?m)^[ \t]*\(?([A-J])[\.\):][ \t]+(\S.*?)[ \t]*$", prompt)}
+    return found if len(found) >= 2 else {}
