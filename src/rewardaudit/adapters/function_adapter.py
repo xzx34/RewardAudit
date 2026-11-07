@@ -85,6 +85,8 @@ def load_callable(path: str) -> tuple[Callable[..., Any], str]:
         fn = getattr(module, func_name, None)
         if not callable(fn):
             raise AuditError(f"{target} has no function {func_name!r}. Name one it defines, as {target}:function_name")
+        if inspect.isclass(fn):
+            raise AuditError(f"{func_name} is a class. Write a small function that calls it and name that function (see docs/guide.md)")
         return fn, func_name
     for name in CANDIDATE_NAMES:
         fn = getattr(module, name, None)

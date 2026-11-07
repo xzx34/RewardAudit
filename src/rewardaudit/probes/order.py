@@ -62,7 +62,7 @@ def o5_multiple_wrapped(task, rng, ctx):
     if w is None:
         return []
     w2 = ctx.wrong_answer(task, random.Random(rng.random())) or w
-    return [("three", _two(ctx, "{0}\n{1}\n{2}", w, g, w2)), ("two_gold_first", _two(ctx, "{0} {1}", g, w))]
+    return [("three", _two(ctx, "{0}\n{1}\n{2}", w, g, w2)), ("two_gold_first", _two(ctx, "{0}\n{1}" if ctx.opens_a_line() else "{0} {1}", g, w))]
 
 
 def _hedges(a: str, b: str, ctx: ProbeContext) -> list[tuple[str, str]]:

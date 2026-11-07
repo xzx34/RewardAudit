@@ -416,6 +416,18 @@ def test_a_row_with_no_accepted_answers_is_an_empty_answer_and_no_missing_column
     assert sum(t.answer == "" for t in r.tasks) == 1 and len(r.tasks) == 13
 
 
+def test_an_unknown_rate_in_fail_on_is_an_error_and_no_silent_pass():
+    res = _run("reward.py", "--dataset", "data.jsonl", "--fail-on", "rejects>0.5")
+    _says_one_line(res, "does not know 'rejects'", "right_rejected")
+
+
+def test_a_class_is_named_as_such(tmp_path):
+    reward = tmp_path / "reward.py"
+    reward.write_text("class Grader:\n    def __init__(self, strict=True):\n        self.strict = strict\n")
+    data = _write(tmp_path / "data.jsonl", ROWS)
+    _says_one_line(_run(f"{reward}:Grader", "--dataset", str(data)), "Grader is a class", "small function")
+
+
 def test_the_command_line_takes_a_reference_column(tmp_path):
     reward = tmp_path / "reward.py"
     reward.write_text("def score(completion, answer):\n    return float(completion.strip() in answer)\n")

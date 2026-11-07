@@ -16,11 +16,12 @@ from rewardaudit.errors import AuditError, WorkerError, short_error
 from rewardaudit.pipeline import AuditResult, exit_code
 from rewardaudit.report import render_terminal, write_outputs
 
-app = typer.Typer(add_completion=False, no_args_is_help=True, help="Black-box audit of RLVR checkers.",
+app = typer.Typer(add_completion=False, no_args_is_help=True, help="Test the checker of an RL environment, without a model.",
                   pretty_exceptions_enable=False)
 console = Console()
 errors = Console(stderr=True)
 USAGE_ERROR = 2
+RATES = ("non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected")
 
 
 def _sample_size(n: str) -> int | str:
@@ -41,6 +42,8 @@ def _fail_on(s: str | None) -> dict[str, float] | None:
     out: dict[str, float] = {}
     for part in s.split(","):
         key, _, val = part.strip().partition(">")
+        if key.strip() not in RATES:
+            raise AuditError(f"--fail-on does not know {key.strip()!r}; the rates are {', '.join(RATES)}")
         try:
             out[key.strip()] = float(val)
         except ValueError:
@@ -93,7 +96,7 @@ def audit(
     full: bool = typer.Option(False, "--full", help="print every finding, not only the top five"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="print only the result"),
 ) -> None:
-    """Audit one checker. Exit code: 0 no finding, 1 findings, 2 the audit could not be done."""
+    """Audit one checker. Exit code: 0 no high or medium finding, 1 such a finding, 2 the audit could not be done or the rates could not be measured."""
     try:
         size, gates = _sample_size(n), _fail_on(fail_on)
     except AuditError as e:

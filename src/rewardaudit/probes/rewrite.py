@@ -45,7 +45,7 @@ def q5_explanation_before(task, rng, ctx):
     pre, mark = ctx.split_wrap()
     text = (f"First, identify the quantities involved. Working carefully through each step and checking "
             f"the arithmetic along the way (for instance {d[0]} and {d[1]} appear as intermediate values), "
-            f"we arrive at the result.\n\nTherefore, ")
+            f"we arrive at the result.\n\n{'' if ctx.opens_a_line() else 'Therefore, '}")
     return [("before", pre + text + mark(g))]
 
 

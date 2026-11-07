@@ -56,32 +56,39 @@ def compute_score(solution_str, ground_truth): ...       # verl; data_source and
 def reward(prompts, completions, **columns): ...         # TRL and open-r1; returns a list, other columns are passed
 ```
 
-Parameters named `prompt`, `messages`, `info`, `metadata`, `data_source` or `extra_info` get those values from the row. A
-function can return a number, a bool, a dict (the main value from `score`, `overall`, `reward`, `rewards`, `total` or
-`accuracy`; other numbers count as sub-scores), or a one-element list or tensor.
+Parameters with other names get the reply and then the reference by position. Parameters named `prompt`, `messages`, `info`,
+`metadata`, `data_source` or `extra_info` get those values from the row.
+
+A function can return a number, a bool, a one-element list or tensor, or a dict. From a dict the main value is taken from
+`score`, `overall`, `reward`, `rewards`, `total` or `accuracy`, and other numbers count as sub-scores. A dict with none of those
+keys counts all its numbers, bools included, as parts of a total, so return one number if that is not what they are.
 
 **Anything else: wrap it.** rewardaudit needs only a function that takes a reply and a reference answer and returns a score,
-so a few lines in your own file connect any benchmark. Call your checker from it without changing what the checker decides:
+so a few lines in your own file connect any benchmark, including a checker that is a class or a method. Call your checker from
+it without changing what the checker decides:
 
 ```python
-# audit_me.py
-from my_project.rewards import Grader
+# audit_me.py, next to the code it imports
+from rewards import Grader
 
 grader = Grader(strict=True)
 
 def score(completion, answer):
-    return grader.grade(response=completion, expected="\\boxed{%s}" % answer)
+    return grader.grade(response=completion, expected=answer)["points"]
 ```
 
 ### The reply format
 
 rewardaudit first finds out how the checker wants a reply written: it sends each reference answer as it is, in `\boxed{}`, in
 `<answer>` tags, after `Final Answer:`, after `####`, and in other common forms, along with any tag or answer line the prompts
-ask for. Every probe then writes its replies in a form the checker accepts. If yours is none of these, name it:
+ask for. Probes then build their replies on a form the checker accepts; some surround it with text or put it inside a sentence,
+since that is what they test. If yours is none of these, name it:
 
 ```bash
 rewardaudit audit reward.py --dataset data.jsonl --format '<solution>{answer}</solution>'
 ```
+
+A format that is a mark and then the answer, such as `RESULT>> {answer}`, is mostly written on a line of its own.
 
 ### Several accepted answers
 
@@ -92,7 +99,8 @@ compares scores, so name one for the replies and hand the whole list to the chec
 rewardaudit audit reward.py --dataset data.jsonl --answer-col answers.text.0 --reference-col answers.text
 ```
 
-A number in a column name picks an item of a list. A row whose list is empty counts as having no answer.
+A number in a column name picks an item of a list, and a row whose list is empty counts as having no answer. Your function's
+reference parameter gets the whole list. Replies are written from the answer you name, so the others are not probed.
 
 ### The reference answer is not what the checker expects
 
@@ -109,9 +117,10 @@ how many.
 **What more rows give you.** Each row costs about 90 checker calls. A behaviour that affects 5% of rows shows up in a sample
 of 100 with a probability of 99.4%, and in a sample of 30 with 79%. Larger samples narrow the intervals and reach rarer rows.
 
-**Time.** A fast checker takes a few minutes per thousand rows at most; a checker that takes 10 ms per call needs about 15
-minutes per thousand rows on one worker. `--workers` runs that many processes (4 by default, or your CPU count if lower). A
-progress bar shows the time left. `--probes N,O,M` runs only those families.
+**Time.** Measured on a laptop: every row of GSM8K (7,473 rows, 680,201 calls) with a regular-expression checker took 40 seconds
+and about 400 MB with 4 workers. A slower checker sets the pace: at 10 ms per call, a thousand rows take about 15 minutes on one
+worker. `--workers` runs that many processes (4 by default, or your CPU count if lower). A progress bar shows the time left.
+`--probes N,O,M` runs only those families.
 
 ## Read the result
 
@@ -125,8 +134,13 @@ Result: problems found (1 high, 2 medium)
   Runs reliably           yes  no errors, timeouts or crashes in 3,727 calls
 ```
 
-Each row answers a question about the checker. `yes` or `no` says whether that row has a high or medium finding. The percentage
-is the share of calls that went that way, with a 95% interval.
+Each row answers a question about the checker. On the first four rows, `yes` means the row has a high or medium finding. **Runs
+reliably** reads the other way round: `yes` is good.
+
+The percentage is the share of calls that went that way, with a 95% interval. These are shares of the replies rewardaudit sends,
+not of what a model would write. They are for comparing runs and for `--fail-on`. A low rate can sit next to a high finding,
+since one kind of reply may be accepted every time and the others never, so read the findings to see what happens. The calls
+in the top line also count the wrong answers and repeats used before the probes, so that number is a little higher.
 
 - **Accepts non-answers:** the best reply built without reading the reference answer. It is chosen on part of the rows and
   measured on the others, so the choice does not inflate the rate. A reply that always says the most common answer is right
@@ -136,14 +150,14 @@ is the share of calls that went that way, with a 95% interval.
 - **Rejects right answers:** the reference answer written another way, still correct.
 - **Runs reliably:** errors, timeouts, crashes and network attempts, and whether repeating a call gives the same score.
 
-**Findings.** Each finding is one probe with its rate and an example reply. Severity is a rule of thumb for what to look at
-first:
+**Findings.** Each finding is one probe, with an example reply and a rate. Where a probe sends distinct kinds of reply, the rate
+is that of the kind that went that way most often. Severity is a rule of thumb for what to look at first:
 
 | Severity | Meaning |
 |---|---|
-| High | Happens on most calls, or right answers lose the score just for the reasoning around them. |
-| Medium | Happens often enough to shape what a model learns: roughly one call in ten or more. |
-| Low | Rare, or about what chance would give. Listed for completeness. |
+| High | Non-answers, wrong answers or hedged answers accepted on about half of calls or more, or right answers losing the score just for the reasoning before them on one call in five or more. |
+| Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts. |
+| Low | The same less often, or about what chance would give, and errors the checker raised. Listed for completeness. |
 
 **A finding is about behaviour.** rewardaudit does not know what you intended. If your task demands an exact format, then
 `34.0` being rejected may be right. Read the example, and run `repro.py` if you want to re-score it.
@@ -155,10 +169,11 @@ format credit does not count as accepted.
 **Saving the report.** `--out DIR` writes:
 
 - `report.md`: the summary, every finding with an example, what to fix, accepted formats, the dataset checks, how it was run.
-- `report.json`: the same results for scripts, with the rate of every probe.
+- `report.json`: the same results for scripts: `metrics.findings`, `metrics.head` for the summary rows, and `metrics.probes` for
+  the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists them; `rewardaudit probes Q6` shows what one sends. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists them; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt), O (two answers), M (definite errors), Q (right
 answers rewritten), P (malformed and extreme input).
 
@@ -239,7 +254,7 @@ except AuditError as e:     # something to fix in the input
     print(e)
 
 result.print()              # the summary; print(full=True) for every finding
-result.findings             # a list of dicts: probe_id, name, category, severity, rate, ci, n, example
+result.findings             # a list of dicts: probe_id, name, category, severity, rate, ci, n, example (the reply is in example["completion"])
 result.rates                # {"non_solving_accepted": 0.0, "wrong_accepted": 0.0, ...}
 result.save("out/")         # report.md and report.json
 ```
@@ -247,11 +262,15 @@ result.save("out/")         # report.md and report.json
 `checker` can be a function (closures and lambdas work), a file (`"reward.py"`, `"reward.py:fn"`), or an environment
 (`"my-env"`, `"owner/name"`). `data` can be a path, `"hf:org/name"`, a list of dicts, a DataFrame or a Hugging Face Dataset.
 
+If right and wrong answers score the same, `audit()` still returns. `result.rates` is then empty and `result.findings` holds only
+replies that scored above the reference answer, so an empty `findings` means nothing unless `rates` has values.
+
 A finding's `category` is its summary row: `non_solving_accepted`, `wrong_accepted`, `hedging_accepted`, `right_rejected` or
 `robustness`.
 
 Other arguments: `n` (a number, or `"all"`), `seed`, `prompt_col`, `answer_col`, `workers`, `timeout`, `probes` (such as
-`["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), and `verifiers`. For a function, also `style`,
+`["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), and `verifiers`. For a function, also `style` (how it is
+called, found from its parameters if not given: `bare`, `verl`, `trl`, `openrlhf`, `areal`, `rllm`, `easyr1` or `positional`),
 `kwargs` (extra keyword arguments), `reference_col` (a column to pass as the reference), `reference_template` (such as
 `"\\boxed{{{answer}}}"`), `ground_truth_json`, and `prompt_in_completion` (pass prompt and reply as one string).
 

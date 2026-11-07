@@ -252,11 +252,21 @@ class Runner:
             self.proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             self.proc.kill()
+        self._close_stdin()
         self.proc = None
+
+    def _close_stdin(self) -> None:
+        """Now, while a failed flush can be caught: at garbage collection it would print a traceback."""
+        try:
+            if self.proc and self.proc.stdin:
+                self.proc.stdin.close()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
 
     def _kill(self) -> None:
         if self.proc is not None:
             self.proc.kill()
+            self._close_stdin()
             try:
                 self.proc.wait(timeout=2)
             except subprocess.TimeoutExpired:

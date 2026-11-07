@@ -164,6 +164,12 @@ class ProbeContext:
 
         return pre, mark
 
+    def opens_a_line(self) -> bool:
+        """The accepted format is a mark and then the answer, with nothing after it ('#### 42', 'Answer: 42'). Checkers often
+        read such a line from its start, so a reply writes it on a line of its own."""
+        written = self.split_wrap()[1](_SENTINEL)
+        return written.endswith(_SENTINEL) and written != _SENTINEL
+
     def think(self, note: str, answer: str) -> str:
         """`note` as thinking before `answer` (a wrapped answer): inside the wrapper's own thinking block, at the
         start when the prompt has already opened one, else in a new block."""

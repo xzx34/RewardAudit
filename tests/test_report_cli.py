@@ -436,3 +436,7 @@ def test_robustness_breakdown_counts_types_probes_and_gold_network():
     assert rb["network"]["gold"] == 1 and "remote service" in rb["network"]["note"]
     assert abs(rb["error_rate"] - 0.4) < 1e-9
     assert exception_type("KeyError: 'x'") == "KeyError" and exception_type("") == "unknown"
+
+
+def test_a_reply_shows_the_spaces_at_its_ends():
+    assert _reply("  x  ") == "␣␣x␣␣" and _reply("a\n\nb") == "a ⏎ b" and _reply("\nx\n") == "x"

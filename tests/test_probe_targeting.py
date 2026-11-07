@@ -89,6 +89,20 @@ def test_other_formats_still_get_the_retraction(wid):
     assert not single_block(wid) and _gen("O4", Task("t", "Compute it.", "42"), primary=wid)
 
 
+@pytest.mark.parametrize("primary, line", [("hash", "#### 42"), ("answer_colon", "Answer: 42"), ("final_answer", "Final Answer: 42"),
+                                           ("prefix:Final", "Final: 42"), ("RESULT>> {answer}", "RESULT>> 42")])
+def test_a_format_that_opens_a_line_stays_on_a_line_of_its_own(primary, line):
+    t = Task("t", "Compute it.", "42")
+    assert _gen("Q5", t, primary=primary)["before"].endswith(f"we arrive at the result.\n\n{line}")
+    assert _gen("O5", t, primary=primary)["two_gold_first"].startswith(f"{line}\n")
+
+
+@pytest.mark.parametrize("primary, end", [("boxed", "Therefore, \\boxed{42}"), ("answer_tag", "Therefore, <answer>42</answer>"),
+                                          ("<sol>{answer}</sol>", "Therefore, <sol>42</sol>"), ("bare", "Therefore, 42")])
+def test_other_formats_can_sit_inside_a_sentence(primary, end):
+    assert _gen("Q5", Task("t", "Compute it.", "42"), primary=primary)["before"].endswith(end)
+
+
 def test_a_format_the_user_gave_is_one_block_and_probes_write_in_it():
     t = Task("t", "Compute it.", "42")
     assert single_block("<sol>{answer}</sol>") and not _gen("O4", t, primary="<sol>{answer}</sol>")

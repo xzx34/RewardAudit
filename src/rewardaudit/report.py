@@ -86,7 +86,8 @@ def _reply(s: str, n: int = 120) -> str:
     """A reply on one line. A long one keeps both ends, since the answer is often the last thing in it."""
     if not s.strip():
         return "(an empty reply)" if not s else "(spaces and newlines only)"
-    s = "".join(ch if ch.isprintable() else " " for ch in re.sub(r"\s*\n\s*", " ⏎ ", s.strip()))
+    s = re.sub(r"^ +| +$", lambda m: "␣" * len(m.group()), s.strip("\n"))  # spaces at the ends may be what is being tested
+    s = "".join(ch if ch.isprintable() else " " for ch in re.sub(r"\s*\n\s*", " ⏎ ", s))
     return s if len(s) <= n else f"{s[:2 * n // 3].rstrip()} … {s[-n // 3:].lstrip()}"
 
 
@@ -251,7 +252,7 @@ def _print_summary(result: AuditResult, console: Console) -> None:
         t.add_row(Text(label), Text(word, style="red" if bad else "green"), Text(body))
     console.print(Padding(t, (0, 0, 1, 2), expand=False))
     if any(h["n"] and not h.get("not_measured") for h in result.metrics["head"]):
-        _say(console, "Rates are shares of calls, with 95% intervals. Yes: a high or medium finding.\n", "dim")
+        _say(console, "Rates are shares of calls, with 95% intervals. Yes on the first four rows: a high or medium finding.\n", "dim")
 
 
 def _print_findings(findings: list[dict[str, Any]], console: Console, full: bool) -> None:
@@ -412,8 +413,8 @@ def render_markdown(result: AuditResult) -> str:
           "| Check | Result | Rate | 95% interval | Calls |", "|---|---|---|---|---|"]
     L += [f"| {label} | {word} | {rate} | {ci} | {n:,} |" for label, word, rate, ci, n, _ in _summary(result)]
     best = next(h for h in result.metrics["head"] if h["key"] == "non_solving_accepted").get("strategy") or {}
-    L += ["", "Rates are shares of calls, and the interval is a 95% Wilson interval. A row says yes when it has a high or medium "
-          "finding." + (f" Accepts non-answers is the rate of the best such reply, {best['probe']}, measured on rows other than "
+    L += ["", "Rates are shares of calls, and the interval is a 95% Wilson interval. The first four rows say yes when they have a high or "
+          "medium finding." + (f" Accepts non-answers is the rate of the best such reply, {best['probe']}, measured on rows other than "
                         "those it was chosen on." if (best.get("confirm") or [0, 0])[1] else ""), ""]
     for line in _notes(result):
         L += [line, ""]
