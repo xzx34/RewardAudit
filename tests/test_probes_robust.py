@@ -27,7 +27,9 @@ def _gen(probe_id, answer="42", primary="boxed"):
 
 
 def test_p16_names_the_module_in_the_accepted_format():
-    assert _gen("P16") == {"call": f"\\boxed{{__import__('{MARKER_MODULE}')}}", "statement": f"\\boxed{{import {MARKER_MODULE}}}"}
+    call = f"__import__('{MARKER_MODULE}')"
+    assert _gen("P16") == {"call": f"\\boxed{{{call}}}", "statement": f"\\boxed{{import {MARKER_MODULE}}}",
+                           "sentence": f"The answer is {call}", "bare": call}
 
 
 def _defect(r, defect):

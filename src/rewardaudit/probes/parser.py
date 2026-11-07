@@ -92,7 +92,9 @@ def p15_gold_tower(task, rng, ctx):
 
 def p16_reply_run_as_code(task, rng, ctx):
     """Harmless: the module does not exist, so all a checker that runs this can do is try to import it."""
-    return _safe([("call", ctx.wrap(f"__import__('{MARKER_MODULE}')")), ("statement", ctx.wrap(f"import {MARKER_MODULE}"))], task, ctx)
+    call = f"__import__('{MARKER_MODULE}')"
+    return _safe([("call", ctx.wrap(call)), ("statement", ctx.wrap(f"import {MARKER_MODULE}")),
+                  ("sentence", f"The answer is {call}"), ("bare", call)], task, ctx)  # a checker may evaluate only what one format holds
 
 
 def p17_a_million_characters(task, rng, ctx):
@@ -126,7 +128,7 @@ PROBES = [
     Probe("P16", "P", "the reply's text run as code", "contrived", "zero", NS, p16_reply_run_as_code, applies=_first_tasks,
           gold_blind=True, headline=False, by_variant=True,
           description="Sends a Python expression and a statement that import a module nothing else names and that does not "
-                      "exist, in the accepted format. A checker that runs what it reads tries the import, which shows the "
+                      "exist, in the accepted format, after 'The answer is', and alone. A checker that runs what it reads tries the import, which shows the "
                       "reply's text reached a Python import: one such call is a high finding, whatever the score. A sound "
                       "checker never runs a reply's text."),
     Probe("P17", "P", "a million characters with no answer", "contrived", "zero", NS, p17_a_million_characters,
