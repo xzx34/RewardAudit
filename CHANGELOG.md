@@ -12,6 +12,7 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   shortest reply still accepted, short of the reference answer on its own. In `report.json` this is
   `defects[].confirmation`: `resends`, the scores of those calls, and `shortest_accepted`, with `completion` and `score`, left
   out when nothing could be taken out. These calls count in no rate or finding; the calls in the top line include them.
+  The progress bar shows them as a stage of its own, `confirming defects`.
 
 ## 0.2.0 - 2026-11-07
 

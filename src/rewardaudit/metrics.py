@@ -141,7 +141,7 @@ def _require_evidence(f: dict[str, Any], enough: bool) -> dict[str, Any]:
     return f
 
 
-def _hit(o: Observation, contract: Contract, gold_blind: bool = False, eps: float = EPS) -> tuple[bool, bool]:
+def hit(o: Observation, contract: Contract, gold_blind: bool = False, eps: float = EPS) -> tuple[bool, bool]:
     """(hit, partial). NOT_SOLVING: hit = accepted at full signal, or for a reply built without the gold, paid by one
     signal key (`Contract.pays_on_one_term`). SOLVING: hit = not accepted."""
     v = o.verdict
@@ -434,7 +434,7 @@ class Tally:
                     st.timeouts += 1
                 elif k == Kind.CRASH:
                     st.crashes += 1
-                h, p = _hit(o, contract, probe.gold_blind)
+                h, p = hit(o, contract, probe.gold_blind)
                 if p and probe.family == "M" and probe.headline:
                     self._add_paid(o)
                 if probe.family == "N" and o.verdict.ok:

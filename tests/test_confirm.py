@@ -39,7 +39,7 @@ class Calls:
         self.sent.append(completion)
         return Verdict(Kind.SCORE, score=float(self.fn(completion, task.answer)))
 
-    def score_many(self, items):
+    def score_many(self, items, progress=None):
         return [self.score(t, c) for t, c in items]
 
 
@@ -119,7 +119,7 @@ def test_cutting_stops_at_its_limit():
 
 
 def test_confirming_leaves_every_rate_and_finding_as_it_was(quickstart, monkeypatch):
-    monkeypatch.setattr(pipeline, "confirm", lambda *a: None)
+    monkeypatch.setattr(pipeline, "confirm", lambda *a, **kw: None)
     plain = audit(last_digits, ROWS, workers=1)
 
     def counted(r):
@@ -128,6 +128,20 @@ def test_confirming_leaves_every_rate_and_finding_as_it_was(quickstart, monkeypa
 
     assert counted(plain) == counted(quickstart) and not any("confirmation" in d for d in plain.defects)
     assert quickstart.meta["checker_calls"] > plain.meta["checker_calls"]  # the calls in the top line include them
+
+
+def test_the_progress_bar_counts_every_confirming_call(monkeypatch):
+    made, seen = [], []
+
+    def counting(runner, *args, **kwargs):
+        before = runner.calls
+        confirm(runner, *args, **kwargs)
+        made.append(runner.calls - before)
+
+    monkeypatch.setattr(pipeline, "confirm", counting)
+    audit(last_digits, ROWS, workers=1, progress=lambda stage, done, total: seen.append((stage, done)))
+    assert "probes" in {s for s, _ in seen} and seen[-1][0] == "confirming defects"
+    assert [d for s, d in seen if s == "confirming defects"] == list(range(1, made[0] + 1))
 
 
 def test_the_terminal_and_report_md_have_a_line_under_each_high_defect(quickstart):

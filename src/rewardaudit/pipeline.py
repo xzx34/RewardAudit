@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from rewardaudit import __version__
-from rewardaudit.confirm import confirm
+from rewardaudit.confirm import MAX_CUT_CALLS, RESENDS, confirm
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
 from rewardaudit.gate import check_contract, check_loaded
 from rewardaudit.goldtype import infer_dataset_type, infer_task_type
@@ -233,7 +233,8 @@ def run_audit(
         metrics["robustness"]["gold_error_example"] = (err_example or "")[-600:]
         issues = runner.dataset_issues()
         defects = collect_defects(metrics, contract)
-        confirm(runner, defects, tasks, contract)
+        high = sum(d["severity"] == "high" for d in defects)
+        confirm(runner, defects, tasks, contract, progress=_stage(progress, "confirming defects", high * (RESENDS + MAX_CUT_CALLS)))
         env_name, meta = runner.name, dict(runner.meta)
         meta["worker_restarts"] = runner.restarts
         meta["checker_calls"] = runner.calls

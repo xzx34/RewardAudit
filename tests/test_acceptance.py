@@ -8,7 +8,7 @@ import random
 import pytest
 
 from rewardaudit.contract import Contract, _find_signal_keys, _task_full, infer_contract
-from rewardaudit.metrics import REJECTED_GOLD_NAME, _hit, compute, floor_estimate
+from rewardaudit.metrics import REJECTED_GOLD_NAME, compute, floor_estimate, hit
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import render_markdown
@@ -229,7 +229,7 @@ def test_a_reply_marked_down_to_half_of_the_gold_total_is_not_accepted():
 
     def counted(score, label):
         verdict = Verdict(Kind.SCORE, score=score, sub_scores={"actions": 0.9})
-        return _hit(Observation("M18", "M", "cut", "t", "x", verdict, label, "zero", "natural"), c)[0]
+        return hit(Observation("M18", "M", "cut", "t", "x", verdict, label, "zero", "natural"), c)[0]
 
     assert not counted(0.286, Label.NOT_SOLVING) and counted(0.5, Label.NOT_SOLVING)  # the metrics count what this says
     assert counted(0.286, Label.SOLVING) and not counted(0.5, Label.SOLVING)

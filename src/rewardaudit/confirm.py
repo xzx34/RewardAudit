@@ -6,6 +6,7 @@ None of these calls counts in the rates or the findings.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from itertools import pairwise
 from typing import Any
 
@@ -13,7 +14,7 @@ from rewardaudit.contract import Contract
 from rewardaudit.defects import RUN_AS_CODE
 from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.labels import states_the_answer
-from rewardaudit.metrics import _hit
+from rewardaudit.metrics import hit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.runner import RunnerPool
 from rewardaudit.types import Label, Observation, Task, Verdict
@@ -34,11 +35,11 @@ def _accepted(ex: dict[str, Any], reply: str, v: Verdict, contract: Contract, go
     """Accepted as the probe statistics count it, for a reply in place of the example's."""
     o = Observation(ex["probe_id"], ex["family"], ex["variant"], ex["task_id"], reply, v, Label(ex["label"]), ex["expect"],
                     ex["tier"])
-    return _hit(o, contract, gold_blind)[0]
+    return hit(o, contract, gold_blind)[0]
 
 
-def _shortest_accepted(runner: RunnerPool, task: Task, ex: dict[str, Any], contract: Contract, gold_blind: bool
-                       ) -> dict[str, Any] | None:
+def _shortest_accepted(runner: RunnerPool, task: Task, ex: dict[str, Any], contract: Contract, gold_blind: bool,
+                       progress: Callable[[int], None] | None) -> dict[str, Any] | None:
     """The example with sentences, then whitespace-separated words, taken out for as long as the rest is still accepted:
     runs of half the pieces first, then of a quarter, down to one piece at a time, until no single piece can go. A rest
     that states the reference answer alone is not sent, since accepting it is right. None when nothing could be taken out."""
@@ -57,6 +58,8 @@ def _shortest_accepted(runner: RunnerPool, task: Task, ex: dict[str, Any], contr
                     continue
                 calls += 1
                 v = runner.score(task, reply)
+                if progress:
+                    progress(1)
                 if _accepted(ex, reply, v, contract, gold_blind):
                     pieces, best, cut = rest, {"completion": reply, "score": v.score}, True
                 else:
@@ -68,25 +71,26 @@ def _shortest_accepted(runner: RunnerPool, task: Task, ex: dict[str, Any], contr
     return best
 
 
-def confirm(runner: RunnerPool, defects: list[dict[str, Any]], tasks: list[Task], contract: Contract) -> None:
+def confirm(runner: RunnerPool, defects: list[dict[str, Any]], tasks: list[Task], contract: Contract,
+            progress: Callable[[int], None] | None = None) -> None:
     """Adds `confirmation` to each high defect with an example: `resends`, the scores of RESENDS more calls with the same
     reply (None for a call that returned no score), and, for a wrong answer, hedge or non-answer the checker accepted on
     every one of them, `shortest_accepted`: the shortest reply cut from it that is still accepted, with its score. A right
-    answer rejected and a reply that reached an import are only sent again."""
+    answer rejected and a reply that reached an import are only sent again. `progress` is called with the calls just made."""
     by_id = {t.id: t for t in tasks}
     blind = {p.id for p in all_probes() if p.gold_blind}
     for d in defects:
         ex = d["example"]
-        if d["severity"] != "high" or not ex or ex["task_id"] not in by_id:
+        if d["severity"] != "high" or not ex:
             continue
         task = by_id[ex["task_id"]]
-        verdicts = runner.score_many([(task, ex["completion"])] * RESENDS)
+        verdicts = runner.score_many([(task, ex["completion"])] * RESENDS, progress=progress)
         d["confirmation"] = {"resends": [v.score if v.ok else None for v in verdicts]}
         gold_blind = ex["probe_id"] in blind
         # a reply that should earn nothing is the example of wrong_accepted, hedging_accepted and non_solving_accepted;
         # of the robustness findings, only a reply that reached an import has an example
         if (ex["label"] == Label.NOT_SOLVING.value and d["id"] != RUN_AS_CODE
                 and all(_accepted(ex, ex["completion"], v, contract, gold_blind) for v in verdicts)):
-            shortest = _shortest_accepted(runner, task, ex, contract, gold_blind)
+            shortest = _shortest_accepted(runner, task, ex, contract, gold_blind, progress)
             if shortest is not None:
                 d["confirmation"]["shortest_accepted"] = shortest
