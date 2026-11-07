@@ -16,7 +16,7 @@ class Defect:
     probes: tuple[str, ...] = ()
 
 
-FIXED_ANSWER, RUN_AS_CODE, ROBUSTNESS, WRONG_PARTIAL, ABOVE_REFERENCE = "D11", "D12", "D13", "D14", "D18"
+REWRITES, FIXED_ANSWER, RUN_AS_CODE, ROBUSTNESS, WRONG_PARTIAL, ABOVE_REFERENCE = "D9", "D11", "D12", "D13", "D14", "D18"
 
 DEFECTS = (
     Defect("D1", "Signs and punctuation ignored",
@@ -25,7 +25,7 @@ DEFECTS = (
     Defect("D2", "Substring match",
            "A reply counts when the reference answer appears somewhere inside it, or when it is a part of the reference answer.",
            ("M21", "M18", "E1", "E5", "O6")),
-    Defect("D3", "Numeric tolerance too wide", "A number that differs from the reference answer still compares equal.", ("M24", "M1")),
+    Defect("D3", "Numeric tolerance too wide", "A number that differs from the reference answer still compares equal.", ("M24", "M25", "M1")),
     Defect("D4", "One of several answers is read",
            "With several answers marked in one reply, the checker reads one of them, often the first, and ignores the others.",
            ("O5", "O12", "O4", "E6")),

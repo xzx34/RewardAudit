@@ -10,13 +10,28 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - Defects: the report now says what the checker does across probes, from a catalog of 21 kinds of defect, each with the probes
   behind it, its rates and an example. They are in `result.defects` and under `defects` in `report.json`.
 - A sixth question, `wrong_partial`: how often a definite error earns more than nothing. `--fail-on` takes it.
+- 22 new probes, 77 in all:
+  - how answers are compared: M21 characters attached to the answer, M22 its opposite with a Unicode minus, M23 another unit,
+    M24 a number off by 0.1% to 10%, M25 a hundred times the number or a hundredth, L5 the most common answer, L6 the prompt's
+    last number;
+  - other spellings: Q23 numbers, Q24 units, Q25 percentages, Q26 dates, Q27 words, Q30 option texts, Q31 LaTeX markup;
+  - which answer is read: O12 two answers in two accepted formats, O13 only in the thinking block, O14 an option's letter with
+    another's text, O15 a range around the answer, Q28 and Q29 long text around the answer;
+  - robustness: P16 a reply's text run as code, P17 a million characters. P2 also sends invisible characters and a NUL byte
+    inside a wrong answer.
+- Findings for a checker that returns nan or inf, and for scoring much slower on long replies.
 
 ### Changed
 
 - A finding stays low below ten scored calls or on one row, with the note "too few calls to rate". Failed calls and rejected
   reference answers need two rows.
 - The terminal lists defects. The findings, one per probe, are under `--full` and in `report.md`.
-- Exit code 1 now means a high or medium defect, which includes wrong answers paid in part on one call in ten or more.
+- Exit code 1 now means a high or medium defect, which includes wrong answers paid in part.
+
+### Fixed
+
+- A fixed answer that happens to be right on a row now stays out of the rate on checkers that read the bare reply.
+- A reference answer with a percent sign is now recognized inside a reply.
 
 ## 0.1.0 - 2026-11-06
 

@@ -33,8 +33,8 @@ def _gen(probe_id, answer, prompt="What is the answer?", others=()):
 
 
 @pytest.mark.parametrize(("answer", "expected"), [
-    ("42", {"append_0": "420", "append_00": "4200", "prepend_1": "142"}),
-    ("-42", {"append_0": "-420", "append_00": "-4200", "prepend_1": "-142"}),
+    ("42", {"append_0": "420", "prepend_1": "142"}),
+    ("-42", {"append_0": "-420", "prepend_1": "-142"}),
     ("3.5", {"prepend_1": "13.5"}),  # 3.50 is the same number
 ])
 def test_m21_attaches_digits_and_keeps_the_sign(answer, expected):
@@ -116,6 +116,35 @@ def test_q23_spells_a_number_other_ways(answer, expected):
     assert _gen("Q23", answer, "How many are there?") == expected
 
 
+def test_m25_sends_a_hundred_times_and_a_hundredth():
+    assert _gen("M25", "42") == {"x100": "4200", "div100": "0.42"}
+    assert _gen("M25", "42", "What percentage of the class passed?") == {}  # 0.42 and 42 can both be right there
+    assert _gen("M25", "0") == _gen("M25", "Paris") == {}
+
+
+def test_a_checker_that_allows_for_percentages_is_found():
+    def allows_percent(completion, answer):  # as some real checkers do, in every comparison
+        try:
+            return float(any(abs(float(completion) - float(answer) * k) < 1e-9 for k in (1, 100, 0.01)))
+        except ValueError:
+            return 0.0
+
+    rows = [{"prompt": f"Add {i} and 10.", "answer": str(i + 10)} for i in range(12)]
+    r = audit(allows_percent, rows, workers=1)
+    assert next(f for f in r.findings if f["probe_id"] == "M25")["severity"] == "high"
+    assert next(d for d in r.defects if d["id"] == "D3")["severity"] == "high"
+    assert "D2" not in {d["id"] for d in r.defects}
+
+
+def test_q23_stays_low_and_out_of_the_rate():
+    def digits_only(completion, answer):
+        return float(completion == answer)
+
+    rows = [{"prompt": f"How many are {i} and 10?", "answer": str(i + 10)} for i in range(12)]
+    r = audit(digits_only, rows, workers=1, probes=["Q"])
+    assert next(f for f in r.findings if f["probe_id"] == "Q23")["severity"] == "low" and not PROBES["Q23"].headline
+
+
 def test_q23_is_for_quantities():
     assert _gen("Q23", "42", "Which version of the library added this?") == {}
     assert _gen("Q23", "Paris") == {}
@@ -158,7 +187,8 @@ def test_q26_needs_a_date_that_says_which_number_is_the_month(answer):
     ("the chair", {"no_article": "chair"}),
     ("a green apple", {"no_article": "green apple"}),
     ("apples", {"article": "the apples"}),
-    ("New York", {"hyphen": "New-York"}),
+    ("New York", {}),  # no one writes a name with a hyphen
+    ("rain forest", {"article": "the rain forest", "hyphen": "rain-forest"}),
     ("well-known", {"article": "the well-known", "no_hyphen": "well known"}),
     ("Romeo & Juliet", {"and_word": "Romeo and Juliet"}),
     ("Salt and Pepper", {"ampersand": "Salt & Pepper"}),

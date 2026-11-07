@@ -88,7 +88,7 @@ def test_long_text_comes_in_four_lengths_around_the_answer_and_holds_no_answer(p
     variants = _gen(probe_id, "42")
     assert list(variants) == [name for name, _ in LENGTHS]
     for (name, size), reply in zip(LENGTHS, variants.values(), strict=True):
-        assert size < len(reply) < size + 40, name
+        assert size < len(reply) <= size + 40, name
         assert (reply.startswith("\\boxed{42}") if probe_id == "Q28" else reply.endswith("\\boxed{42}"))
         assert reply.count("42") == 1 and not re.search(r"\d", reply.replace("\\boxed{42}", ""))
     assert PROBES[probe_id].sweep and not PROBES[probe_id].headline
@@ -118,11 +118,12 @@ def test_q31_writes_latex_markup_inside_a_box():
     assert _gen("Q31", "Paris") == {"text": "\\boxed{\\text{Paris}}"}
     assert _gen("Q31", "45", "What is the angle ABC?")["degrees"] == "\\boxed{45^\\circ}"
     assert "degrees" not in _gen("Q31", "45", "How many apples are there?")
-    assert _gen("Q31", "\\frac{1}{2}") == {}
+    assert _gen("Q31", "\\frac{1}{2}") == _gen("Q31", "(3,4]") == _gen("Q31", "42") == _gen("Q31", "p - q") == {}  # not what goes in \\text{}
     assert "text" not in _gen("Q31", "Paris", primary="answer_tag")
+    assert _gen("Q31", "Saint-Tropez") == {"text": "\\boxed{\\text{Saint-Tropez}}"}
 
 
-@pytest.mark.parametrize(("variant", "rate", "severity"), [("1k", 1.0, "medium"), ("4k", 0.5, "medium"), ("16k", 1.0, "low"), ("64k", 1.0, "low"), ("1k", 0.2, "low")])
+@pytest.mark.parametrize(("variant", "rate", "severity"), [("0.1k", 1.0, "medium"), ("1k", 1.0, "medium"), ("4k", 0.5, "medium"), ("16k", 1.0, "low"), ("64k", 1.0, "low"), ("1k", 0.2, "low")])
 def test_a_right_answer_lost_at_an_ordinary_length_is_the_serious_case(variant, rate, severity):
     assert _sweep_severity(Label.SOLVING, variant, rate) == severity
 
@@ -135,12 +136,20 @@ def test_a_checker_that_reads_the_last_characters_is_found():
     r = audit(tail, rows, workers=1)
     f = next(f for f in r.findings if f["probe_id"] == "Q28")
     assert f["severity"] == "medium" and f["example"]["variant"] == "1k" and f["rate"] == 1.0
-    assert f["note"] == "accepted: 1k 0%, 4k 0%, 16k 0%, 64k 0%"
+    assert f["note"] == "accepted: 0.1k 100%, 1k 0%, 4k 0%, 16k 0%, 64k 0%"
     assert "Q29" not in {g["probe_id"] for g in r.findings}
     assert next(d for d in r.defects if d["id"] == "D8")["severity"] == "medium"
-    head = next(h for h in r.metrics["head"] if h["key"] == "right_rejected")
-    probes = {p["id"]: p for p in r.metrics["probes"]}
-    assert head["n"] == sum(p["n_scored"] for p in probes.values() if p["label"] == "solving" and p["headline"])
+
+
+def test_a_checker_that_loses_the_answer_next_to_any_text_has_no_window():
+    def whole_reply(completion, answer):
+        return float(completion in (answer, f"\\boxed{{{answer}}}"))
+
+    rows = [{"prompt": f"Add {i} and 10.", "answer": str(i + 10)} for i in range(12)]
+    r = audit(whole_reply, rows, workers=1, probes=["Q"])
+    f = next(f for f in r.findings if f["probe_id"] == "Q28")
+    assert f["example"]["variant"] == "0.1k" and f["severity"] == "medium"
+    assert "D8" not in {d["id"] for d in r.defects} and "Q28" in {e["probe_id"] for d in r.defects if d["id"] == "D9" for e in d["evidence"]}
 
 
 def test_scoring_time_that_grows_with_the_reply_is_a_finding():

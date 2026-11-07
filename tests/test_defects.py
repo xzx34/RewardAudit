@@ -59,6 +59,14 @@ def test_a_defect_takes_the_worst_of_its_evidence_and_the_worst_defect_comes_fir
     assert [e["probe_id"] for e in out[0]["evidence"]] == ["Q5", "Q1"]
 
 
+def test_probes_with_too_few_calls_count_together_where_they_have_enough():
+    thin = {"severity": "low", "rated": "high", "note": TOO_FEW, "n_scored": 6, "hit_tasks": 3}
+    out = _defects([_finding("M2", **thin), _finding("M3", **thin)])
+    assert out[0]["id"] == "D1" and out[0]["severity"] == "high" and out[0]["evidence"][0]["severity"] == "low"
+    assert _defects([_finding("M2", **(thin | {"n_scored": 4})), _finding("M3", **(thin | {"n_scored": 4}))])[0]["severity"] == "low"
+    assert _defects([_finding("M2", **(thin | {"hit_tasks": 1})), _finding("M3", **(thin | {"hit_tasks": 1}))])[0]["severity"] == "low"
+
+
 def test_failed_calls_are_evidence_of_mishandled_input_whichever_probe_sent_them():
     out = _defects([_finding("Q1", "medium", "robustness"), _finding("P5", "low", "non_solving_accepted")])
     assert [d["id"] for d in out] == ["D13"] and len(out[0]["evidence"]) == 2
@@ -125,6 +133,15 @@ def test_wrong_answers_paid_in_part_are_a_row_and_a_defect():
     d = next(d for d in r.defects if d["id"] == "D14")
     assert d["severity"] == "medium" and d["evidence"][0]["probe_id"] == "wrong_partial"
     assert "Wrong answers paid in part" in render_markdown(r)
+
+
+def test_a_small_share_for_a_wrong_answer_is_a_format_bonus_and_stays_low():
+    def bonus(completion, answer):
+        return 1.0 if completion.strip() == f"\\boxed{{{answer}}}" else 0.1 if "boxed" in completion else 0.0
+
+    r = audit(bonus, ROWS, workers=1)
+    head = next(h for h in r.metrics["head"] if h["key"] == "wrong_partial")
+    assert head["value"] > 0.5 and head["severity"] == "low" and "10% of its score" in head["detail"]
 
 
 def test_a_checker_paying_nothing_for_a_wrong_answer_has_no_partial_defect():

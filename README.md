@@ -44,29 +44,32 @@ rewardaudit audit reward.py --dataset data.jsonl --n 100
 ```
 
 ```
-rewardaudit 0.1.0 · reward:score · 40 of 40 rows (seed 0) · 3,782 calls · 1 s
+rewardaudit 0.1.0 · reward:score · 40 of 40 rows (seed 0) · 4,667 calls · 1 s
 
-Result: problems found (1 high, 2 medium)
+Result: problems found (2 high, 3 medium)
 
-  Accepts non-answers     no     0%  [0%, 14%]
-  Accepts wrong answers   no     1%  [0%, 3%]
-  Accepts hedged answers  yes   23%  [20%, 27%]
-  Rejects right answers   yes   19%  [16%, 22%]
-  Runs reliably           yes  no errors, timeouts or crashes in 3,727 calls
+  Accepts non-answers         no     0%  [0%, 14%]
+  Accepts wrong answers       yes   14%  [11%, 17%]
+  Accepts hedged answers      yes   26%  [23%, 30%]
+  Rejects right answers       yes   19%  [16%, 22%]
+  Pays wrong answers in part  no     0%  [0%, 1%]
+  Runs reliably               yes  no errors, timeouts or crashes in 4,612 calls
 
-Rates are shares of calls, with 95% intervals. Yes on the first four rows: a high or medium finding.
+Rates are shares of calls, with 95% intervals. Yes on the first five rows: a high or medium problem.
 
 Reference answers accepted on 100% of rows. Replies were sent in the format \boxed{34}, one of 22 it accepts.
 
-Findings (4)
-  HIGH    O11  hedge between two answers, the right one last     100%
-               The answer is either 35 or 34.
-  MEDIUM  Q8   equivalent numeral (sign, trailing zeros)          67%
-               \boxed{34.0}
+Defects (6)
+  HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
+              \boxed{−34}
+  HIGH    D6  Hedged answers accepted  O11 100%
+              The answer is either 35 or 34.
+  MEDIUM  D3  Numeric tolerance too wide  M24 75%, M25 38%
+              \boxed{34.34}
   ...
 ```
 
-Here the checker takes the last number in the reply, so `either 35 or 34` earns full score and `34.0` earns nothing.
+Here the checker takes the last run of digits in the reply, so `either 35 or 34` and `−34` earn full score and `34.0` earns nothing.
 `rewardaudit demo` shows three more examples without any files of yours.
 
 ## What it checks
@@ -77,9 +80,10 @@ Here the checker takes the last number in the reply, so `either 35 or 34` earns 
 | Accepts wrong answers | Does a definite error still earn full score? | off by one, sign flipped, another task's answer |
 | Accepts hedged answers | Does giving two answers, one of them right, earn full score? | `either 35 or 34`, the right answer retracted |
 | Rejects right answers | Does a correct answer lose the score when written differently? | `34.0`, `\dfrac{1}{2}`, an explanation before it |
+| Pays wrong answers in part | Does a definite error earn more than nothing? | off by one, one word changed |
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
-`rewardaudit probes` lists all 55 probes and `rewardaudit probes O11` explains one.
+`rewardaudit probes` lists all 77 probes and `rewardaudit probes O11` explains one.
 
 A finding says how the checker behaved, not whether that was intended. A strict format rule may be what you want, so read
 the example before you change anything.

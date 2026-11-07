@@ -22,6 +22,7 @@ from rewardaudit.defects import (
     BY_PROBE,
     DEFECTS,
     FIXED_ANSWER,
+    REWRITES,
     ROBUSTNESS,
     RUN_AS_CODE,
     WRONG_PARTIAL,
@@ -133,8 +134,9 @@ TOO_FEW = "too few calls to rate"
 
 
 def _require_evidence(f: dict[str, Any], enough: bool) -> dict[str, Any]:
+    """`rated` keeps what it would have been: the probes of one defect may have enough between them."""
     if f["severity"] != "low" and not enough:
-        f["severity"] = "low"
+        f["rated"], f["severity"] = f["severity"], "low"
         f["note"] = "; ".join(x for x in (f["note"], TOO_FEW) if x)
     return f
 
@@ -261,6 +263,8 @@ def _not_measured(h: dict[str, Any], why: str) -> dict[str, Any]:
 
 
 def _rejected_severity(probe_id: str, rate: float) -> str:
+    if probe_id == "Q23":  # nearly every checker rejects a number in words: this shows which spellings it reads
+        return "low"
     return "high" if (probe_id in ("Q5", "Q22") and rate >= 0.2) else ("medium" if rate >= 0.1 else "low")
 
 
@@ -561,7 +565,8 @@ def _partial_head(tally: Tally, n: int) -> dict[str, Any]:
     k = tally.paid_calls
     earned = f", earning {tally.paid_share / k:.0%} of its score on average" if k else ""
     h = _metric("wrong_partial", "Wrong answers paid in part", k, n, f"the reference answer with a definite error{earned}")
-    h |= {"severity": "medium" if h["value"] >= 0.1 else "low", "note": "",
+    share = tally.paid_share / k if k else 0.0  # a small share is a format bonus, not an answer paid for
+    h |= {"severity": "medium" if h["value"] >= 0.1 and share >= 0.2 else "low", "note": "",
           "example": tally.paid_example.to_dict() if tally.paid_example else None}
     return _require_evidence(h, n >= MIN_CALLS and len(tally.paid_tasks) >= MIN_TASKS)
 
@@ -641,6 +646,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,
             "task_rate": s.task_rate, "n_tasks": s.n_tasks, "gold_blind": s.probe.gold_blind, "above_floor": lo > floor,
+            "n_scored": s.n_scored, "hit_tasks": s.task_hits,
             "example": example.to_dict() if example else None, "note": note,
         }, s.n_scored >= MIN_CALLS and s.task_hits >= MIN_TASKS))
     for s in stats.values():
@@ -740,12 +746,21 @@ def _defect_of(f: dict[str, Any]) -> str | None:
         return ABOVE_REFERENCE
     if f["category"] == "robustness" and f["probe_id"] != "S1":
         return ROBUSTNESS
+    if f["probe_id"] in ("Q28", "Q29") and (f.get("example") or {}).get("variant") == "0.1k":
+        return REWRITES  # it loses the score next to any text: no window comes into it
     defect = BY_PROBE.get(f["probe_id"])
     return None if defect == FIXED_ANSWER and not f.get("above_floor") else defect
 
 
+def _defect_severity(evidence: list[dict[str, Any]], rank: dict[str, int]) -> str:
+    """The highest of its evidence. A probe with too few calls of its own counts where the defect's probes together have
+    enough, as on a dataset with few numbers, where each of the probes on numbers gets only a few rows."""
+    enough = (sum(f.get("n_scored", 0) for f in evidence) >= MIN_CALLS and max(f.get("hit_tasks", 0) for f in evidence) >= MIN_TASKS)
+    return min((f.get("rated", f["severity"]) if enough else f["severity"] for f in evidence), key=rank.__getitem__)
+
+
 def collect_defects(metrics: dict[str, Any], contract: Contract) -> list[dict[str, Any]]:
-    """One record per defect with evidence, most severe first: its severity is the highest of its evidence."""
+    """One record per defect with evidence, most severe first."""
     found: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for f in metrics["findings"]:
         if (defect := _defect_of(f)) is not None:
@@ -760,7 +775,7 @@ def collect_defects(metrics: dict[str, Any], contract: Contract) -> list[dict[st
     for d in DEFECTS:
         evidence = sorted(found.get(d.id, []), key=lambda f: (rank[f["severity"]], -f["rate"]))
         if evidence:
-            out.append({"id": d.id, "name": d.name, "explanation": d.explanation, "severity": evidence[0]["severity"],
+            out.append({"id": d.id, "name": d.name, "explanation": d.explanation, "severity": _defect_severity(evidence, rank),
                         "evidence": [_evidence(f) for f in evidence],
                         "example": next((f["example"] for f in evidence if f.get("example")), None)})
     return sorted(out, key=lambda d: rank[d["severity"]])

@@ -125,21 +125,23 @@ worker. `--workers` runs that many processes (4 by default, or your CPU count if
 ## Read the result
 
 ```
-Result: problems found (1 high, 1 medium)
+Result: problems found (2 high, 3 medium)
 
   Accepts non-answers         no     0%  [0%, 14%]
-  Accepts wrong answers       no     1%  [0%, 3%]
-  Accepts hedged answers      yes   23%  [20%, 27%]
+  Accepts wrong answers       yes   14%  [11%, 17%]
+  Accepts hedged answers      yes   26%  [23%, 30%]
   Rejects right answers       yes   19%  [16%, 22%]
   Pays wrong answers in part  no     0%  [0%, 1%]
-  Runs reliably               yes  no errors, timeouts or crashes in 3,727 calls
+  Runs reliably               yes  no errors, timeouts or crashes in 4,612 calls
 
-Defects (3)
+Defects (6)
+  HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
+              \boxed{−34}
   HIGH    D6  Hedged answers accepted  O11 100%
               The answer is either 35 or 34.
-  MEDIUM  D9  Equivalent rewrites rejected  Q8 67%, Q6 33%
-              \boxed{34.0}
-  LOW     D1  Signs and punctuation ignored  M3 4%
+  MEDIUM  D3  Numeric tolerance too wide  M24 75%, M25 38%
+              \boxed{34.34}
+  ...
 ```
 
 Each row answers a question about the checker. On the first five rows, `yes` means a high or medium problem. **Runs reliably**
@@ -157,8 +159,8 @@ in the top line also count the wrong answers and repeats used before the probes,
 - **Accepts hedged answers:** a reply stating two answers, of which one is right, or stating the right one and taking it back.
 - **Rejects right answers:** the reference answer written another way, still correct.
 - **Pays wrong answers in part:** the reference answer with a definite error, earning more than nothing and less than the
-  reference answer. The row says `yes` from one call in ten. A score such as F1 does this by design; whether that is what you
-  want is your call.
+  reference answer. The row says `yes` from one call in ten, when they earn a fifth of its score or more on average: less is
+  usually a bonus for the format. A score such as F1 does this by design; whether that is what you want is your call.
 - **Runs reliably:** errors, timeouts, crashes and network attempts, and whether repeating a call gives the same score.
 
 **Defects.** A defect says what the checker does, across the probes that show it: each line has its severity, its name, and the
@@ -170,17 +172,17 @@ looks for a substring.
 |---|---|---|
 | D1 | Signs and punctuation ignored | M2, M3, M22 |
 | D2 | Substring match | M21, M18, E1, E5, O6 |
-| D3 | Numeric tolerance too wide | M24, M1 |
+| D3 | Numeric tolerance too wide | M24, M25, M1 |
 | D4 | One of several answers is read | O5, O12, O4, E6 |
 | D5 | Reads the thinking block | O10, O13 |
 | D6 | Hedged answers accepted | O7, O11, O14, O15, E2, E3, E8 |
 | D7 | Negation ignored | O3 |
-| D8 | Only a fixed-length window is read | Q28, Q29 |
-| D9 | Equivalent rewrites rejected | the other Q probes |
+| D8 | Only a fixed-length window is read | Q28, Q29, when 100 characters of text keep the score and more lose it |
+| D9 | Equivalent rewrites rejected | the other Q probes, and Q28 and Q29 when even 100 characters lose the score |
 | D10 | Copying the prompt pays | L1, L2, L3, L4, L6, E9 |
 | D11 | A fixed answer pays | L5 and the N family, above what a fixed answer gets by chance |
-| D12 | Reply text run as code | P16 |
-| D13 | Malformed or extreme replies mishandled | P1, P2, P5, P15, P17, and any probe's errors, timeouts and crashes |
+| D12 | Reply text run as code | P16, when the reply reaches a Python import |
+| D13 | Malformed or extreme replies mishandled | P1, P2, P5, P15, P17, any probe's errors, timeouts and crashes, scores that are not numbers, and scoring much slower on long replies |
 | D14 | Wrong answers paid in part | the row of that name |
 | D15 | Same input, different scores | S1, the same reply sent again |
 | D16 | Reference answer rejected | G1 |
@@ -196,12 +198,14 @@ thumb for what to look at first:
 
 | Severity | Meaning |
 |---|---|
-| High | Non-answers, wrong answers or hedged answers accepted on about half of calls or more, or right answers losing the score just for the reasoning before them on one call in five or more. |
-| Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts, wrong answers paid in part on one call in ten or more. |
+| High | A reply's text reaching a Python import, on one call. Non-answers, wrong answers or hedged answers accepted on about half of calls or more, a number 5% off accepted on half of rows, or right answers losing the score just for the reasoning before them on one call in five or more. |
+| Medium | Wrong answers accepted or right answers rejected on one call in ten or more, hedged answers accepted on one in five, non-answers accepted more often than chance would give, crashes and timeouts, scores that are not numbers, wrong answers paid in part as the row above says, a number 1% off accepted on half of rows, a right answer lost to 4k characters of text or fewer. |
 | Low | The same less often, or about what chance would give, and errors the checker raised. Listed for completeness. |
 
 A few calls say little, so a finding stays low, with the note "too few calls to rate", below ten scored calls or on one row only.
-Failed calls and rejected reference answers need two rows.
+Failed calls and rejected reference answers need two rows. A defect looks at its probes together: on a dataset with few numbers,
+each probe on numbers has only a few calls, and between them they may have enough. Q23 stays low, since few checkers read a
+number in words.
 
 **A finding is about behaviour.** rewardaudit does not know what you intended. If your task demands an exact format, then
 `34.0` being rejected may be right. Read the example, and run `repro.py` if you want to re-score it.
@@ -217,9 +221,9 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists them; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
-placeholder replies), E (many candidates in one reply), L (copying the prompt), O (two answers), M (definite errors), Q (right
-answers rewritten), P (malformed and extreme input).
+**Probes.** `rewardaudit probes` lists all 77; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
+M (definite errors), Q (right answers rewritten), P (malformed and extreme input, a reply run as code).
 
 **Dataset checks.** Empty answers, duplicate prompts, answers that appear in the prompt, skewed answers, and multiple-choice
 answers that are not among the options. These read the data only, and they do not affect the exit code.

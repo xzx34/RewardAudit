@@ -160,6 +160,20 @@ def asks_integer(task: Task) -> bool:
     return bool(_INTEGER_RE.search("\n".join([ln for ln in task.prompt.splitlines() if ln.strip()][-3:])))
 
 
+_ASKS_PERCENT = re.compile(r"\bwhat\s+(?:is\s+the\s+)?percent(?:age)?\b|\b(?:as|in)\s+(?:a\s+)?percent(?:age)?\b"
+                           r"|\bhow\s+many\s+percent\b", re.I)
+
+
+def question_part(prompt: str) -> str:
+    """The end of a prompt, where the question usually is; a line on the format of the reply may follow it."""
+    return " ".join(re.split(r"(?<=[.?!])\s+", prompt.strip())[-2:])
+
+
+def asks_percent(prompt: str) -> bool:
+    """The question wants a percentage, as opposed to mentioning one on the way ('he ate 20 percent of them')."""
+    return bool(_ASKS_PERCENT.search(question_part(prompt)))
+
+
 def infer_dataset_type(tasks: list[Task]) -> tuple[str, Counter[str]]:
     counts: Counter[str] = Counter(infer_gold_type(t.answer) for t in tasks)
     major, _ = counts.most_common(1)[0]

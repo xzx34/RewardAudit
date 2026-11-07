@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from rewardaudit.equiv import equiv, flip_bool, to_letter, to_number
+from rewardaudit.goldtype import asks_percent
 from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, ProbeContext, fmt_num, plain_number
 from rewardaudit.types import Label, Task
 
@@ -135,7 +136,7 @@ def m21_attached(task, rng, ctx):
     g = ctx.gold(task)
     if _plain(task, ctx):
         sign, digits = ("-", g[1:]) if g.startswith("-") else ("", g)
-        return _keep(ctx, task, [("append_0", g + "0"), ("append_00", g + "00"), ("prepend_1", f"{sign}1{digits}")])
+        return _keep(ctx, task, [("append_0", g + "0"), ("prepend_1", f"{sign}1{digits}")])
     bare = g.rstrip(".!?")
     words = [w for t in ctx.other_tasks(rng) if t.id != task.id for w in re.findall(rf"[A-Za-z]{{{MIN_WORD},}}", ctx.gold(t))
              if w.lower() not in g.lower()]  # a shorter word may be an article, which many comparisons rightly drop
@@ -166,6 +167,12 @@ def m24_relative_error(task, rng, ctx):
         return []
     off = {f"{e:.1%}".replace(".0%", "%"): _spelled(x * (1 + e)) for e in (0.001, 0.01, 0.02, 0.05, 0.1)}
     return _keep(ctx, task, [(name, s) for name, s in off.items() if s != _spelled(x)])
+
+
+def m25_percent_scale(task, rng, ctx):
+    """A checker that allows for an answer written as a percentage takes a hundred times the answer, on every row."""
+    x = to_number(ctx.gold(task))
+    return _keep(ctx, task, [("x100", _spelled(x * 100)), ("div100", fmt_num(x / 100))]) if x else []
 
 
 PROBES = [
@@ -204,7 +211,7 @@ PROBES = [
                       "does not compare against this task's own accepts it, a sound one gives zero."),
     Probe("M21", "M", "the reference answer with characters attached", "natural", "zero", NS, m21_attached,
           applies=lambda t, c: _plain(t, c) or c.gtype(t) in ("short_str", "long_text"), by_variant=True,
-          description="Sends the reference answer inside a longer answer: 42 as 420, 4200 and 142, a word with a letter "
+          description="Sends the reference answer inside a longer answer: 42 as 420 and 142, a word with a letter "
                       "added, or followed by a word from another row's answer. A checker that looks for the reference "
                       "answer as a substring accepts these, a sound one gives zero."),
     Probe("M22", "M", "opposite number with a Unicode minus", "natural", "zero", NS, m22_unicode_minus,
@@ -220,4 +227,9 @@ PROBES = [
           description="Sends the numeric reference answer off by 0.1%, 1%, 2%, 5% and 10%, skipping what prints the same "
                       "as the reference answer. Its finding gives the acceptance rate of each and the widest accepted at "
                       "least half the time; a sound checker allows for rounding at most."),
+    Probe("M25", "M", "a hundred times the number, or a hundredth", "natural", "zero", NS, m25_percent_scale,
+          applies=lambda t, c: _plain(t, c) and not asks_percent(t.prompt),
+          description="Sends the numeric reference answer multiplied or divided by a hundred, unless the question asks for "
+                      "a percentage; a checker that allows for a percentage in every comparison accepts them, a sound one "
+                      "gives zero."),
 ]

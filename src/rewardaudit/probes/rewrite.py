@@ -8,7 +8,14 @@ from datetime import date
 from decimal import Decimal
 
 from rewardaudit.equiv import NUMBER_WORDS, to_letter, to_number
-from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, option_texts
+from rewardaudit.goldtype import (
+    asks_answer_only,
+    asks_integer,
+    asks_percent,
+    asks_quantity,
+    option_texts,
+    question_part,
+)
 from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
 
@@ -204,20 +211,13 @@ def q23_number_spellings(task, rng, ctx):
 _UNIT_WORDS = ("dollars|cents|meters|metres|kilometers|kilometres|miles|feet|inches|centimeters|kilograms|grams|pounds|ounces|"
                "liters|litres|gallons|seconds|minutes|hours|days|weeks|months|years")
 _ASKS_UNIT = re.compile(rf"\b(?:in|how many|number of)\s+({_UNIT_WORDS})\b", re.I)
-_ASKS_PERCENT = re.compile(r"\bwhat\s+(?:is\s+the\s+)?percent(?:age)?\b|\b(?:as|in)\s+(?:a\s+)?percent(?:age)?\b"
-                           r"|\bhow\s+many\s+percent\b", re.I)
-
-
-def _question(prompt: str) -> str:
-    """The end of a prompt, where the question usually is; a line on the format of the reply may follow it."""
-    return " ".join(re.split(r"(?<=[.?!])\s+", prompt.strip())[-2:])
 
 
 def q24_unit(task, rng, ctx):
     g = ctx.gold(task)
     if m := UNIT_RE.fullmatch(g):
         return [("without_unit", ctx.wrap(m["number"]))]
-    asked = _ASKS_UNIT.findall(_question(task.prompt))
+    asked = _ASKS_UNIT.findall(question_part(task.prompt))
     return [("with_unit", ctx.wrap(f"{g} {asked[-1].lower()}"))] if asked and plain_number(g) and _prose_allowed(task, ctx) else []
 
 
@@ -226,7 +226,7 @@ def q25_percent(task, rng, ctx):
     g = ctx.gold(task)
     if m := re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*\\?%", g):
         return [("as_decimal", ctx.wrap(fmt_num(float(m[1]) / 100)))]
-    if plain_number(g) and abs(float(g)) >= 1 and _ASKS_PERCENT.search(_question(task.prompt)):
+    if plain_number(g) and abs(float(g)) >= 1 and asks_percent(task.prompt):
         return [("percent_sign", ctx.wrap(f"{g}%"))]
     return []
 
@@ -275,14 +275,14 @@ def q27_spelling(task, rng, ctx):
         out["article"] = f"the {g}"
     if re.search(r"[^\W\d_]{3}-[^\W\d_]{3}", g):
         out["no_hyphen"] = g.replace("-", " ")
-    elif not article and re.fullmatch(r"[^\W\d_]{3,} [^\W\d_]{3,}", g):
+    elif not article and g.islower() and re.fullmatch(r"[^\W\d_]{3,} [^\W\d_]{3,}", g):  # no one writes a name that way
         out["hyphen"] = g.replace(" ", "-")
     out["and_word"] = g.replace("&", "and")
     out["ampersand"] = g.replace(" and ", " & ")
     return [(name, ctx.wrap(s)) for name, s in out.items() if s != g]
 
 
-LENGTHS = (("1k", 1_000), ("4k", 4_000), ("16k", 16_000), ("64k", 64_000))
+LENGTHS = (("0.1k", 100), ("1k", 1_000), ("4k", 4_000), ("16k", 16_000), ("64k", 64_000))  # 0.1k: not about length if it loses there
 
 
 def _long_text(task, rng, ctx):
@@ -316,8 +316,10 @@ def q30_option_text(task, rng, ctx):
 
 def q31_latex_markup(task, rng, ctx):
     g = ctx.gold(task)
-    out = [("text", ctx.wrap(f"\\text{{{g}}}"))] if "\\boxed{" in ctx.wrap("x") and "\\" not in g else []
-    if plain_number(g) and re.search(r"\b(?:angle|degrees?)\b", _question(task.prompt), re.I):
+    # what a model writes in \text{} inside a box: words, and not 'p - q'
+    words = re.fullmatch(r"[^\W\d_ ,'-]+(?:[ ,'-]+[^\W\d_ ,'-]+)*", g) and re.search(rf"[^\W\d_]{{{MIN_WORD},}}", g)
+    out = [("text", ctx.wrap(f"\\text{{{g}}}"))] if "\\boxed{" in ctx.wrap("x") and words else []
+    if plain_number(g) and re.search(r"\b(?:angle|degrees?)\b", question_part(task.prompt), re.I):
         out.append(("degrees", ctx.wrap(f"{g}^\\circ")))
     return out
 
@@ -363,10 +365,10 @@ PROBES = [
           description="Sends a plain-word reference answer in lower and upper case, not on prompts that work on "
                       "characters or say that case counts; a sound checker gives full credit."),
     Probe("Q23", "Q", "other spellings of a number", "natural", "full", SOL, q23_number_spellings,
-          applies=lambda t, c: _quantity(t, c) and plain_number(c.gold(t)),
+          applies=lambda t, c: _quantity(t, c) and plain_number(c.gold(t)), headline=False,
           description="Sends a numeric reference answer in English words (under 100), in scientific notation (when large "
                       "or with many digits), in full-width digits, and with the minus sign U+2212; a sound checker gives "
-                      "full credit."),
+                      "full credit. Few checkers read all of these, so this says which they read and stays low."),
     Probe("Q24", "Q", "with or without the unit", "natural", "full", SOL, q24_unit,
           description="Sends a reference answer that has a unit without it, and adds the unit to one that has none when "
                       "the question names it ('how many dollars'); a sound checker gives full credit."),
@@ -382,12 +384,12 @@ PROBES = [
                       "and a space swapped, and with & and 'and' swapped; a sound checker gives full credit."),
     Probe("Q28", "Q", "long text after the answer", "natural", "full", SOL, q28_long_text_after, applies=_few_with_prose,
           headline=False, sweep=True,
-          description="Sends the reference answer followed by 1k, 4k, 16k and 64k characters of neutral text. Its finding "
+          description="Sends the reference answer followed by 100, 1k, 4k, 16k and 64k characters of neutral text. Its finding "
                       "gives the acceptance rate of each and the shortest that loses the score; a sound checker gives "
                       "full credit. Sent on five rows, not when the prompt asks for only the answer."),
     Probe("Q29", "Q", "long text before the answer", "natural", "full", SOL, q29_long_text_before, applies=_few_with_prose,
           headline=False, sweep=True,
-          description="Sends 1k, 4k, 16k and 64k characters of neutral text and then the reference answer. Its finding gives "
+          description="Sends 100, 1k, 4k, 16k and 64k characters of neutral text and then the reference answer. Its finding gives "
                       "the acceptance rate of each and the shortest that loses the score; a sound checker gives full "
                       "credit. Sent on five rows, not when the prompt asks for only the answer."),
     Probe("Q30", "Q", "an option's text with or without its letter", "natural", "full", SOL, q30_option_text,
@@ -395,6 +397,6 @@ PROBES = [
           description="Sends the right option's letter with its text, and its text alone unless the prompt asks for a "
                       "letter; a sound checker gives full credit."),
     Probe("Q31", "Q", "an answer in LaTeX markup", "natural", "full", SOL, q31_latex_markup,
-          description="Inside \\boxed{} sends the reference answer in \\text{}, and with ^\\circ when the question is about "
+          description="Inside \\boxed{} sends an answer in words in \\text{}, and with ^\\circ when the question is about "
                       "an angle; a sound checker gives full credit."),
 ]
