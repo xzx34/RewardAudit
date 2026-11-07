@@ -658,6 +658,8 @@ def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
         sev = _sweep_severity(s.probe.label, variant, rate) if s.probe.sweep else sev
         if s.probe.id == "O13" and "</think>" not in contract.wrap("x"):  # no thinking block in its format: it reads the whole reply
             sev = "low"
+        if s.probe.id == "G2":  # which of the dataset's accepted answers lost the score, as the dataset writes them
+            note = "rejected: " + ", ".join(repr(contract.answer_of(o.completion, o.task_id)) for o in s.examples)
         findings.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,

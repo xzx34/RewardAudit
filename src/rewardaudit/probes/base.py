@@ -151,6 +151,7 @@ class ProbeContext:
     gold_type: str
     tasks: list[Task]
     gold_types: dict[str, str] = field(default_factory=dict)  # per-task
+    aliases: dict[str, list[str]] = field(default_factory=dict)  # per task: the row's other accepted answers, for G2
     task: Task | None = None  # the task currently being probed; set by the audit loop
     _commands: frozenset[str] | None = field(default=None, init=False, repr=False)
     _numeric_dataset: bool | None = field(default=None, init=False, repr=False)

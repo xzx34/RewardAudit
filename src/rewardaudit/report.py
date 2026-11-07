@@ -598,7 +598,8 @@ def sample_context() -> ProbeContext:
                         self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
                         task_wrappers={i: ["boxed"] for i in ids})
     ctx = ProbeContext(contract=contract, gold_type="int", tasks=SAMPLE_TASKS,
-                       gold_types={t.id: infer_gold_type(t.answer) for t in SAMPLE_TASKS})
+                       gold_types={t.id: infer_gold_type(t.answer) for t in SAMPLE_TASKS},
+                       aliases={"words": ["Victor-Marie Hugo", "Hugo"]})
     ctx._numeric_dataset = True  # the samples mix answer types on purpose; Q8 still shows its examples
     return ctx
 
@@ -630,6 +631,8 @@ def find_explainable(key: str) -> tuple[str, Any] | None:
 def _list_family(fam: str, console: Console) -> None:
     _say(console, f"{fam}  {FAMILIES[fam][0]}", "bold")
     t = _grid()
+    if fam == "G":  # G1 comes from the calls with the reference answers, but readers look for it here
+        t.add_row("", Text(REJECTED_GOLD_ID), Text(f"{REJECTED_GOLD_NAME} (a finding, not a probe)"))
     for p in FAMILIES[fam][1]:
         t.add_row("", Text(p.id), Text(p.name))
     console.print(t)

@@ -106,8 +106,8 @@ rewardaudit audit reward.py --dataset data.jsonl --answer-col answers.text.0 --r
 ```
 
 A number in a column name picks an item of a list, and a row whose list is empty has no answer and is left out. Your
-function's reference parameter gets the whole list. Replies are written from the answer you name, so the others are not
-probed.
+function's reference parameter gets the whole list. Replies are written from the answer you name, and G2 sends each of the
+others as well, one per reply and up to 8 per row, since a checker given the list should accept any of them.
 
 ### The reference answer is not what the checker expects
 
@@ -201,7 +201,7 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 | D13 | Malformed or extreme replies mishandled | P1, P2, P5, P15, P17, any probe's errors, timeouts and crashes, scores that are not numbers, and scoring much slower on long replies |
 | D14 | Wrong answers paid in part | the row of that name |
 | D15 | Same input, different scores | S1, the same reply sent again |
-| D16 | Reference answer rejected | G1 |
+| D16 | Reference answer rejected | G1, G2 |
 | D17 | Units ignored | M23 |
 | D18 | Score does not follow the answer | any wrong answer earning the reference answer's score, or a reply that should earn nothing scoring above it |
 | D19 | Close answers accepted | M5, M6, M7 |
@@ -242,9 +242,10 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists all 77; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists all 78; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
-M (definite errors), Q (right answers rewritten), P (malformed and extreme input, a reply run as code).
+M (definite errors), Q (right answers rewritten), G (the row's other accepted answers; G1, the finding of a reference answer
+rejected in every format, is listed with them), P (malformed and extreme input, a reply run as code).
 
 **Dataset checks.** Rows whose reference answer is empty (blank, or an empty list, as SQuAD 2.0 keeps its unanswerable
 questions) are left out before the draw, and a line says how many; the other row counts in the report are of the rows left.

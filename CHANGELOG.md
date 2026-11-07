@@ -31,6 +31,11 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   reference answers were empty stopped the audit. The row counts in the report, `n_rows` among them, are of the rows left;
   `meta.empty_rows_left_out` in `report.json` has the number. A dataset whose reference answers are all empty stops with a
   message naming the column. An environment's own rows are not left out, and an empty answer there is still a dataset issue.
+- G2, in a new family G: where the checker receives a list of accepted answers (`--reference-col`), each one other than the
+  reference answer is sent in the accepted format, one per reply and up to 8 per row. One that loses the score is a finding
+  under Rejects right answers, outside its rate, medium from one in ten; its note names some of them. D16 now reads "The
+  dataset's own reference answer, or one of its other accepted answers, is treated like a wrong one." `rewardaudit probes G`
+  lists G1 there too. 78 probes in all.
 
 ## 0.2.0 - 2026-11-07
 

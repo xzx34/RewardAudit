@@ -197,6 +197,18 @@ def _structured_hint(fn: Callable[..., Any], names: list[str]) -> tuple[type, ..
     return tuple(out)
 
 
+def reference_aliases(spec: dict[str, Any], task: Task) -> list[str]:
+    """The row's other accepted answers, for G2: the `reference_col` the checker receives (see `reference`), when it is a
+    list of strings, without the reference answer itself, blanks and repeats. Other references give none: a template is
+    one string, and a list in the answer column is the answer itself. Without `reference_col` the checker gets only the
+    answer picked from a list (answers.text.0), so the rest of that list is nothing it compares with."""
+    col = spec.get("reference_col")
+    value = get_path(task.info, col) if col else MISSING
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        return []
+    return list(dict.fromkeys(a for v in value if (a := v.strip()) and a != task.answer.strip()))
+
+
 class FunctionAdapter(Adapter):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__()

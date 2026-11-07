@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from rewardaudit import __version__
+from rewardaudit.adapters.function_adapter import reference_aliases
 from rewardaudit.confirm import MAX_CUT_CALLS, RESENDS, confirm
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
 from rewardaudit.gate import check_contract, check_loaded
@@ -203,7 +204,8 @@ def run_audit(
         if not determinism["deterministic"]:
             log("the checker gave different scores to identical inputs")
 
-        ctx = ProbeContext(contract=contract, gold_type=gold_type, tasks=answerable, gold_types=gold_types)
+        aliases = {t.id: a for t in answerable if (a := reference_aliases(spec, t))}  # none for an environment
+        ctx = ProbeContext(contract=contract, gold_type=gold_type, tasks=answerable, gold_types=gold_types, aliases=aliases)
         probes: list[Probe] = sorted(all_probes(config.families), key=lambda p: TIER_RANK.get(p.tier, 9))
         passing = [t for t in tasks if contract.self_pass.get(t.id)]
         head = passing[:ESTIMATE_TASKS]

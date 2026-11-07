@@ -312,6 +312,14 @@ class Contract:
         start = before.rfind(mark) if mark else before.rfind("\n") + 1
         return None if start < 0 else completion[:start] + self.wrap(answer, task_id)[len(head) - len(mark):]
 
+    def answer_of(self, completion: str, task_id: str | None = None) -> str:
+        """The answer a reply written as `wrap(answer)` holds, without the format's own text; the reply as it is when it
+        is not written so."""
+        head, _, tail = self.wrap(_ANSWER_SLOT, task_id).partition(_ANSWER_SLOT)
+        if len(completion) < len(head) + len(tail) or not (completion.startswith(head) and completion.endswith(tail)):
+            return completion
+        return completion[len(head):len(completion) - len(tail)]
+
     def passing_tasks(self) -> list[str]:
         return [t for t, ok in self.self_pass.items() if ok]
 

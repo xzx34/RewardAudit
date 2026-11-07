@@ -366,7 +366,7 @@ PROBLEMS = [
     ("a_word_for_n", "reward", "data", {"n": "many"}, ["--n", "many"], ["positive whole number or 'all'", "many"]),
     ("function_without_dataset", "reward", None, {}, [], ["needs a dataset", "jsonl", "hf:org/name"]),
     ("environment_with_dataset", "owner/name", "data", {}, [], ["owner/name is an environment", "brings its own dataset", "--dataset"]),
-    ("unknown_probe_family", "reward", "data", {"probes": ["Z"]}, ["--probes", "Z"], ["Unknown probe family 'Z'", "N, E, L, O, M, Q, P"]),
+    ("unknown_probe_family", "reward", "data", {"probes": ["Z"]}, ["--probes", "Z"], ["Unknown probe family 'Z'", "N, E, L, O, M, Q, G, P"]),
     ("no_reference_answers", "reward", "unanswered", {}, [], ["All 2 rows of", "have an empty reference answer in 'answer'", "--answer-col"]),
 ]
 
