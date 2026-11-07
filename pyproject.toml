@@ -1,0 +1,60 @@
+[project]
+name = "rewardaudit"
+dynamic = ["version"]
+description = "Black-box audit of checkers (reward functions, verifiers) in RL environments with verifiable rewards."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Zixiang Xu" }]
+keywords = ["reinforcement-learning", "rlvr", "reward", "verifier", "audit", "evaluation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.0",
+  "cloudpickle>=3.0",
+]
+
+[project.optional-dependencies]
+data = ["datasets>=2.19", "pyarrow>=14"]
+math = ["math-verify>=0.8"]
+dev = ["pytest>=8", "ruff>=0.5", "math-verify>=0.8", "datasets>=2.19", "pyarrow>=14"]
+
+[project.scripts]
+rewardaudit = "rewardaudit.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/xzx34/rewardaudit"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/rewardaudit/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rewardaudit"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "UP042"]  # Kind/Label stay (str, Enum): their str() is part of the report format
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
