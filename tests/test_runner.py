@@ -1,7 +1,9 @@
 """The worker processes: what a checker can do to them, and what the audit makes of it."""
 
+import importlib.metadata
 import json
 import os
+import platform
 import subprocess
 import sys
 
@@ -202,6 +204,27 @@ def test_the_network_guard_sees_every_way_to_connect_and_each_call_starts_clean(
         assert v.kind == Kind.SCORE and v.score == 0.25 and v.network
         v = r.score(TASK, "1")
         assert v.score == 1.0 and not v.network
+
+
+def test_a_worker_says_as_it_stops_which_packages_the_checker_imported(tmp_path):
+    with RunnerPool(_spec(tmp_path, "import pytest\n\ndef score(prompt, completion, answer):\n    return 1.0\n"), workers=2) as pool:
+        assert pool.score(TASK, "1").score == 1.0
+    env = pool.environment
+    assert env["python"] == platform.python_version() and env["platform"] == platform.platform()
+    assert env["packages"]["pytest"] == importlib.metadata.version("pytest") and "rewardaudit" not in env["packages"]
+    assert list(env["packages"]) == sorted(env["packages"], key=str.lower)
+
+
+def test_the_standard_library_is_no_package_and_a_dead_worker_says_nothing(tmp_path):
+    with Runner(_spec(tmp_path, BY_REPLY), timeout_s=20.0) as r:  # os and time, and the checker's own file
+        assert r.score(TASK, "1").score == 1.0
+    assert r.environment["packages"] == {}
+    gone = Runner(_spec(tmp_path, BY_REPLY))
+    gone.start()
+    gone.proc.kill()
+    gone.proc.wait()
+    gone.stop()
+    assert gone.environment == {}
 
 
 @pytest.mark.parametrize("modules", [

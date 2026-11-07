@@ -85,7 +85,28 @@ class _MarkerWatch:
         return seen
 
 
+def _environment(preloaded: set[str]) -> dict[str, Any]:
+    """What the checker ran under: this Python, this platform, and {distribution: version} for the third-party modules
+    imported since the worker started. That leaves out the standard library, `preloaded` (this package, `__main__`, what
+    .pth files import at startup, and cloudpickle, which loads a function handed over from Python). A module no installed
+    distribution provides, such as the checker's own file, is not listed; one that several provide lists them all."""
+    import importlib.metadata
+    import platform
+
+    names = {name.partition(".")[0] for name in list(sys.modules)} - preloaded - sys.stdlib_module_names  # a list: threads import too
+    packages: dict[str, str] = {}
+    for dist in importlib.metadata.distributions():
+        # the modules it provides: top_level.txt, or else the first part of each path in RECORD. packages_distributions()
+        # does the same through a path object for every file, a tenth of a second per worker in a venv of a hundred
+        provides = (dist.read_text("top_level.txt") or "").split() or [
+            line.split(",")[0].split("/")[0].partition(".")[0] for line in (dist.read_text("RECORD") or "").splitlines()]
+        if names.intersection(provides):
+            packages.setdefault(dist.metadata["Name"], dist.version)  # the first on sys.path is the one imported
+    return {"python": platform.python_version(), "platform": platform.platform(), "packages": packages}
+
+
 def main() -> None:
+    preloaded = {name.partition(".")[0] for name in sys.modules} | {"cloudpickle"}  # not the checker's imports
     out = sys.stdout
     sys.stdout = sys.stderr  # anything the checker prints must not corrupt the protocol
     # and anything it reads must not wait on the protocol: a load that asks a question gets end-of-file, not a hang
@@ -156,6 +177,7 @@ def main() -> None:
             elif op == "ping":
                 send({"ok": True})
             elif op == "exit":
+                send({"ok": True, **_environment(preloaded)})
                 break
             else:
                 send({"ok": False, "error": f"unknown op {op!r}"})

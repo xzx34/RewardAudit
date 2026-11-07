@@ -246,7 +246,10 @@ placeholder replies), E (many candidates in one reply), L (copying the prompt, f
 M (definite errors), Q (right answers rewritten), P (malformed and extreme input, a reply run as code).
 
 **Dataset checks.** Empty answers, duplicate prompts, answers that appear in the prompt, skewed answers, and multiple-choice
-answers that are not among the options. These read the data only, and they do not affect the exit code.
+answers that are not among the options. These read the data only, and they do not affect the exit code. The line after them,
+`Checker imports`, names the third-party packages imported in the process that ran the checker, with their versions, the
+first 8 by name. Another version of one can change what the checker decides, so these are the versions that reproduce the
+result; `environment` in `report.json` lists them all, with the Python version and the platform.
 
 ## When the audit stops
 
@@ -325,6 +328,7 @@ result.print()              # the summary; print(full=True) for every finding
 result.defects              # a list of dicts, most severe first: id, name, explanation, severity, evidence, example, confirmation
 result.findings             # a list of dicts: probe_id, name, category, severity, rate, ci, n, example (the reply is in example["completion"])
 result.rates                # {"non_solving_accepted": 0.0, "wrong_accepted": 0.0, ...}
+result.environment          # what the checker ran under: python, platform and packages, such as {"sympy": "1.14.0"}
 result.save("out/")         # report.md and report.json
 ```
 

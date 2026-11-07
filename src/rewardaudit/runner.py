@@ -18,6 +18,7 @@ from rewardaudit.types import SCORE_NOT_A_NUMBER, Kind, Task, Verdict
 
 SRC_ROOT = str(Path(__file__).resolve().parents[1])
 MAX_MEMORY_DEATHS = 3  # in a row; a restart reloads the dataset, so workers would go on being killed
+EXIT_REPLY_S = 5.0  # for the reply to exit, which reads the metadata of every distribution installed: longer in a large venv
 
 
 _LIBPROC: list[Any] = []
@@ -118,6 +119,17 @@ class RunnerPool:
     def restarts(self) -> int:
         return sum(r.restarts for r in self._runners)
 
+    @property
+    def environment(self) -> dict[str, Any]:
+        """Once stopped: python and platform from the first worker that replied, and the packages any of them imported,
+        by name. Empty if none replied."""
+        replied = [r.environment for r in self._runners if r.environment]
+        if not replied:
+            return {}
+        packages = {name: version for env in replied for name, version in env["packages"].items()}
+        return {"python": replied[0]["python"], "platform": replied[0]["platform"],
+                "packages": dict(sorted(packages.items(), key=lambda item: item[0].lower()))}
+
     # --- API -----------------------------------------------------------------
 
     def tasks(self, n: int | None, seed: int = 0) -> list[Task]:
@@ -201,6 +213,7 @@ class Runner:
         self.calls = 0
         self.memory_deaths = 0
         self._memory_error = ""
+        self.environment: dict[str, Any] = {}  # python, platform, packages: what the worker said when it was stopped
 
     @property
     def retired(self) -> bool:
@@ -247,7 +260,10 @@ class Runner:
             if self.proc.stdin:
                 self.proc.stdin.write(json.dumps({"op": "exit"}) + "\n")
                 self.proc.stdin.flush()
-        except (BrokenPipeError, OSError, ValueError):
+                reply = self._recv(EXIT_REPLY_S)  # the worker replies with what it ran under; a dead one says nothing
+                if reply and "packages" in reply:
+                    self.environment = {k: reply[k] for k in ("python", "platform", "packages")}
+        except (BrokenPipeError, OSError, ValueError, WorkerError):
             pass
         try:
             self.proc.wait(timeout=2)

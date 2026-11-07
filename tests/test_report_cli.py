@@ -4,6 +4,7 @@ import dataclasses
 import difflib
 import itertools
 import json
+import platform
 import re
 import subprocess
 import sys
@@ -281,6 +282,33 @@ def test_how_this_was_run_names_checker_dataset_and_settings(tmp_path):
     for text in ("reward:score", str(tmp_path / "reward.py"), f"`{tmp_path / 'data.jsonl'}`, 16 rows",
                  "8 rows drawn at random, seed 3", "7 s per call", "Workers: 1", "Probe families: N", "`repro.py`"):
         assert text in section, text
+
+
+def test_a_checker_on_the_standard_library_imports_none(tmp_path):
+    (tmp_path / "reward.py").write_text("import re\n\ndef score(completion, answer):\n    return float(re.sub(r'\\s', '', completion) == answer)\n")
+    (tmp_path / "data.jsonl").write_text("\n".join(json.dumps(row) for row in ROWS_OF_NUMBERS))
+    r = audit(str(tmp_path / "reward.py"), str(tmp_path / "data.jsonl"), n=8, workers=1, probes=["N"])
+    assert r.environment["packages"] == {} and r.environment["python"] == platform.python_version()
+    text, md = screen(r), render_markdown(r)
+    assert text.rindex("Dataset: ") < text.index("\nChecker imports: none\n\n")  # the line after the dataset checks
+    assert md.index("- Dataset: ") < md.index("- Checker imports: none\n") < md.index("- Sample: ")
+    write_outputs(r, tmp_path / "out")
+    assert json.loads((tmp_path / "out" / "report.json").read_text(encoding="utf-8"))["environment"] == r.environment
+
+
+def test_cloudpickle_that_carries_a_function_from_python_is_not_its_import():
+    def exact(completion, answer):  # defined here, so it travels by value and its module is not imported again
+        return float(completion.strip() == answer)
+
+    assert audit(exact, ROWS_OF_NUMBERS, probes=["N"], workers=1).environment["packages"] == {}
+
+
+def test_checker_imports_name_eight_packages_and_count_the_rest(substring):
+    r = dataclasses.replace(substring, environment={**substring.environment, "packages": {f"pkg{i}": f"1.{i}" for i in range(11)}})
+    line = "Checker imports: " + ", ".join(f"pkg{i} 1.{i}" for i in range(8)) + " and 3 more"
+    assert line in flat(screen(r)) and f"- {line}\n" in render_markdown(r)
+    nothing = dataclasses.replace(substring, environment={})  # no worker replied: no line, rather than a wrong "none"
+    assert "Checker imports" not in screen(nothing) and "Checker imports" not in render_markdown(nothing)
 
 
 def test_report_json_is_the_result_without_its_calls(substring, tmp_path):

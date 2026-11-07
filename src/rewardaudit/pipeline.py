@@ -60,6 +60,7 @@ class AuditResult:
     version: str = __version__
     observations: list[Observation] = field(default_factory=list)
     defects: list[dict[str, Any]] = field(default_factory=list)  # most severe first: id, name, severity, evidence, example, confirmation
+    environment: dict[str, Any] = field(default_factory=dict)  # python, platform, packages {distribution: version}; empty if no worker said
 
     @property
     def findings(self) -> list[dict[str, Any]]:
@@ -90,6 +91,7 @@ class AuditResult:
             "meta": self.meta,
             "spec": self.spec,
             "config": vars(self.config),
+            "environment": self.environment,
             "elapsed_s": self.elapsed_s,
             "n_rows": self.n_rows,
             "n_tasks": len(self.tasks),
@@ -246,7 +248,7 @@ def run_audit(
         dataset_issues=issues, determinism=determinism, latency_ms=latency,
         elapsed_s=time.perf_counter() - t_start, n_rows=n_rows,
         spec={k: v for k, v in spec.items() if k not in ("pickled", "sys_path")},
-        observations=kept, defects=defects,
+        observations=kept, defects=defects, environment=runner.environment,  # sent by the workers the with block stopped
     )
 
 

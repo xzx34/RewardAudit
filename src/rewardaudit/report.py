@@ -25,7 +25,7 @@ from rewardaudit.probes.registry import FAMILIES
 from rewardaudit.types import Label, Task
 
 SCHEMA_VERSION = "1"
-MAX_FORMATS, MAX_EVIDENCE = 8, 6
+MAX_FORMATS, MAX_EVIDENCE, MAX_IMPORTS = 8, 6, 8
 SERIOUS = ("high", "medium")
 SEV_STYLE = {"high": "bold red", "medium": "yellow", "low": "dim"}
 RELIABLE_ROW = "Runs reliably"
@@ -142,6 +142,16 @@ def no_discrimination_line(c: Contract, m: dict[str, Any]) -> str:
         return (f"Format-only reward: any answer in the right format earns the reference answer's score, and the reference "
                 f"answer in other formats earns less. {same} Nothing below says whether an answer is right.")
     return f"{same} {check}; nothing below says whether an answer is right."
+
+
+def imports_line(environment: dict[str, Any]) -> str | None:
+    """The third-party packages the checker imported, with their versions, since another version can change what it decides.
+    None when no worker said; report.json has every package."""
+    if "packages" not in environment:
+        return None
+    items = [f"{name} {version}" for name, version in environment["packages"].items()]
+    text = ", ".join(items[:MAX_IMPORTS]) + (f" and {len(items) - MAX_IMPORTS} more" if len(items) > MAX_IMPORTS else "")
+    return f"Checker imports: {text or 'none'}"
 
 
 def _verdict(result: AuditResult) -> str:
@@ -343,6 +353,8 @@ def render_terminal(result: AuditResult, console: Console | None = None, *, full
         console.print()
     for text in [_issue_text(i) for i in result.dataset_issues] or ["no issues"]:
         _say(console, f"Dataset: {text}")
+    if line := imports_line(result.environment):
+        _say(console, line)
     console.print()
     if findings and not full:
         _say(console, f"{'full=True' if _from_python(result) else '--full'} prints the {_plural(len(findings), 'finding')} behind this, one per probe.", "dim")
@@ -457,9 +469,10 @@ def _md_how_run(result: AuditResult) -> list[str]:
     data = str(spec.get("dataset") or "")
     known = data.startswith("hf:") or (data and Path(data).exists())  # rows handed over in memory went to a temporary file
     data = f"`{data}`" if known else "rows passed in memory" if data else "the checker's own"
-    L = [f"- Checker: {checker}", f"- Dataset: {data}, {result.n_rows:,} rows",
-         f"- Sample: {len(result.tasks):,} rows drawn at random, seed {cfg.seed}", f"- Timeout: {cfg.timeout_s:g} s per call",
-         f"- Workers: {cfg.workers}"]
+    L = [f"- Checker: {checker}", f"- Dataset: {data}, {result.n_rows:,} rows"]
+    L += [f"- {line}"] if (line := imports_line(result.environment)) else []
+    L += [f"- Sample: {len(result.tasks):,} rows drawn at random, seed {cfg.seed}", f"- Timeout: {cfg.timeout_s:g} s per call",
+          f"- Workers: {cfg.workers}"]
     L += [f"- Probe families: {', '.join(cfg.families)}"] if cfg.families else []
     L += [f"- Framework: {meta['framework']}"] if meta.get("framework") else []
     return L + ([] if _from_python(result) else ["- `repro.py`, next to this report, re-scores the reply behind each finding"])
