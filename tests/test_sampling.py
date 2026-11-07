@@ -6,6 +6,7 @@ import random
 import time
 
 import pytest
+from rich.console import Console
 
 from rewardaudit.adapters.base import sample_tasks
 from rewardaudit.adapters.dataset import load_tasks
@@ -18,6 +19,7 @@ from rewardaudit.pipeline import TIER_RANK, AuditConfig, run_audit
 from rewardaudit.probes import mutate
 from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.registry import all_probes
+from rewardaudit.report import render_terminal
 from rewardaudit.types import Kind, Label, Observation, Task, Verdict
 
 ENDS_WITH_GOLD = """
@@ -103,21 +105,21 @@ def test_an_audits_rows_follow_its_seed_and_not_its_workers(tmp_path, checker):
 
 def test_a_datasets_own_ids_are_used_when_they_tell_the_rows_apart(tmp_path):
     rows = [{**r, "id": f"row-{i}"} for i, r in enumerate(_rows(4))]
-    assert [t.id for t in load_tasks(_write(tmp_path, rows))] == ["row-0", "row-1", "row-2", "row-3"]
+    assert [t.id for t in load_tasks(_write(tmp_path, rows))[0]] == ["row-0", "row-1", "row-2", "row-3"]
     rows = [{**r, "id": 100 + i} for i, r in enumerate(_rows(4))]
-    assert [t.id for t in load_tasks(_write(tmp_path, rows))] == ["100", "101", "102", "103"]
+    assert [t.id for t in load_tasks(_write(tmp_path, rows))[0]] == ["100", "101", "102", "103"]
 
 
 @pytest.mark.parametrize("ids", [["same"] * 4, ["a", "b", "a", "c"], [1, "1", 2, 3], [None] * 4])
 def test_row_ids_stay_unique_when_the_id_column_repeats(tmp_path, ids):
     rows = [{**r, "id": i} for i, r in zip(ids, _rows(4), strict=True)]
-    assert [t.id for t in load_tasks(_write(tmp_path, rows))] == ["0", "1", "2", "3"]
+    assert [t.id for t in load_tasks(_write(tmp_path, rows))[0]] == ["0", "1", "2", "3"]
 
 
 def test_an_id_column_that_collides_with_a_row_number_where_it_is_missing(tmp_path):
     rows = _rows(4)
     rows[0]["id"] = 2  # row 2 has no id and takes its number
-    assert [t.id for t in load_tasks(_write(tmp_path, rows))] == ["0", "1", "2", "3"]
+    assert [t.id for t in load_tasks(_write(tmp_path, rows))[0]] == ["0", "1", "2", "3"]
 
 
 def test_an_audit_keeps_rows_with_a_repeated_id_apart(tmp_path, checker):
@@ -136,14 +138,36 @@ def _outside_the_sample(k: int, n: int, seed: int) -> list[int]:
 @pytest.mark.parametrize("workers", [1, 2])
 def test_issues_outside_the_sample_are_reported(tmp_path, checker, workers):
     rows = _rows(30)
-    a, b, c, *_ = _outside_the_sample(30, 5, seed=0)
+    a, b, *_ = _outside_the_sample(30, 5, seed=0)
     rows[b]["prompt"] = rows[a]["prompt"]
-    rows[c]["answer"] = ""
     r = audit(checker, _write(tmp_path, rows), n=5, seed=0, probes=["N"], workers=workers)
-    assert not {str(a), str(b), str(c)} & {t.id for t in r.tasks} and r.n_rows == 30
+    assert not {str(a), str(b)} & {t.id for t in r.tasks} and r.n_rows == 30
     issues = {i["id"]: i for i in r.dataset_issues}
-    assert issues["duplicate_prompts"]["tasks"] == [[str(a), str(b)]]
-    assert issues["empty_answers"]["tasks"] == [str(c)] and issues["empty_answers"]["count"] == 1
+    assert issues["duplicate_prompts"]["tasks"] == [[str(a), str(b)]] and "empty_rows_left_out" not in issues
+
+
+@pytest.mark.parametrize("workers", [1, 2])
+def test_rows_with_an_empty_reference_are_left_out_before_the_draw(tmp_path, checker, workers):
+    rows = _rows(30)
+    for i, empty in zip((3, 8, 15, 22), ("", "  \n", None, []), strict=True):
+        rows[i]["answer"] = empty
+    r = audit(checker, _write(tmp_path, rows), n=20, probes=["N"], workers=workers)
+    assert r.n_rows == 26 and len(r.tasks) == 20 and not {"3", "8", "15", "22"} & {t.id for t in r.tasks}
+    assert all(t.answer.strip() for t in r.tasks) and r.contract.self_pass_rate == 1.0
+    issues = {i["id"]: i for i in r.dataset_issues}
+    left = issues["empty_rows_left_out"]
+    assert left["name"] == "4 rows with an empty reference were left out" and left["count"] == 4 and left["severity"] == "low"
+    assert "empty_answers" not in issues and r.meta["empty_rows_left_out"] == 4
+
+
+def test_one_row_left_out_is_one_row(tmp_path, checker):
+    rows = _rows(12)
+    rows[5]["answer"] = ""
+    r = audit(checker, _write(tmp_path, rows), n=4, probes=["N"], workers=1)
+    console = Console(width=200, record=True, force_terminal=False)
+    render_terminal(r, console)
+    text = console.export_text()
+    assert "Dataset: 1 row with an empty reference was left out (they were not sampled;" in text and "4 of 11 rows" in text
 
 
 def test_a_skew_of_the_whole_dataset_is_counted_on_all_its_rows(tmp_path, checker):
@@ -152,14 +176,6 @@ def test_a_skew_of_the_whole_dataset_is_counted_on_all_its_rows(tmp_path, checke
         row["answer"] = "7"
     r = audit(checker, _write(tmp_path, rows), n=5, probes=["N"], workers=1)
     assert next(i for i in r.dataset_issues if i["id"] == "skewed_answers")["count"] == 12
-
-
-def test_a_sampled_empty_answer_is_a_dataset_issue_and_not_a_rejection(tmp_path, checker):
-    rows = _rows(12)
-    rows[0]["answer"] = ""
-    r = audit(checker, _write(tmp_path, rows), n="all", probes=["N"], workers=1)
-    assert [i["tasks"] for i in r.dataset_issues if i["id"] == "empty_answers"] == [["0"]]
-    assert "0" not in r.contract.self_pass and "G1" not in {f["probe_id"] for f in r.findings}
 
 
 # --- the metrics in batches ------------------------------------------------------------------------------------------------

@@ -13,14 +13,21 @@ from rewardaudit.types import Task
 _SPACE = re.compile(r"\s+")
 
 
-def run_dataset_checks(tasks: list[Task]) -> list[dict[str, Any]]:
-    """Each issue: id, name, severity, count, task ids (at most ten) and a note."""
+def run_dataset_checks(tasks: list[Task], left_out: int = 0) -> list[dict[str, Any]]:
+    """Each issue: id, name, severity, count, task ids (at most ten) and a note. `left_out`: rows that had an empty
+    reference answer and never became tasks (`load_tasks`)."""
     n = len(tasks)
     if n == 0:
         return []
     gold_type, _ = infer_dataset_type(tasks)
     issues: list[dict[str, Any]] = []
 
+    if left_out:
+        rows = f"{left_out:,} rows with an empty reference were" if left_out > 1 else "1 row with an empty reference was"
+        issues.append({"id": "empty_rows_left_out", "name": f"{rows} left out", "count": left_out, "severity": "low",
+                       "note": "they were not sampled; a reply to them could not be scored against anything"})
+
+    # an environment loads its own tasks, and they can still have an empty answer
     empty = [t.id for t in tasks if not t.answer.strip()]
     if empty:
         issues.append({"id": "empty_answers", "name": "empty reference answers", "count": len(empty), "tasks": empty[:10],

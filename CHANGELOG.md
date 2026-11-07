@@ -25,6 +25,12 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   and a checker that catches it rejects every answer it would have parsed. `report.json` has a new top-level key,
   `environment`, with `python`, `platform` and `packages` (every package, name to version), as the workers reported them;
   from Python it is `result.environment`. `schema_version` stays 1, since no existing key changed.
+- Rows of a dataset file whose reference answer is empty (a blank string, `null`, or an empty list, as SQuAD 2.0 keeps its
+  unanswerable questions) are left out before the draw, and the dataset checks say so: `100 rows with an empty reference were
+  left out`, `empty_rows_left_out` in `dataset_issues`, low. Before, they were drawn with the rest, and a sample where half the
+  reference answers were empty stopped the audit. The row counts in the report, `n_rows` among them, are of the rows left;
+  `meta.empty_rows_left_out` in `report.json` has the number. A dataset whose reference answers are all empty stops with a
+  message naming the column. An environment's own rows are not left out, and an empty answer there is still a dataset issue.
 
 ## 0.2.0 - 2026-11-07
 

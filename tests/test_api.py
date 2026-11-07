@@ -325,7 +325,8 @@ def files(tmp_path) -> dict[str, str]:
            "strange_columns": tmp_path / "strange.jsonl", "text": tmp_path / "data.txt", "missing_data": tmp_path / "nope.jsonl",
            "missing_reward": tmp_path / "nope.py", "helpers": tmp_path / "helpers.py", "empty_reward": tmp_path / "empty.py",
            "empty": tmp_path / "empty.jsonl", "scalars": tmp_path / "scalars.jsonl", "mixed": tmp_path / "mixed.jsonl",
-           "broken_json": tmp_path / "broken.json", "dict_json": tmp_path / "dict.json", "not_python": tmp_path / "reward.txt"}
+           "broken_json": tmp_path / "broken.json", "dict_json": tmp_path / "dict.json", "not_python": tmp_path / "reward.txt",
+           "unanswered": tmp_path / "unanswered.jsonl"}
     out["reward"].write_text("def score(completion, answer):\n    return float(answer in completion)\n", encoding="utf-8")
     _write(out["data"], ROWS)
     out["bad_line"].write_text('{"prompt": "p", "answer": "1"}\n{"prompt": "p", \n', encoding="utf-8")
@@ -339,6 +340,7 @@ def files(tmp_path) -> dict[str, str]:
     out["broken_json"].write_text("{", encoding="utf-8")
     out["dict_json"].write_text('{"a": 1}', encoding="utf-8")
     out["not_python"].write_text("not python\n", encoding="utf-8")
+    _write(out["unanswered"], [{"prompt": "p", "answer": ""}, {"prompt": "q", "answer": None}])
     return {k: str(v) for k, v in out.items()}
 
 
@@ -365,6 +367,7 @@ PROBLEMS = [
     ("function_without_dataset", "reward", None, {}, [], ["needs a dataset", "jsonl", "hf:org/name"]),
     ("environment_with_dataset", "owner/name", "data", {}, [], ["owner/name is an environment", "brings its own dataset", "--dataset"]),
     ("unknown_probe_family", "reward", "data", {"probes": ["Z"]}, ["--probes", "Z"], ["Unknown probe family 'Z'", "N, E, L, O, M, Q, P"]),
+    ("no_reference_answers", "reward", "unanswered", {}, [], ["All 2 rows of", "have an empty reference answer in 'answer'", "--answer-col"]),
 ]
 
 
@@ -419,10 +422,11 @@ def test_a_list_of_accepted_answers_goes_to_the_checker_and_one_of_them_into_the
     assert r.contract.self_pass_rate == 1.0 and r.tasks[0].answer.startswith("thing")
 
 
-def test_a_row_with_no_accepted_answers_is_an_empty_answer_and_no_missing_column():
+def test_a_row_with_no_accepted_answers_is_left_out_and_no_missing_column():
     rows = [*ALIASES, {"question": "Unanswerable?", "answers": {"text": []}}]
     r = audit(_any_alias, rows, n="all", answer_col="answers.text.0", reference_col="answers.text", workers=1, probes=["N"])
-    assert sum(t.answer == "" for t in r.tasks) == 1 and len(r.tasks) == 13
+    assert len(r.tasks) == r.n_rows == 12 and "12" not in {t.id for t in r.tasks}
+    assert [i["count"] for i in r.dataset_issues if i["id"] == "empty_rows_left_out"] == [1]
 
 
 def test_an_unknown_rate_in_fail_on_is_an_error_and_no_silent_pass():
@@ -572,9 +576,10 @@ def test_exit_codes(tmp_path):
 
 
 def test_dataset_issues_do_not_set_the_exit_code():
-    rows = [dict(row) for row in ROWS]
-    rows[0]["answer"] = ""
+    rows = [dict(row) for row in ROWS] + [{"prompt": "An unanswered card.", "answer": ""}]
+    for row in rows[:5]:
+        row["answer"] = "1000"  # five rows of twelve: a skew that is high
     rows[2]["prompt"] = rows[1]["prompt"]
     r = audit(EXACT, rows, n="all", probes=["N"], workers=1)
-    assert {"empty_answers", "duplicate_prompts"} <= {i["id"] for i in r.dataset_issues}
+    assert {"skewed_answers", "duplicate_prompts", "empty_rows_left_out"} <= {i["id"] for i in r.dataset_issues}
     assert any(i["severity"] == "high" for i in r.dataset_issues) and exit_code(r) == 0

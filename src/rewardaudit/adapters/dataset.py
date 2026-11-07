@@ -3,6 +3,7 @@
 Columns may be dotted paths into nested values (verl parquet files keep the gold in reward_model.ground_truth), and a number
 in a path picks an item of a list (answers.text.0).
 A structured gold (dict or list) becomes JSON text in Task.answer; its parent column stays in Task.info.
+A row whose gold is empty is left out (SQuAD 2.0 keeps its unanswerable questions as rows with no answer).
 """
 
 from __future__ import annotations
@@ -37,6 +38,12 @@ def get_path(row: dict[str, Any], key: str) -> Any:
         else:
             return MISSING
     return cur
+
+
+def _no_answer(value: Any) -> bool:
+    """A gold that holds no answer: None (an item past the end of a list too), a blank string or an empty list. Read
+    before `answer_text`, which writes an empty list as '[]'."""
+    return value is None or (isinstance(value, str) and not value.strip()) or (isinstance(value, list) and not value)
 
 
 def answer_text(value: Any) -> str:
@@ -127,7 +134,9 @@ def load_tasks(
     prompt_col: str | None = None,
     answer_col: str | None = None,
     split: str | None = None,
-) -> list[Task]:
+) -> tuple[list[Task], int]:
+    """The rows that have a reference answer, as tasks, and how many rows were left out for having none. A row keeps its
+    number (or id) in the file either way."""
     rows = _rows_from_hf(source[3:], split) if source.startswith("hf:") else _rows_from_path(source)
     if not rows:
         raise AuditError(f"The dataset {source} is empty")
@@ -142,7 +151,12 @@ def load_tasks(
         prompt_value, answer = get_path(row, pc), get_path(row, ac)
         if prompt_value is MISSING or answer is MISSING:
             raise AuditError(f"Row {i} of {source} has no column {pc if prompt_value is MISSING else ac!r}")
+        if _no_answer(answer):
+            continue
         prompt, messages = _render_prompt(prompt_value)
         info = {k: v for k, v in row.items() if k not in (pc, ac)}
         tasks.append(Task(id=tid, prompt=prompt, answer=answer_text(answer), messages=messages, info=info))
-    return tasks
+    if not tasks:
+        raise AuditError(f"All {len(rows):,} rows of {source} have an empty reference answer in {ac!r}. "
+                         "If another column holds it, name it with --answer-col")
+    return tasks, len(rows) - len(tasks)

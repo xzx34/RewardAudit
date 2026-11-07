@@ -774,6 +774,18 @@ def test_an_environment_goes_through_the_whole_audit(tmp_path):
     assert r.spec["env"] == "o/fake_env_full" and "dataset" not in r.spec
 
 
+def test_an_empty_answer_of_an_environment_is_a_dataset_issue_and_not_a_rejection(tmp_path):
+    """An environment loads its own rows, so an empty answer is not left out as a dataset file's would be."""
+    spec = _env_spec(tmp_path)
+    env = tmp_path / "fake_env_full.py"
+    env.write_text(env.read_text(encoding="utf-8").replace('"answer": str(10 + i)', '"answer": "" if i == 0 else str(10 + i)'),
+                   encoding="utf-8")
+    r = run_audit(spec, AuditConfig(n_tasks=None, families=["N"]))
+    assert r.n_rows == len(r.tasks) == 12 and r.tasks[0].answer == "" and r.tasks[0].id not in r.contract.self_pass
+    assert [i["tasks"] for i in r.dataset_issues if i["id"] == "empty_answers"] == [[r.tasks[0].id]]
+    assert "empty_rows_left_out" not in {i["id"] for i in r.dataset_issues} and "G1" not in {f["probe_id"] for f in r.findings}
+
+
 @pytest.mark.parametrize("kw, cls, advice", [
     ({"base": "MultiTurnEnv"}, "multi_turn_or_tools", "one reply"),
     ({"rollout": "raise ValueError('Plain string task routes are no longer supported')"}, "load_failed", "--verifiers"),

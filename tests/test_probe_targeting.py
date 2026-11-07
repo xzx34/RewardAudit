@@ -10,7 +10,7 @@ import pytest
 
 from rewardaudit.contract import REASONING, WRAPPERS, Contract
 from rewardaudit.equiv import contains_equiv
-from rewardaudit.errors import NotAuditable
+from rewardaudit.errors import AuditError, NotAuditable
 from rewardaudit.goldtype import asks_answer_only, infer_gold_type
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.base import ProbeContext
@@ -279,16 +279,15 @@ def _spec(tmp_path, golds):
     return {"kind": "function", "path": str(tmp_path / "checker.py"), "dataset": str(tmp_path / "data.jsonl")}
 
 
-def test_an_empty_gold_is_a_dataset_issue_and_not_a_rejected_answer(tmp_path):
+def test_an_empty_gold_is_left_out_and_not_a_rejected_answer(tmp_path):
     golds = [f"{i} plums" for i in range(23)] + [""] * 6 + ["   "]
     r = run_audit(_spec(tmp_path, golds), AuditConfig(n_tasks=30, families=["N", "M"], keep_observations=True))
-    empty = {t.id for t in r.tasks if not t.answer.strip()}
-    assert len(r.tasks) == 30 and len(empty) == 7
+    empty = {str(i) for i in range(23, 30)}
+    assert len(r.tasks) == r.n_rows == 23 and not empty & {t.id for t in r.tasks}
     assert len(r.contract.self_pass) == 23 and r.contract.self_pass_rate == 1.0 and r.contract.rejected_golds() == []
     assert not [f for f in r.metrics["findings"] if f["probe_id"] == "G1"]
-    assert next(i for i in r.dataset_issues if i["id"] == "empty_answers")["count"] == 7
+    assert next(i for i in r.dataset_issues if i["id"] == "empty_rows_left_out")["count"] == 7
     assert not empty & {o.task_id for o in r.observations}
-    assert not empty & {tid for _, tid, _, _ in r.contract.observations}
     assert r.metrics["n_tasks"] == 23 and r.metrics["floor"]["value"] == pytest.approx(1 / 23)  # '' is no constant answer
 
 
@@ -311,5 +310,7 @@ def score(prompt, completion, answer):
 
 
 def test_a_dataset_of_only_empty_golds_cannot_be_audited(tmp_path):
-    with pytest.raises(NotAuditable, match="5 of 5 reference answers are empty"):
+    with pytest.raises(AuditError, match="All 5 rows of .* have an empty reference answer"):
         run_audit(_spec(tmp_path, [""] * 5), AuditConfig(n_tasks=5, families=["N"]))
+    with pytest.raises(NotAuditable, match="5 of 5 reference answers are empty or placeholders"):
+        run_audit(_spec(tmp_path, ["n/a"] * 5), AuditConfig(n_tasks=5, families=["N"]))

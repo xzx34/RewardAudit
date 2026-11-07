@@ -260,7 +260,7 @@ class FunctionAdapter(Adapter):
 
     def all_tasks(self) -> list[Task]:
         if self._tasks is None:
-            self._tasks = load_tasks(
+            self._tasks, self.meta["empty_rows_left_out"] = load_tasks(
                 self.spec["dataset"],
                 prompt_col=self.spec.get("prompt_col"),
                 answer_col=self.spec.get("answer_col"),

@@ -163,7 +163,8 @@ def main() -> None:
             elif op == "dataset_issues":
                 from rewardaudit.checks.dataset import run_dataset_checks
 
-                send({"ok": True, "issues": run_dataset_checks(reading_rows(adapter.all_tasks))})
+                rows = reading_rows(adapter.all_tasks)  # loading tells how many rows were left out
+                send({"ok": True, "issues": run_dataset_checks(rows, left_out=adapter.meta.get("empty_rows_left_out", 0))})
             elif op == "score":
                 task = Task.from_dict(req["task"])
                 guard.tripped = False

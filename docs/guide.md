@@ -105,8 +105,9 @@ compares scores, so name one for the replies and hand the whole list to the chec
 rewardaudit audit reward.py --dataset data.jsonl --answer-col answers.text.0 --reference-col answers.text
 ```
 
-A number in a column name picks an item of a list, and a row whose list is empty counts as having no answer. Your function's
-reference parameter gets the whole list. Replies are written from the answer you name, so the others are not probed.
+A number in a column name picks an item of a list, and a row whose list is empty has no answer and is left out. Your
+function's reference parameter gets the whole list. Replies are written from the answer you name, so the others are not
+probed.
 
 ### The reference answer is not what the checker expects
 
@@ -118,7 +119,7 @@ answer to build its replies, so it has to be the answer itself.
 
 `--n` is yours to choose. rewardaudit always reads the whole dataset and draws that many rows at random, without replacement,
 using `--seed` (0 by default). The default is 100; `--n all` uses every row. The report states how many rows were drawn from
-how many.
+how many. A row whose reference answer is empty is left out first, since a reply to it could not be scored against anything.
 
 **What more rows give you.** Each row costs about 90 checker calls. A behaviour that affects 5% of rows shows up in a sample
 of 100 with a probability of 99.4%, and in a sample of 30 with 79%. Larger samples narrow the intervals and reach rarer rows.
@@ -245,8 +246,11 @@ format credit does not count as accepted.
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
 M (definite errors), Q (right answers rewritten), P (malformed and extreme input, a reply run as code).
 
-**Dataset checks.** Empty answers, duplicate prompts, answers that appear in the prompt, skewed answers, and multiple-choice
-answers that are not among the options. These read the data only, and they do not affect the exit code. The line after them,
+**Dataset checks.** Rows whose reference answer is empty (blank, or an empty list, as SQuAD 2.0 keeps its unanswerable
+questions) are left out before the draw, and a line says how many; the other row counts in the report are of the rows left.
+Then the checks: empty answers, which an environment's own rows can still have, duplicate prompts, answers that appear in
+the prompt, skewed answers, and multiple-choice answers that are not among the options. These read the data only, and they do
+not affect the exit code. The line after them,
 `Checker imports`, names the third-party packages imported as the checker loaded and scored, with their versions, the first
 8 by name. Packages imported to read the dataset, such as pyarrow or datasets, do not count, nor does cloudpickle, which
 carries a function over from Python. Another version of one can change what the checker decides, so these are the versions

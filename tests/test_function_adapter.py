@@ -210,10 +210,10 @@ def test_dataset_dotted_columns_and_structured_gold(tmp_path):
              "reward_model": {"ground_truth": {"target": ["1998"]}, "style": "rule"}, "extra_info": {"index": 0}}]
     path = tmp_path / "verl.jsonl"
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-    (t,) = load_tasks(str(path))
+    (t,), _ = load_tasks(str(path))
     assert t.prompt == "Find the year." and json.loads(t.answer) == {"target": ["1998"]}
     assert t.info["reward_model"]["style"] == "rule" and t.info["extra_info"] == {"index": 0}
-    (u,) = load_tasks(str(path), answer_col="reward_model.style")
+    (u,), _ = load_tasks(str(path), answer_col="reward_model.style")
     assert u.answer == "rule"
     with pytest.raises(AuditError, match="no column"):
         load_tasks(str(path), answer_col="reward_model.missing")
@@ -241,7 +241,7 @@ def _parquet(path):
 ])
 def test_dataset_files(tmp_path, name, write):
     write(tmp_path / name)
-    assert [(t.id, t.prompt, t.answer) for t in load_tasks(str(tmp_path / name))] == [("0", "p0", "a0"), ("1", "p1", "a1")]
+    assert [(t.id, t.prompt, t.answer) for t in load_tasks(str(tmp_path / name))[0]] == [("0", "p0", "a0"), ("1", "p1", "a1")]
 
 
 @pytest.mark.parametrize("source, split, expected", [
@@ -259,7 +259,7 @@ def test_a_hugging_face_name_gives_its_config_and_split(monkeypatch, source, spl
         return ROWS
 
     monkeypatch.setitem(sys.modules, "datasets", types.SimpleNamespace(load_dataset=load_dataset))
-    assert [t.answer for t in load_tasks(source, split=split)] == ["a0", "a1"] and asked == [expected]
+    assert [t.answer for t in load_tasks(source, split=split)[0]] == ["a0", "a1"] and asked == [expected]
 
 
 def test_chat_prompts_and_a_system_prompt():
@@ -271,6 +271,24 @@ def test_chat_prompts_and_a_system_prompt():
 def test_a_row_without_a_column_says_which(tmp_path):
     (tmp_path / "rows.jsonl").write_text(json.dumps(ROWS[0]) + "\n" + json.dumps({"prompt": "p1"}), encoding="utf-8")
     with pytest.raises(AuditError, match="Row 1 of .* has no column 'answer'"):
+        load_tasks(str(tmp_path / "rows.jsonl"))
+
+
+def test_rows_with_an_empty_reference_answer_are_left_out_and_counted(tmp_path):
+    answers = ["a0", "", "  \n", None, [], 0, "a6", ["x"], {}]
+    rows = [{"prompt": f"p{i}", "answer": a} for i, a in enumerate(answers)]
+    (tmp_path / "rows.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    tasks, left_out = load_tasks(str(tmp_path / "rows.jsonl"))
+    assert left_out == 4 and [(t.id, t.answer) for t in tasks] == [("0", "a0"), ("5", "0"), ("6", "a6"), ("7", '["x"]'), ("8", "{}")]
+    squad = [{"question": "q0", "answers": {"text": ["Paris"]}}, {"question": "q1", "answers": {"text": []}}]
+    (tmp_path / "squad.jsonl").write_text("\n".join(json.dumps(r) for r in squad), encoding="utf-8")
+    tasks, left_out = load_tasks(str(tmp_path / "squad.jsonl"), answer_col="answers.text.0")  # an empty list: no item 0
+    assert [t.answer for t in tasks] == ["Paris"] and left_out == 1
+
+
+def test_a_dataset_whose_answers_are_all_empty_says_so(tmp_path):
+    (tmp_path / "rows.jsonl").write_text("\n".join(json.dumps({"prompt": f"p{i}", "answer": ""}) for i in range(3)), encoding="utf-8")
+    with pytest.raises(AuditError, match=r"All 3 rows of .*rows.jsonl have an empty reference answer in 'answer'\. .*--answer-col"):
         load_tasks(str(tmp_path / "rows.jsonl"))
 
 
