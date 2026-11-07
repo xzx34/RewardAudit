@@ -1,6 +1,7 @@
 """Load every row of a dataset as tasks: jsonl / json / csv / parquet files or Hugging Face datasets.
 
-Columns may be dotted paths into nested values (verl parquet files keep the gold in reward_model.ground_truth).
+Columns may be dotted paths into nested values (verl parquet files keep the gold in reward_model.ground_truth), and a number
+in a path picks an item of a list (answers.text.0).
 A structured gold (dict or list) becomes JSON text in Task.answer; its parent column stays in Task.info.
 """
 
@@ -23,14 +24,18 @@ MISSING = object()
 
 
 def get_path(row: dict[str, Any], key: str) -> Any:
-    """row[key], or the nested value of a dotted key ('reward_model.ground_truth'); MISSING if absent."""
+    """row[key], or the nested value of a dotted key ('reward_model.ground_truth', 'answers.text.0'); MISSING if absent.
+    An item past the end of a list is None: a row whose list of answers is empty has no answer, and that is no missing column."""
     if key in row:
         return row[key]
     cur: Any = row
     for part in key.split("."):
-        if not isinstance(cur, dict) or part not in cur:
+        if isinstance(cur, list) and part.isdigit():
+            cur = cur[int(part)] if int(part) < len(cur) else None
+        elif isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        else:
             return MISSING
-        cur = cur[part]
     return cur
 
 

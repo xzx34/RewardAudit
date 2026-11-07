@@ -82,6 +82,7 @@ def audit(
     seed: int = typer.Option(0, help="seed of the random draw"),
     prompt_col: str | None = typer.Option(None, help="column holding the prompt (found by name if not given)"),
     answer_col: str | None = typer.Option(None, help="column holding the reference answer (found by name if not given)"),
+    reference_col: str | None = typer.Option(None, help="column the checker receives as the reference, if not the answer column, such as a list of accepted answers"),
     out: str | None = typer.Option(None, help="directory for report.md, report.json and repro.py"),
     workers: int | None = typer.Option(None, help="parallel worker processes (default: 4, or the CPUs if fewer)"),
     timeout: float = typer.Option(10.0, help="seconds allowed per checker call"),
@@ -99,7 +100,7 @@ def audit(
         _fail(str(e))
     result = _execute(lambda **kw: run(target, dataset, n=size, seed=seed, prompt_col=prompt_col, answer_col=answer_col,
                                        workers=workers, timeout=timeout, probes=probes.split(",") if probes else None,
-                                       reply_format=reply_format, verifiers=verifiers, **kw), quiet)
+                                       reference_col=reference_col, reply_format=reply_format, verifiers=verifiers, **kw), quiet)
     path = write_outputs(result, out) if out else None
     render_terminal(result, console, full=full, out=path)
     raise typer.Exit(exit_code(result, gates))

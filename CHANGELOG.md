@@ -14,6 +14,7 @@ First public version.
   reliably. Each has a rate with a 95% interval, and each problem is a finding with an example.
 - Sampling: `--n` rows drawn at random from the whole dataset, or `--n all`.
 - Reply formats: finds which formats the checker accepts, and takes one of its own with `--format`.
+- Several accepted answers: `--answer-col answers.text.0 --reference-col answers.text`.
 - Scores with several parts: judges acceptance on the parts that separate right answers from wrong ones.
 - Stops with a one-line reason when the numbers would mislead, such as reference answers that never earn full score.
 - `--out DIR` writes `report.md`, `report.json` and `repro.py`, which re-scores the reply behind each finding.

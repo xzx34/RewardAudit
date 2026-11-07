@@ -112,7 +112,8 @@ result.save("out/")  # report.md, report.json
 rewardaudit needs a function that takes a reply and a reference answer and returns a score. Parameters are matched by name,
 so `score(completion, answer)`, verl's `compute_score(solution_str, ground_truth)` and TRL's
 `reward(prompts, completions, **columns)` work as they are. For any other benchmark, a few lines that call its checker are
-enough, and `--format '<solution>{answer}</solution>'` names a reply format the tool does not try by itself. Datasets can be
+enough, `--format '<solution>{answer}</solution>'` names a reply format the tool does not try by itself, and
+`--answer-col answers.text.0 --reference-col answers.text` handles a list of accepted answers. Datasets can be
 jsonl, json, csv, parquet or `hf:org/name[:config[:split]]`.
 
 A [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers) environment works too, and brings its own dataset:

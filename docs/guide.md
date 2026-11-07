@@ -39,7 +39,7 @@ Try `rewardaudit demo` first if you want to see the output without any files of 
 rewardaudit audit reward.py --dataset data.jsonl --prompt-col q --answer-col a
 ```
 
-Dotted names reach into nested values (`reward_model.ground_truth`). A prompt can be a string or a list of chat messages. An
+Dotted names reach into nested values (`reward_model.ground_truth`, `answers.text.0`). A prompt can be a string or a list of chat messages. An
 answer that is a dict or list is passed on as it is. An `id` column names the rows in reports, if its values are unique.
 
 ## Connect your checker
@@ -82,6 +82,17 @@ ask for. Every probe then writes its replies in a form the checker accepts. If y
 ```bash
 rewardaudit audit reward.py --dataset data.jsonl --format '<solution>{answer}</solution>'
 ```
+
+### Several accepted answers
+
+Many QA benchmarks accept any of several answers and keep them in a list. rewardaudit writes each reply from one answer and
+compares scores, so name one for the replies and hand the whole list to the checker:
+
+```bash
+rewardaudit audit reward.py --dataset data.jsonl --answer-col answers.text.0 --reference-col answers.text
+```
+
+A number in a column name picks an item of a list. A row whose list is empty counts as having no answer.
 
 ### The reference answer is not what the checker expects
 

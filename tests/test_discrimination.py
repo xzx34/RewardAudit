@@ -2,6 +2,7 @@
 
 import difflib
 import json
+from collections import Counter
 
 import pytest
 from rich.console import Console
@@ -100,6 +101,24 @@ def test_whole_reply_similarity_is_recognised():
                                                  for i in range(6)])
     assert c.accepted == ["bare"] and c.whole_reply_similarity and not c.no_discrimination
     assert c.to_dict()["whole_reply_similarity"] is True
+
+
+def _token_f1(completion, answer):
+    """A QA metric: punctuation goes, then the overlap of the words."""
+    def words(s):
+        return "".join(ch for ch in s.lower() if ch.isalnum() or ch.isspace()).split()
+
+    pred, gold = Counter(words(completion)), Counter(words(answer))
+    common = sum((pred & gold).values())
+    return 2 * common / (sum(pred.values()) + sum(gold.values()))
+
+
+def test_a_grader_that_strips_punctuation_is_whole_reply_similarity_too():
+    tasks = [Task(id=f"t{i}", prompt="Name it.", answer=f"the old bridge of town {i}") for i in range(6)]
+    c = infer_contract(FakeRunner(_token_f1), tasks)
+    assert {"bare", "hash", "bold"} <= set(c.accepted) and c.primary == "bare" and c.whole_reply_similarity
+    exact = infer_contract(FakeRunner(lambda c, a: _token_f1(c, a) == 1.0), tasks)  # no partial credit: a finding, as above
+    assert exact.primary == "bare" and not exact.whole_reply_similarity
 
 
 @pytest.mark.parametrize("fn", [

@@ -396,6 +396,35 @@ def test_the_command_line_takes_a_reply_format(tmp_path):
     _says_one_line(_run(str(reward), "--dataset", str(data), "--format", "<sol></sol>"), "holds {answer}")
 
 
+ALIASES = [{"question": f"Name the thing on card {i}.", "answers": {"text": [f"thing{i}", f"item{i}"]}} for i in range(12)]
+
+
+def _any_alias(completion, answer):
+    return float(completion.strip() in answer)
+
+
+def test_a_list_of_accepted_answers_goes_to_the_checker_and_one_of_them_into_the_replies():
+    stop = _stops(_any_alias, ALIASES, answer_col="answers.text")
+    assert "--answer-col COLUMN.0 --reference-col COLUMN" in stop.advice
+    r = audit(_any_alias, ALIASES, answer_col="answers.text.0", reference_col="answers.text", workers=1, probes=["N"])
+    assert r.contract.self_pass_rate == 1.0 and r.tasks[0].answer.startswith("thing")
+
+
+def test_a_row_with_no_accepted_answers_is_an_empty_answer_and_no_missing_column():
+    rows = [*ALIASES, {"question": "Unanswerable?", "answers": {"text": []}}]
+    r = audit(_any_alias, rows, n="all", answer_col="answers.text.0", reference_col="answers.text", workers=1, probes=["N"])
+    assert sum(t.answer == "" for t in r.tasks) == 1 and len(r.tasks) == 13
+
+
+def test_the_command_line_takes_a_reference_column(tmp_path):
+    reward = tmp_path / "reward.py"
+    reward.write_text("def score(completion, answer):\n    return float(completion.strip() in answer)\n")
+    data = _write(tmp_path / "data.jsonl", ALIASES)
+    res = _run(str(reward), "--dataset", str(data), "--answer-col", "answers.text.0", "--reference-col", "answers.text",
+               "--probes", "N", "--workers", "1")
+    assert res.exit_code != 2 and "accepted on 100% of rows" in res.output, res.output
+
+
 def _says_one_line(res, *says: str) -> None:
     assert res.exit_code == 2, res.output
     assert res.exception is None or isinstance(res.exception, SystemExit)

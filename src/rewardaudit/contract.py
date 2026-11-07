@@ -346,6 +346,7 @@ def is_full(score: float | None, full: float, eps: float = 1e-9) -> bool:
 
 MARKED = ("boxed", "answer_tag", "hash", "final_answer", "answer_colon", "boxed_dollar", "the_final_answer_is",
           "bold", "json", "code_block", "dollar")
+PUNCTUATION_ONLY = frozenset(("bare", "hash", "bold", "code_block", "dollar"))  # what a checker that strips punctuation cannot tell apart
 
 
 def ends_open_think(tasks: list[Task]) -> bool:
@@ -392,6 +393,8 @@ def _choose_primary(accepted: list[str], rates: dict[str, float], best_rate: flo
     for w in MARKED:
         if w in tied and (f"reasoning_{w}" in accepted or w in ("boxed_dollar", "the_final_answer_is")):
             return w
+    if "bare" in tied:
+        return "bare"
     for w in MARKED:
         if w in tied:
             return w
@@ -523,12 +526,12 @@ def _compare_with_wrong(c: Contract, wrong: dict[str, Verdict], eps: float = 1e-
 
 def _whole_reply_similarity(c: Contract, by_wrapper: dict[str, dict[str, Verdict]], eps: float = 1e-9) -> bool:
     """The checker grades the whole reply by closeness to the gold (edit distance, token overlap) and locates no
-    answer in it: only the bare gold earns full score, and on most passing tasks the same gold in other formats
-    earns varying parts of it. Any text around the answer lowers such a score by definition, so a rewrite of the
-    reply measures the metric, not a right answer being rejected."""
-    if c.accepted != ["bare"]:
+    answer in it: only the bare gold earns full score, punctuation around it aside, and on most passing tasks the same gold
+    in other formats earns varying parts of it. Any text around the answer lowers such a score by definition, so a
+    rewrite of the reply measures the metric, not a right answer being rejected."""
+    if "bare" not in c.accepted or not PUNCTUATION_ONLY.issuperset(c.accepted):
         return False
-    others = [w for w in c.wrappers_run if w != "bare"]
+    others = [w for w in c.wrappers_run if w not in c.accepted]
 
     def graded(tid: str) -> bool:
         vals = [c.signal(by_wrapper[w][tid]) for w in others]

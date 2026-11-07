@@ -17,6 +17,8 @@ NO_REFERENCE = ("rewardaudit rewrites the right answer and compares scores, so i
                 "If another column holds it, name it with --answer-col")
 NOT_PASSING = ("Check that the answer column holds the final answer, and that the checker gets it in the form it expects. "
                "Pass the reply format with --format, or wrap the checker in a small function (see docs/guide.md)")
+ACCEPTED_ANSWERS = ("The answer column holds lists. If each list holds the accepted answers, write replies from one and give "
+                    "the checker the whole list: --answer-col COLUMN.0 --reference-col COLUMN")
 TIMING_OUT = "Give the checker more time with --timeout"
 FAILED = "Fewer --workers may help if the machine ran out of memory"
 # 0.1.14 refuses a plain-string `task` column (0.1.13 was never released), and from 0.1.11 reward functions get message
@@ -100,6 +102,18 @@ def no_reference_reason(tasks: list[Task]) -> str | None:
         keys = sorted(set().union(*hits))
         return f"{len(hits)} of {n} reference answers are specifications, not answers (keys: {', '.join(keys[:4])})"
     return None
+
+
+def _holds_lists(tasks: list[Task]) -> bool:
+    """Most reference answers are JSON lists of plain values: the column may hold accepted answers, not one answer."""
+    def is_list(answer: str) -> bool:
+        try:
+            value = json.loads(answer)
+        except ValueError:
+            return False
+        return isinstance(value, list) and bool(value) and not any(isinstance(v, (dict, list)) for v in value)
+
+    return 2 * sum(is_list(t.answer) for t in tasks) > len(tasks)
 
 
 def _row_id_values(info: dict[str, Any]) -> set[str]:
@@ -203,6 +217,8 @@ def check_contract(contract: Any, tasks: list[Task], meta: dict[str, Any]) -> No
         cls, reason, advice = verdict
         if cls == "gold_never_passes" and meta.get("framework"):
             advice = f"{advice}. {OLD_VERIFIERS}"
+        if cls == "gold_never_passes" and _holds_lists(tasks):
+            advice = f"{ACCEPTED_ANSWERS}. {advice}"
         raise NotAuditable(cls, reason, advice)
     if not contract.no_discrimination:
         reason = low_gold_share_reason(contract, meta)
