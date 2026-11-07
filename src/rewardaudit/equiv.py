@@ -544,6 +544,8 @@ def contains_equiv(text: str, gold: str, gold_type: str | None = None, derived: 
         if equiv(c, gold, gold_type):
             return True
     if g is not None:
+        if ng.endswith("%") and re.search(r"(?<![\d.])" + re.escape(ng), nt):  # number tokens leave the percent sign out
+            return True
         for tok in extract_numbers(text):
             if equiv(tok, gold, gold_type):
                 return True

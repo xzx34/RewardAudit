@@ -533,6 +533,12 @@ SAMPLE_TASKS = [
     Task("list", "List the prime factors of 30 in increasing order, separated by commas.", "2, 3, 5"),
     Task("json", "Return the point (3, 4) as a JSON object with keys x and y.", '{"x": 3, "y": 4}'),
     Task("grid", "Invert every cell of this binary grid (0 becomes 1, 1 becomes 0):\n0 1\n1 1", "1 0\n0 0"),
+    Task("same", "What is 40 + 2?", "42"),
+    Task("unit", "How far is the station?", "5 km"),
+    Task("money", "A pen costs 3 dollars. How many dollars do 4 pens cost?", "12"),
+    Task("percent", "What percentage of 200 is 50?", "25%"),
+    Task("date", "When did the library open?", "2020-03-05"),
+    Task("words", "Who wrote Les Miserables?", "Victor Hugo"),
 ]
 REJECTED_GOLD_HELP = (
     "Most reference answers pass, yet on some rows the checker treats the dataset's own answer like a wrong one in every "
@@ -543,10 +549,11 @@ REJECTED_GOLD_HELP = (
 
 def _row_label(p: Probe) -> str:
     """The summary row a probe's calls count toward. Any probe's failed calls count toward Runs reliably as well."""
-    if not p.headline:
+    if p.family == "P":
         return f"{RELIABLE_ROW}; a reply the checker accepts is a finding under {ROWS['non_solving_accepted'][0]}"
-    return ROWS["right_rejected" if p.label == Label.SOLVING else "wrong_accepted" if p.family == "M"
-                else "hedging_accepted" if p.family == "O" else "non_solving_accepted"][0]
+    row = ROWS["right_rejected" if p.label == Label.SOLVING else "wrong_accepted" if p.family == "M"
+               else "hedging_accepted" if p.family == "O" else "non_solving_accepted"][0]
+    return row if p.headline else f"{row}, as a finding but not in the rate"
 
 
 def sample_context() -> ProbeContext:

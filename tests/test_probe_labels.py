@@ -38,7 +38,14 @@ TASKS = [
     Task("unstated", "Give the two numbers from the table.", "[4, 9]"),
     Task("grid", "Invert every cell of the binary grid:\n0 1 0\n1 0 1", "1 0 1\n0 1 0"),
     Task("jsongrid", "Transpose the matrix [[1, 3], [2, 4]].", "[[1, 2], [3, 4]]"),
+    Task("again", "What is 16 times 2?", "32"),
+    Task("unit", "How far is the station?", "5 km"),
+    Task("money", "A pen costs 3 dollars. How many dollars do 4 pens cost?", "12"),
+    Task("percent", "What percentage of 200 is 50?", "25%"),
+    Task("date", "When did the library open?", "2020-03-05"),
 ]
+# Their replies are right by construction, in spellings the tool's own comparison does not read.
+SPELLINGS = ("Q23", "Q24", "Q25", "Q26", "Q27")
 PRIMARIES = ("boxed", "think_boxed", "bare")
 WORD_GOLD = re.compile(r"\bgolds?\b", re.I)
 
@@ -75,9 +82,13 @@ def test_not_solving_variants_do_not_contain_gold_alone(primary):
         if probe.label != Label.NOT_SOLVING or probe.family == "O":
             continue
         gt = ctx.gtype(task)
-        if probe.family == "M":
+        if probe.id == "M23":  # the tool's own comparison reads '5 km' and '5 m' as the number 5
+            assert strip_wrappers(comp) != task.answer
+        elif probe.family == "M":
             inner = strip_wrappers(comp)
             assert not equiv(inner, task.answer, gt), (probe.id, name, comp, task.answer)
+        elif probe.id in ("L5", "L6"):  # sent whatever the row's answer is; a coincidence is left out of the rate
+            continue
         elif probe.family == "P" or (probe.family in ("N", "L") and gt not in ("bool", "mcq")):
             # gold-blind constants may coincide with closed-form golds; that is the floor, not an error
             assert not contains_equiv(comp, task.answer, gt), (probe.id, name, comp[:200], task.answer)
@@ -99,7 +110,7 @@ def test_final_answer_is_wrong_when_gold_only_in_reasoning(primary):
 @pytest.mark.parametrize("primary", PRIMARIES)
 def test_solving_variants_contain_exactly_the_gold(primary):
     for ctx, probe, task, name, comp in _variants(primary, ["Q"]):
-        if probe.label != Label.SOLVING:
+        if probe.label != Label.SOLVING or probe.id in SPELLINGS:
             continue
         gt = "set" if probe.id == "Q10" else ctx.gtype(task)
         assert contains_equiv(comp, task.answer, gt), (probe.id, name, comp, task.answer)
@@ -147,14 +158,14 @@ def test_the_probes():
     assert {fam: [p.id for p in probes] for fam, (_, probes) in FAMILIES.items()} == {
         "N": ["N1", "N2", "N3", "N5", "N9", "N10"],
         "E": ["E1", "E5", "E2", "E3", "E6", "E9", "E8"],
-        "L": ["L1", "L2", "L3", "L4"],
+        "L": ["L1", "L2", "L3", "L4", "L5", "L6"],
         "O": ["O3", "O4", "O5", "O6", "O7", "O11", "O10"],
-        "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M8", "M9", "M10", "M11", "M12", "M13", "M17"],
-        "Q": ["Q1", "Q3", "Q5", "Q6", "Q22", "Q21", "Q8", "Q9", "Q2", "Q10"],
+        "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M8", "M9", "M10", "M11", "M12", "M13", "M17"],
+        "Q": ["Q1", "Q3", "Q5", "Q6", "Q22", "Q21", "Q8", "Q9", "Q2", "Q23", "Q24", "Q25", "Q26", "Q27", "Q10"],
         "P": ["P1", "P2", "P15", "P5"],
     }
     assert {p.expect for p in all_probes()} == {"zero", "full"} and {p.label for p in all_probes()} == {Label.NOT_SOLVING, Label.SOLVING}
-    assert {p.family for p in all_probes() if not p.headline} == {"P"}
+    assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "M24"}
 
 
 @pytest.mark.parametrize("primary", PRIMARIES)

@@ -257,6 +257,12 @@ def _non_solving_finding(probe: Probe, rate: float, lo: float, floor: float) -> 
     return "non_solving_accepted", "medium" if probe.tier == "contrived" and sev == "high" else sev
 
 
+def _tolerance_severity(variant: str, rate: float) -> str:
+    """How wide the accepted error is decides: rounding explains 0.1%, not 5%. Below half the rows it is the rows, not a rule."""
+    width = float(variant.rstrip("%"))
+    return "low" if rate < 0.5 or width < 1 else "medium" if width < 5 else "high"
+
+
 def _above_gold_note(ex: Observation, contract: Contract, gold: float) -> str:
     """Against the gold or the gold in the reply's own reasoning, whichever scored higher; both totals on a composite rubric."""
     if not contract.signal_keys or ex.task_id not in contract.gold_total:
@@ -392,7 +398,7 @@ class Tally:
                 elif k == Kind.CRASH:
                     st.crashes += 1
                 h, p = _hit(o, contract, probe.gold_blind)
-                if p and probe.family == "M":
+                if p and probe.family == "M" and probe.headline:
                     self._add_paid(o)
                 if probe.family == "N" and o.verdict.ok:
                     self.null_floor = max(self.null_floor, contract.signal(o.verdict) or 0.0)
@@ -523,7 +529,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
         head1["detail"] += "; not above what a fixed answer gets"
 
     def pooled(pred) -> tuple[int, int]:
-        sel = [s for s in stats.values() if pred(s)]
+        sel = [s for s in stats.values() if pred(s) and s.probe.headline]
         return sum(s.obs_hits for s in sel), sum(s.n_scored for s in sel)
 
     hk, hn = pooled(lambda s: s.probe.family == "O" and s.probe.label == Label.NOT_SOLVING)
@@ -557,6 +563,7 @@ def _summarize(tally: Tally) -> dict[str, Any]:
             category, sev = "right_rejected", _rejected_severity(s.probe.id, rate)
         else:
             category, sev = _non_solving_finding(s.probe, rate, lo, floor)
+            sev = _tolerance_severity(variant, rate) if s.probe.sweep else sev
         findings.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,

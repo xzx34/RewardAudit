@@ -6,7 +6,7 @@ import re
 
 from rewardaudit.equiv import contains_equiv, equiv, extract_boxed, normalize, to_letter
 from rewardaudit.goldtype import mcq_options
-from rewardaudit.probes.base import Probe, ProbeContext, safe_not_solving
+from rewardaudit.probes.base import Probe, ProbeContext, prompt_numbers, safe_not_solving
 from rewardaudit.types import Label, Task
 
 NS = Label.NOT_SOLVING
@@ -116,6 +116,16 @@ def l4_after_marker(task, rng, ctx):
     return _safe(out, task, ctx)
 
 
+def l5_most_common(task, rng, ctx):
+    common = ctx.most_common_gold()
+    return [("most_common", ctx.wrap(common))] if common else []
+
+
+def l6_last_number(task, rng, ctx):
+    numbers = prompt_numbers(task.prompt)
+    return [("last_number", ctx.wrap(numbers[-1]))] if numbers else []
+
+
 PROBES = [
     Probe("L1", "L", "the prompt echoed back", "amplified", "zero", NS, l1_echo_prompt, applies=_prompt_clean,
           gold_blind=True,
@@ -132,4 +142,12 @@ PROBES = [
           gold_blind=True,
           description="Sends what follows the prompt's last answer marker (often a template placeholder such "
                       "as $LETTER), and that whole line; a sound checker gives zero."),
+    Probe("L5", "L", "the dataset's most common reference answer", "natural", "zero", NS, l5_most_common, gold_blind=True,
+          description="Sends the reference answer most rows share, on every row. Rows where it is the right answer are "
+                      "left out of its rate, so a hit means the checker reads other answers as this one; a sound checker "
+                      "gives zero."),
+    Probe("L6", "L", "the prompt's last number", "natural", "zero", NS, l6_last_number,
+          applies=lambda t, c: c.numeric_dataset(), gold_blind=True,
+          description="Sends the last number in the prompt as the answer, where most reference answers are numbers. Rows "
+                      "where it is the right answer are left out of its rate; a sound checker gives zero."),
 ]

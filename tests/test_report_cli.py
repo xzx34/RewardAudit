@@ -94,7 +94,7 @@ def test_the_command_line_prints_the_first_screen_at_80_columns(tmp_path, monkey
     res = runner.invoke(cli.app, ["audit", "demo:substring", "--n", "12", "-q", "--out", str(tmp_path)])
     assert res.exit_code == 1, res.output  # planted defects are findings
     lines = res.output.splitlines()
-    assert len(lines) <= 40, res.output
+    assert len(lines) <= 45, res.output
     assert all(len(line.rstrip()) <= 80 for line in lines if not line.startswith("Saved")), res.output
     assert f"Saved report.md, report.json and repro.py in {tmp_path}" in res.output
     assert all((tmp_path / name).exists() for name in ("report.md", "report.json", "repro.py"))

@@ -10,7 +10,10 @@ from rewardaudit.equiv import contains_equiv, distinct_candidates, equiv, extrac
 
 def states_the_answer(text: str, gold: str, gold_type: str | None = None, derived: Iterable[str] = ()) -> bool:
     """Exactly one final-answer candidate, equivalent to the reference answer; hedges and lists of numbers do not count.
-    `derived`: wrapper ids of the checker's own answer fields (`Contract.derived`), read as candidates too."""
+    `derived`: wrapper ids of the checker's own answer fields (`Contract.derived`), read as candidates too. A reply that
+    is only the answer has no mark for a candidate to be read from, so it counts as it stands."""
+    if equiv(text, gold, gold_type):
+        return True
     if not contains_equiv(text, gold, gold_type, derived):
         return False
     cands = distinct_candidates(text, gold_type, derived)

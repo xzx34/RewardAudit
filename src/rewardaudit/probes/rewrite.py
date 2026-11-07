@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from datetime import date
+from decimal import Decimal
 
-from rewardaudit.equiv import to_number
+from rewardaudit.equiv import NUMBER_WORDS, to_number
 from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity
-from rewardaudit.probes.base import MIN_WORD, Probe
+from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
 
 SOL = Label.SOLVING
@@ -170,6 +173,115 @@ def q2_case(task, rng, ctx):
     return [(name, ctx.wrap(cased)) for name, cased in (("lower", g.lower()), ("upper", g.upper())) if cased != g]
 
 
+_WORD_OF = {v: w for w, v in reversed(NUMBER_WORDS.items())}
+_FULL_WIDTH = {ord(c): ord(c) + 0xFEE0 for c in "0123456789"}
+
+
+def _in_words(g: str) -> str | None:
+    """A whole number under 100 in English words."""
+    n = int(g) if g.isdigit() else -1
+    if not 0 <= n < 100:
+        return None
+    return _WORD_OF.get(n) or f"{_WORD_OF[n - n % 10]}-{_WORD_OF[n % 10]}"
+
+
+def _scientific(g: str) -> str | None:
+    """Exact scientific notation, for a number that a model might write that way: large, or with many digits."""
+    sign, digits, exponent = Decimal(g).normalize().as_tuple()
+    if not digits or (abs(Decimal(g)) < 10000 and len(digits) < 4):
+        return None
+    tail = "".join(map(str, digits[1:]))
+    return f"{'-' if sign else ''}{digits[0]}{'.' + tail if tail else ''}e{exponent + len(digits) - 1}"
+
+
+def q23_number_spellings(task, rng, ctx):
+    g = ctx.gold(task)
+    spelled = {"words": _in_words(g), "scientific": _scientific(g), "full_width": g.translate(_FULL_WIDTH),
+               "unicode_minus": g.replace("-", "\u2212") if g.startswith("-") else None}
+    return [(name, ctx.wrap(s)) for name, s in spelled.items() if s]
+
+
+_UNIT_WORDS = ("dollars|cents|meters|metres|kilometers|kilometres|miles|feet|inches|centimeters|kilograms|grams|pounds|ounces|"
+               "liters|litres|gallons|seconds|minutes|hours|days|weeks|months|years")
+_ASKS_UNIT = re.compile(rf"\b(?:in|how many|number of)\s+({_UNIT_WORDS})\b", re.I)
+_ASKS_PERCENT = re.compile(r"\bwhat\s+(?:is\s+the\s+)?percent(?:age)?\b|\b(?:as|in)\s+(?:a\s+)?percent(?:age)?\b"
+                           r"|\bhow\s+many\s+percent\b", re.I)
+
+
+def _question(prompt: str) -> str:
+    """The end of a prompt, where the question usually is; a line on the format of the reply may follow it."""
+    return " ".join(re.split(r"(?<=[.?!])\s+", prompt.strip())[-2:])
+
+
+def q24_unit(task, rng, ctx):
+    g = ctx.gold(task)
+    if m := UNIT_RE.fullmatch(g):
+        return [("without_unit", ctx.wrap(m["number"]))]
+    asked = _ASKS_UNIT.findall(_question(task.prompt))
+    return [("with_unit", ctx.wrap(f"{g} {asked[-1].lower()}"))] if asked and plain_number(g) and _prose_allowed(task, ctx) else []
+
+
+def q25_percent(task, rng, ctx):
+    """A plain number below 1 under a question in percent could mean either, so it stays out."""
+    g = ctx.gold(task)
+    if m := re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*\\?%", g):
+        return [("as_decimal", ctx.wrap(fmt_num(float(m[1]) / 100)))]
+    if plain_number(g) and abs(float(g)) >= 1 and _ASKS_PERCENT.search(_question(task.prompt)):
+        return [("percent_sign", ctx.wrap(f"{g}%"))]
+    return []
+
+
+_MONTHS = "January February March April May June July August September October November December".split()
+_DATE_FORMS = (re.compile(r"(?P<y>\d{4})-(?P<m>\d{1,2})-(?P<d>\d{1,2})"),
+               re.compile(r"(?P<mon>[A-Za-z]{3,9})\.? (?P<d>\d{1,2})(?:st|nd|rd|th)?,? (?P<y>\d{4})"),
+               re.compile(r"(?P<d>\d{1,2})(?:st|nd|rd|th)? (?P<mon>[A-Za-z]{3,9})\.?,? (?P<y>\d{4})"))
+
+
+def parse_date(s: str) -> date | None:
+    """A date in a form that says which number is the month; 3/5/2020 does not."""
+    for form in _DATE_FORMS:
+        if m := form.fullmatch(s):
+            parts = m.groupdict()
+            month = next((i + 1 for i, name in enumerate(_MONTHS) if name[:3].lower() == parts["mon"][:3].lower()), 0) \
+                if "mon" in parts else int(parts["m"])
+            try:
+                return date(int(parts["y"]), month, int(parts["d"]))
+            except ValueError:
+                return None
+    return None
+
+
+def q26_date(task, rng, ctx):
+    g, d = ctx.gold(task), parse_date(ctx.gold(task))
+    month = _MONTHS[d.month - 1]
+    forms = {"iso": d.isoformat(), "long": f"{month} {d.day}, {d.year}", "short": f"{month[:3]} {d.day}, {d.year}"}
+    return [(name, ctx.wrap(s)) for name, s in forms.items() if s != g]
+
+
+def _words(task, ctx) -> bool:
+    """A short answer in words, on a prompt that does not work on characters or ask about hyphens."""
+    prompt = " ".join(str(m.get("content")) for m in task.chat())
+    return (ctx.gtype(task) == "short_str" and bool(re.search(rf"[^\W\d_]{{{MIN_WORD},}}", ctx.gold(task)))
+            and not _CASE_MATTERS.search(prompt) and not re.search(r"\b(?:hyphens?|dash(?:es)?)\b", prompt, re.I))
+
+
+def q27_spelling(task, rng, ctx):
+    g = ctx.gold(task)
+    out = {"no_accents": "".join(c for c in unicodedata.normalize("NFD", g) if not unicodedata.combining(c))}
+    article = re.match(r"(?:the|an?)\s+(.+)", g, re.I)
+    if article:
+        out["no_article"] = article[1]
+    elif g[0].islower():
+        out["article"] = f"the {g}"
+    if re.search(r"[^\W\d_]{3}-[^\W\d_]{3}", g):
+        out["no_hyphen"] = g.replace("-", " ")
+    elif not article and re.fullmatch(r"[^\W\d_]{3,} [^\W\d_]{3,}", g):
+        out["hyphen"] = g.replace(" ", "-")
+    out["and_word"] = g.replace("&", "and")
+    out["ampersand"] = g.replace(" and ", " & ")
+    return [(name, ctx.wrap(s)) for name, s in out.items() if s != g]
+
+
 PROBES = [
     Probe("Q1", "Q", "extra whitespace", "natural", "full", SOL, q1_whitespace,
           description="Sends the reference answer with extra spaces and newlines around it and inside the format, "
@@ -210,4 +322,22 @@ PROBES = [
     Probe("Q2", "Q", "letter case", "natural", "full", SOL, q2_case, applies=_wordy,
           description="Sends a plain-word reference answer in lower and upper case, not on prompts that work on "
                       "characters or say that case counts; a sound checker gives full credit."),
+    Probe("Q23", "Q", "other spellings of a number", "natural", "full", SOL, q23_number_spellings,
+          applies=lambda t, c: _quantity(t, c) and plain_number(c.gold(t)),
+          description="Sends a numeric reference answer in English words (under 100), in scientific notation (when large "
+                      "or with many digits), in full-width digits, and with the minus sign U+2212; a sound checker gives "
+                      "full credit."),
+    Probe("Q24", "Q", "with or without the unit", "natural", "full", SOL, q24_unit,
+          description="Sends a reference answer that has a unit without it, and adds the unit to one that has none when "
+                      "the question names it ('how many dollars'); a sound checker gives full credit."),
+    Probe("Q25", "Q", "percent sign or decimal", "natural", "full", SOL, q25_percent,
+          description="Sends 25% as 0.25, and adds the percent sign to a number when the question asks for a percentage; "
+                      "a sound checker gives full credit."),
+    Probe("Q26", "Q", "other spellings of a date", "natural", "full", SOL, q26_date,
+          applies=lambda t, c: parse_date(c.gold(t)) is not None,
+          description="Sends a date reference answer as 2020-03-05, March 5, 2020 and Mar 5, 2020; a sound checker gives "
+                      "full credit."),
+    Probe("Q27", "Q", "other spellings of a word", "natural", "full", SOL, q27_spelling, applies=_words,
+          description="Sends a short answer in words without accents, with or without a leading article, with a hyphen "
+                      "and a space swapped, and with & and 'and' swapped; a sound checker gives full credit."),
 ]

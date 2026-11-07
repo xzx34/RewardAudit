@@ -21,7 +21,7 @@ def test_substring_accepts_shotgun(results):
     assert heads["non_solving_accepted"] >= 0.9
     assert heads["hedging_accepted"] >= 0.9
     assert "E1" in _findings(r)
-    assert heads["right_rejected"] == 0.0
+    assert {f["probe_id"] for f in r.findings if f["category"] == "right_rejected"} == {"Q23"}  # it looks for the digits
 
 
 def test_mcq_regex_reads_first_letter(results):

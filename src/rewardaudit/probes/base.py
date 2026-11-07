@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -12,6 +13,7 @@ from rewardaudit.equiv import (
     contains_equiv,
     equiv,
     flip_bool,
+    normalize,
     strip_wrappers,
     to_letter,
     to_number,
@@ -123,6 +125,16 @@ def fmt_num(x: float) -> str:
     return f"{x:.6g}"
 
 
+UNIT_RE = re.compile(r"(?P<number>-?\d[\d,.]*)(?P<gap>\s*(?:\\[,; ])?\s*(?:\\(?:text|mathrm)\{\s*)?)"
+                     r"(?P<unit>km|cm|kg|ms|mol|mL|Pa|Hz|°C|m|g|s|K|L|J|W|N)(?P<close>\}?)")
+_PLAIN_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def plain_number(s: str) -> bool:
+    """Digits and at most a sign and a decimal point, so characters can be added to it or spelled in other ways."""
+    return bool(_PLAIN_NUMBER.fullmatch(s))
+
+
 OTHER_TASKS = 30
 FIRST_PASSING = 5
 
@@ -137,12 +149,21 @@ class ProbeContext:
     _commands: frozenset[str] | None = field(default=None, init=False, repr=False)
     _numeric_dataset: bool | None = field(default=None, init=False, repr=False)
     _first_passing: frozenset[str] | None = field(default=None, init=False, repr=False)
+    _most_common: str | None = field(default=None, init=False, repr=False)
 
     def first_passing(self) -> frozenset[str]:
         """The first few tasks whose reference answer passes, for probes whose calls are too costly to run on every task."""
         if self._first_passing is None:
             self._first_passing = frozenset(self.contract.passing_tasks()[:FIRST_PASSING])
         return self._first_passing
+
+    def most_common_gold(self) -> str:
+        """The reference answer that most rows share, '' if no two rows share one."""
+        if self._most_common is None:
+            spelled = {normalize(t.answer): self.gold(t) for t in reversed(self.tasks)}
+            answer, count = Counter(normalize(t.answer) for t in self.tasks).most_common(1)[0] if self.tasks else ("", 0)
+            self._most_common = spelled[answer] if count >= 2 else ""
+        return self._most_common
 
     def wrap(self, answer: str) -> str:
         """Wrap in the format this checker accepts, choosing a wrapper that passed on the current task."""
