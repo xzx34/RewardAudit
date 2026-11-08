@@ -106,8 +106,12 @@ def q8_numeric_forms(task, rng, ctx):
     elif "." in g:
         if g.startswith("0."):
             out.append(("no_leading_zero", g[1:]))
-        out.append(("trailing_zero", g + "0"))
+        if m := _DECIMAL.search(g):  # after the number's last digit, not after a unit or % that follows it
+            out.append(("trailing_zero", f"{g[:m.end()]}0{g[m.end():]}"))
     return [(n, ctx.wrap(c)) for n, c in out]
+
+
+_DECIMAL = re.compile(r"\d*\.\d+")
 
 
 _FRAC_ARGS = re.compile(r"\\([dt]?frac)\{([^{}]*)\}\{([^{}]*)\}")

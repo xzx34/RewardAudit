@@ -240,6 +240,12 @@ def test_q8_leaves_a_version_number_in_a_word_dataset_alone():
     assert _gen("Q8", numbers[0], numbers)["trailing_zero"] == "\\boxed{4.40}"
 
 
+def test_q8_puts_the_trailing_zero_on_the_number_not_after_its_percent_sign():
+    numbers = _tasks("21.46%", "0.5%", "12", "7")
+    assert _gen("Q8", numbers[0], numbers) == {"trailing_zero": "\\boxed{21.460%}"}
+    assert _gen("Q8", numbers[1], numbers) == {"no_leading_zero": "\\boxed{.5%}", "trailing_zero": "\\boxed{0.50%}"}
+
+
 @pytest.mark.parametrize("primary", ["boxed", "think_boxed", "bare"])
 def test_q8_variants_still_contain_the_gold(primary):
     tasks = _tasks("32", "-1.5", "13", "1000", "0.25")

@@ -97,6 +97,8 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - A TRL-style reward whose `completions` is annotated `list[Dict[str, str]]` gets chat messages, as one annotated with
   `dict` does. Before, it was taken to want plain strings and failed on every call; the annotation is now read without
   regard to case.
+- Q8 writes the trailing zero of a percentage on its number: `21.460%` for `21.46%`. Before, it was put after the percent
+  sign, `21.46%0`, which is not the same number, and a checker that rejected it was counted as rejecting a right answer.
 
 ## 0.2.0 - 2026-11-07
 
