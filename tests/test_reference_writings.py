@@ -87,6 +87,7 @@ def test_thousands_separators_only_on_a_quantity_as_q8():
     ctx.task = year
     assert {name for name, *_ in G3.generate(year, random.Random(0), ctx)} == {"period"}  # no one writes 2,005
     assert "commas" in _written("2005", "How many people came?")
+    assert set(_written("47869", "What is the pass key?")) == {"period"}  # nor 47,869 for a key
 
 
 @pytest.mark.parametrize("answer", ['{"x": 3, "y": 4}', "[1, 2]", '["a", "b"]', "1 0\n0 1"])

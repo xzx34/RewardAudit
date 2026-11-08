@@ -140,7 +140,7 @@ def asks_answer_only(task: Task) -> bool:
 _QUANTITY_RE = re.compile(
     r"\bhow (?:many|much|long|far|old|tall|high|fast|often)\b|\b(?:the|total) number of\b(?!\s+the\b)|"
     r"\banswer with (?:a|one|a single) number\b", re.I)
-_IDENTIFIER_RE = re.compile(r"\b(?:versions?|index(?:es)?|indices|identifiers?)\b", re.I)
+_IDENTIFIER_RE = re.compile(r"\b(?:versions?|index(?:es)?|indices|identifiers?|pass ?keys?|passcodes?)\b", re.I)
 
 
 def asks_quantity(task: Task) -> bool | None:

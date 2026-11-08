@@ -411,6 +411,14 @@ def test_in_a_mostly_numeric_dataset_only_the_named_identifiers_leave():
     assert _gen("Q8", numbers[0], tasks) and not _gen("Q8", version, tasks)
 
 
+def test_a_pass_key_is_no_quantity_even_in_a_numeric_dataset():
+    keys = [Task(str(i), "There is important info hidden inside a lot of irrelevant text.\nWhat is the pass key?",
+                 str(47869 + i)) for i in range(5)]
+    assert all(asks_quantity(t) is False for t in keys) and not _gen("Q8", keys[0], keys)
+    assert asks_quantity(Task("t", "Enter the passcode.", "4821")) is False
+    assert asks_quantity(Task("t", "How many pass keys are hidden in the text?", "3")) is True
+
+
 def test_the_question_decides_and_not_the_passage_before_it():
     passage = "\n".join(["How much was it, she asked.", "The new version is out.", "Nothing else changed.", "We left."])
     assert asks_quantity(Task("t", passage + "\nWhat did she buy?\nWhere?\nTell me.", "3")) is None

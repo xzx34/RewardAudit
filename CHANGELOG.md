@@ -91,6 +91,8 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - Where a probe sends distinct kinds of reply and its finding gives the rate of the kind that went that way most often, the
   example is now one of that kind. Before, it was taken from the first rows that went that way, and could be of another.
 - `report.md` writes `1 call` and `1 row`, not `1 calls` and `1 rows`.
+- A question that asks for a pass key or a passcode asks for a string of digits, not a quantity, as one that names a version
+  or an index does: Q8 no longer sends `47,869` or `+47869` for the key `47869`, nor does G3 write it as the reference.
 
 ## 0.2.0 - 2026-11-07
 
