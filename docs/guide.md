@@ -120,8 +120,9 @@ G3 turns this around: it sends the reference answer as it passed, while the chec
 another way, one way per call, such as `1,200` for `1200`, `\dfrac` for `\frac` or a period at the end. A checker that then
 loses the score gives a dataset's rows different scores for how their answers are written (D22). G3 is sent only where the
 checker gets the answer itself, or a `reference_template` with `{answer}` in it, which then holds the other writing: not
-with `--reference-col` or `ground_truth_json`, nor in a verifiers environment, nor on a reference answer that is JSON. The
-example of its finding has `reference`, the writing the checker got; `report.md` shows it and `repro.py` scores against it.
+with `--reference-col` or `ground_truth_json`, nor in a verifiers environment, nor on a reference answer that is JSON. Its
+finding's rate is over all its calls, and its note gives the rate of each writing. The example of its finding has
+`reference`, the writing the checker got; `report.md` shows it and `repro.py` scores against it.
 
 ## Choose how many rows
 
@@ -225,8 +226,8 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 | D22 | Reference formatting changes the verdict | G3 |
 
 **Findings.** Each finding is one probe, with an example reply and a rate; `--full` prints them, and `report.md` always has them.
-Where a probe sends distinct kinds of reply, the rate is that of the kind that went that way most often. Severity is a rule of
-thumb for what to look at first:
+Where a probe sends distinct kinds of reply, the rate is that of the kind that went that way most often, and the example is
+one of that kind. Severity is a rule of thumb for what to look at first:
 
 | Severity | Meaning |
 |---|---|

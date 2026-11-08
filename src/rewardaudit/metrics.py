@@ -68,7 +68,7 @@ class ProbeStats:
     variants: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0, 0, 0]))
     # per variant: [disc_hits, disc_n, conf_hits, conf_n]
     variant_hits: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # [hits, scored]
-    variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps: the first hit of each variant
+    variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps and by_variant: the first hit of each variant
     variant_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))  # sweeps: time of each scored call
     variant_score: dict[str, float] = field(default_factory=lambda: defaultdict(float))  # sweeps: sum of score / gold's score
     reached_import: int = 0  # calls whose text got as far as importing MARKER_MODULE
@@ -471,7 +471,7 @@ class Tally:
                 counted[1] += int(o.verdict.ok)
                 if h and example is None:
                     example = o
-                if probe.sweep and h:
+                if (probe.sweep or probe.by_variant) and h:
                     st.variant_examples.setdefault(o.variant, o)
                 if probe.sweep and o.verdict.ok:
                     st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
@@ -665,7 +665,7 @@ def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
             variant, k, n = s.most_accepted_variant()
             rate = k / n
             lo, hi = wilson(k, n)
-            example = next((e for e in s.examples if e.variant == variant), example)
+            example = s.variant_examples[variant]  # its own, which the first rows' hits may not hold
         if s.probe.label == Label.SOLVING:
             category, sev = "right_rejected", _rejected_severity(s.probe.id, rate)
         else:

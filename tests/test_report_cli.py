@@ -22,6 +22,7 @@ from rewardaudit.probes.base import Probe
 from rewardaudit.probes.registry import FAMILIES, all_probes
 from rewardaudit.report import (
     _code,
+    _md_finding,
     _reply,
     no_discrimination_line,
     render_markdown,
@@ -372,6 +373,14 @@ def test_report_json_is_the_result_without_its_calls(substring, tmp_path):
     data = json.loads((tmp_path / "out" / "report.json").read_text(encoding="utf-8"))
     assert data["schema_version"] == "1" and set(data) == {"schema_version", *substring.to_dict()}
     assert "observations" not in data and data["metrics"]["probes"] and data["contract"]["accepted"]
+
+
+def test_the_rate_line_of_a_finding_says_call_and_row_in_the_singular():
+    finding = {"probe_id": "Q1", "name": "extra whitespace", "category": "right_rejected", "severity": "low", "rate": 1.0,
+               "ci": [0.21, 1.0], "n": 1, "n_tasks": 1, "note": "", "example": None}
+    assert "Rate 100% of 1 call on 1 row, 95% interval" in "\n".join(_md_finding(finding, None))
+    assert "Rate 100% of 2 calls on 12 rows," in "\n".join(_md_finding(finding | {"n": 2, "n_tasks": 12}, None))
+    assert "Rate 100% of 1 row," in "\n".join(_md_finding(finding | {"unit": "tasks"}, None))
 
 
 def _run_repro(path, cwd):

@@ -78,12 +78,19 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   period at the end, words in `\text{}` under a `\boxed{}` format, a percentage as a decimal and back, the unit taken off or
   the one the question names added, thousands separators added to a quantity or taken out. A checker that loses the score
   there scores the rows of a dataset that does not write its answers uniformly by how they are written. Like G2 it is a
-  finding under Rejects right answers, outside its rate, medium at most, from one in ten; its note gives the rate of each
-  writing, such as `rejected: period 100%, commas 0%`. It is sent where the checker gets the answer itself or a
+  finding under Rejects right answers, outside its rate, medium at most, from one in ten. Its rate is over all its calls,
+  since some writings apply on nearly every row and others on few; its note gives the rate of each writing, such as
+  `rejected: period 100%, commas 0%`. It is sent where the checker gets the answer itself or a
   `reference_template` with `{answer}` in it: not with `--reference-col` or `ground_truth_json`, not in a verifiers
   environment, and not on a reference answer that is JSON. In `report.json` the example of a G3 finding has a new key,
   `reference`, the writing the checker got; `report.md` shows it next to the row's own, and `repro.py` scores the reply
   against it. The calls file has no such key. 83 probes in all.
+
+### Fixed
+
+- Where a probe sends distinct kinds of reply and its finding gives the rate of the kind that went that way most often, the
+  example is now one of that kind. Before, it was taken from the first rows that went that way, and could be of another.
+- `report.md` writes `1 call` and `1 row`, not `1 calls` and `1 rows`.
 
 ## 0.2.0 - 2026-11-07
 

@@ -306,3 +306,14 @@ def test_a_checker_that_guesses_when_it_finds_no_answer_is_not_deterministic():
     assert not r.determinism["deterministic"]
     assert next(d for d in r.defects if d["id"] == "D15")["severity"] == "medium"
     assert "the same reply, sent several times" in next(f for f in r.findings if f["probe_id"] == "S1")["note"]
+
+
+def test_a_probe_of_several_replies_shows_the_reply_it_reports():
+    """The first rows accept one reply and later rows another more often: the example is of the one reported."""
+    probe = _probe("O9", "O", by_variant=True)
+    tasks = [Task(id=str(i), prompt="p", answer=str(i + 100)) for i in range(10)]
+    obs = [Observation(probe.id, probe.family, v, t.id, f"{v} {t.id}", Verdict(Kind.SCORE, score=float(hit)), probe.label,
+                       probe.expect, probe.tier)
+           for i, t in enumerate(tasks) for v, hit in (("a", i < 3), ("b", i >= 5))]
+    f = next(f for f in compute(obs, [probe], tasks, _contract([t.id for t in tasks]), "int")["findings"] if f["probe_id"] == "O9")
+    assert (f["rate"], f["n"]) == (0.5, 10) and f["example"]["variant"] == "b" and f["example"]["task_id"] == "5"

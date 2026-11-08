@@ -77,11 +77,12 @@ PROBES = [
                       "in the accepted format, one per reply and up to 8 per row; a sound checker gives each full credit. "
                       "Its finding names some that lost the score."),
     Probe("G3", "G", "the reference answer written another way", "natural", "full", Label.SOLVING,
-          g3_reference_written_another_way, applies=_reference_reaches_checker, headline=False, by_variant=True,
+          g3_reference_written_another_way, applies=_reference_reaches_checker, headline=False,
           description="Sends the reference answer in the accepted format while the checker gets it written another way, one "
                       "way per call: spaces at its operators and commas taken out or put in, \\frac and \\dfrac swapped, a "
                       "period added, words in \\text{} under a \\boxed{} format, a percentage as a decimal and back, the unit "
                       "taken off or added, thousands separators added to a quantity or taken out; each only where it applies. "
                       "A sound checker gives full credit. Not sent where the checker gets a column of its own or JSON parsed "
-                      "from the reference answer. Its finding gives the rate at which each writing lost the score."),
+                      "from the reference answer. Its finding's rate is over all these calls, and its note gives the rate at "
+                      "which each writing lost the score."),
 ]

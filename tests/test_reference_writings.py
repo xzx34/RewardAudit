@@ -125,7 +125,7 @@ def test_a_variant_with_a_reference_answer_is_sent_with_a_copy_of_its_task():
 def test_g3_belongs_to_d22_and_does_not_count_in_the_rate():
     assert BY_PROBE["G3"] == "D22" and DEFECTS[-1].id == "D22" and DEFECTS[-1].probes == ("G3",)
     assert G3.label == Label.SOLVING and G3.expect == "full" and G3.tier == "natural"
-    assert not G3.headline and not G3.gold_blind and G3.by_variant
+    assert not G3.headline and not G3.gold_blind and not G3.by_variant  # its writings are sent unevenly: the rate is over all
     assert _rejected_severity("G3", 1.0) == "medium"  # never high, unlike Q5 and Q22
 
 
@@ -136,7 +136,7 @@ def exact(completion, answer):
 def test_a_checker_that_compares_strings_rejects_the_reply_against_another_writing():
     r = audit(exact, ROWS, n="all", probes=["G"], workers=1)
     f = next(f for f in r.findings if f["probe_id"] == "G3")
-    assert f["category"] == "right_rejected" and f["severity"] == "medium" and f["rate"] == 1.0 and f["n"] == 12
+    assert f["category"] == "right_rejected" and f["severity"] == "medium" and f["rate"] == 1.0 and f["n"] == 24
     assert f["note"] == "rejected: commas 100%, period 100%"
     ex = f["example"]
     assert ex["variant"] == "period" and ex["completion"] == ex["reference"][:-1] and ex["reference"].endswith(".")
@@ -154,7 +154,8 @@ def test_the_note_gives_every_writing_most_often_rejected_first():
         return float(completion.strip() == answer.replace(",", ""))
 
     f = next(f for f in audit(without_commas, ROWS, n="all", probes=["G"], workers=1).findings if f["probe_id"] == "G3")
-    assert f["note"] == "rejected: period 100%, commas 0%" and f["rate"] == 1.0 and f["example"]["variant"] == "period"
+    assert f["note"] == "rejected: period 100%, commas 0%" and f["rate"] == 0.5 and f["n"] == 24
+    assert f["example"]["variant"] == "period"  # the first call rejected
 
 
 def test_a_checker_that_reads_the_reference_answer_as_a_number_accepts_every_writing():

@@ -426,7 +426,7 @@ def _md_finding(f: dict[str, Any], result: AuditResult) -> list[str]:
                else "A reply that should earn nothing scored above the reference answer on the same row." if f.get("above_gold")
                else "The checker treats the dataset's own reference answer like a wrong one, in every format tried."
                if f["probe_id"] == REJECTED_GOLD_ID else ROWS[key][2] if key else "The checker returned no score on these replies.")
-    over = f"{f['n']:,} rows" if f.get("unit") == "tasks" else f"{f['n']:,} calls on {f['n_tasks']:,} rows"
+    over = _plural(f["n"], "row") if f.get("unit") == "tasks" else f"{_plural(f['n'], 'call')} on {_plural(f['n_tasks'], 'row')}"
     L = [f"### {f['severity'].upper()}: {f['probe_id']} {f['name']}", "",
          f"{meaning} Rate {f['rate']:.0%} of {over}, 95% interval {_ci(f['ci'])}.", ""]
     L += [f["note"][0].upper() + f["note"][1:], ""] if f.get("note") else []
