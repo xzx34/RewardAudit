@@ -93,6 +93,7 @@ def audit(
     reply_format: str | None = None,
     answer_field: bool = False,
     budget_s: float | None = None,
+    calls: str | Path | None = None,
     verifiers: str | None = None,
     log: Log | None = None,
     progress: Callable[[str, int, int], None] | None = None,
@@ -110,6 +111,8 @@ def audit(
       text around the answer is not counted against it. Left False, this is inferred from the probes.
     budget_s: seconds the audit may take, counted from its start. Past them no further probe is sent; the calls made so far
       count as usual, and `result.meta["probes_not_run"]` lists the probes left out. None: no limit.
+    calls: a file to write each call of the reference-answer and probe stages to, one JSON object a line, with task_id,
+      probe_id, variant, completion, kind, score and accepted; `compare()` reads two such files.
     verifiers: for an environment, a constraint on the verifiers version, such as "<0.1.13".
     options: for a scoring function, one of style, kwargs, reference_col, reference_template, ground_truth_json,
       prompt_in_completion, split.
@@ -150,6 +153,7 @@ def audit(
             spec, python, pin = _environment_spec(checker, verifiers, log)
         config = AuditConfig(n_tasks=n, seed=seed, timeout_s=timeout, python=python, families=families,
                              formats=[reply_format] if reply_format else [], answer_field=answer_field, budget_s=budget_s,
+                             calls_path=None if calls is None else str(calls),
                              workers=workers if workers is not None else min(4, os.cpu_count() or 1))
         result = run_audit(spec, config, log=log, progress=progress)
         if pin:

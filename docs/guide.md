@@ -7,10 +7,11 @@
 5. [Read the result](#read-the-result)
 6. [When the audit stops](#when-the-audit-stops)
 7. [Audit a verifiers environment](#audit-a-verifiers-environment)
-8. [Use it in CI](#use-it-in-ci)
-9. [Use it from Python](#use-it-from-python)
-10. [What stays the same across versions](#what-stays-the-same-across-versions)
-11. [Troubleshooting](#troubleshooting)
+8. [Compare two checkers](#compare-two-checkers)
+9. [Use it in CI](#use-it-in-ci)
+10. [Use it from Python](#use-it-from-python)
+11. [What stays the same across versions](#what-stays-the-same-across-versions)
+12. [Troubleshooting](#troubleshooting)
 
 ## What you need
 
@@ -304,6 +305,85 @@ rewardaudit audit owner/name --verifiers '<0.1.11'
 The report says which version the results were measured on. Delete the environment's directory under
 `~/.cache/rewardaudit/envs` to install it afresh.
 
+## Compare two checkers
+
+Two checkers for one dataset, such as a strict one and a lenient one, or two versions of one checker, before and after a
+change, can be compared reply by reply. Audit each with `--calls`, on the same dataset with the same `--n` and `--seed`, so
+that both draw the same rows, then compare the two files:
+
+```bash
+rewardaudit audit reward.py --dataset data.jsonl --calls v1.jsonl
+rewardaudit audit reward_v2.py --dataset data.jsonl --calls v2.jsonl
+rewardaudit compare v1.jsonl v2.jsonl
+```
+
+**The calls file.** One JSON object a line, and nothing else: `task_id`, `probe_id`, `variant`, `completion` (the reply),
+`kind` (`score`, `timeout`, `error` or `crash`), `score`, and `accepted`, whether the audit counted the reply as accepted;
+those two are `null` for a call with no score. The reference answer's calls have `probe_id` `reference` and the format as
+`variant`, or `wrong_answer` for the wrong answer they are checked against. They are written even when the audit stops
+after them, as when the checker rejects its own reference answers. Calls that only check other calls are not in the file:
+the repeats that see whether a score stays the same, those that confirm a high defect, and the reference answer put into a
+reply that scored above it. The file holds every reply in full, about 8 MB for 50 rows:
+most of that is the long replies of P1, P17, Q28 and Q29, which go to five rows only, and each further row adds some 25 KB.
+From Python it is `audit(..., calls="v1.jsonl")`.
+
+**Reading the result.** Here `reward.py` is the quickstart checker, which reads the last run of digits, and `reward_v2.py`
+reads the number in the last `\boxed{}`:
+
+```
+A is v1.jsonl, B is v2.jsonl.
+
+Aligned 4,222 calls; agree on 85.2%. Only in A: 440, only in B: 0.
+
+  reference    A accepts 240, B accepts 0
+               [task 0, bare] 34  A 1.0  B 0.0
+               ...
+  O11          A accepts 80, B accepts 0
+               [task 0, either] The answer is either 35 or 34.  A 1.0  B 0.0
+               [task 0, inside_wrapper] \boxed{35 \text{ or } 34}  A 1.0  B 0.0
+               [task 1, either] The answer is either 35 or 34.  A 1.0  B 0.0
+  Q8           A accepts 0, B accepts 80
+               [task 0, decimal] \boxed{34.0}  A 0.0  B 1.0
+               ...
+
+                              A      B
+  Accepts non-answers         0.3%   0.3%
+  Accepts wrong answers       14.0%  0.0%
+  Accepts hedged answers      26.3%  11.8%
+  Rejects right answers       18.8%  6.2%
+  Pays wrong answers in part  0.0%   0.0%
+  Calls with no score         0.0%   0.0%
+```
+
+- Calls are lined up by row, probe and variant. They agree where `accepted` is the same, and two calls with no score agree.
+- A call only in A or only in B was sent in one audit only: the formats tried for the reference answer depend on the checker,
+  a row whose reference answer a checker rejects gets no probes, some probes need two accepted formats, and a `--budget` can
+  leave probes out. These are counted, not compared.
+- Each audit writes its replies in a format its checker accepts. If the two accept different formats, the replies differ
+  too: the first paragraph then says on how many calls, and the examples show both replies. To compare the two on the same
+  replies, give both audits the same `--format`, one both checkers accept, such as `--format '#### {answer}'`.
+- Then each probe where the two differ, the most differences first: how often A accepted a reply B did not, and the other
+  way round, with up to three examples of each: the row, the variant, the reply and both scores. `no score on one side`
+  counts calls where one checker gave no score and the other rejected the reply. `reference` lists the formats of the
+  reference answer one accepts and the other does not.
+- Which side is right is for you to read from the examples. Most probes send replies that should earn nothing, so there the
+  side that accepts is the one to look at; Q, G and O4 send right answers, and there it is the side that rejects.
+  `rewardaudit probes O4` says what a probe sends and what a sound checker does with it.
+
+**The rates in the table** are worked out from the calls in each file alone: for each row of the summary, the share of the
+calls behind it that were accepted (rejected, for Rejects right answers; for Pays wrong answers in part, wrong answers with a
+score above zero that were not accepted), and last the share of all calls with no score. They are not the audit's own
+numbers, which see more than the file holds. In the audit, Accepts non-answers is the best reply built without reading the
+reference answer, chosen on part of the rows and measured on the others, where this table pools every call of N, E and L;
+Rejects right answers leaves out replies with text around the answer when the checker takes only the answer; Pays wrong
+answers in part looks only at the parts of a score that separate right answers from wrong ones, where this table takes the
+whole score, so a bonus for the format counts here; and each rate has a 95% interval. Accepts wrong answers, Accepts hedged
+answers and Rejects right answers otherwise come out the same as in the audit.
+
+`compare` exits with 0, or with 2 when the two files cannot be compared, as when they have no `task_id` in common. From
+Python, `compare("v1.jsonl", "v2.jsonl")` returns all of this as a dict: `aligned`, `agreement`, `different_replies`,
+`only_in_a`, `only_in_b`, `by_probe` and `heads`.
+
 ## Use it in CI
 
 | Exit code | Meaning |
@@ -357,7 +437,8 @@ A finding's `category` is its summary row: `non_solving_accepted`, `wrong_accept
 Other arguments: `n` (a number, or `"all"`), `seed`, `prompt_col`, `answer_col`, `workers`, `timeout`, `probes` (such as
 `["N", "O"]`), `reply_format` (such as `"<solution>{answer}</solution>"`), `answer_field` (`True` for a checker that takes
 only the answer; see [above](#the-reply-format)), `budget_s` (seconds the audit may take; see
-[above](#choose-how-many-rows)), and `verifiers`. For a function, also `style` (how it is
+[above](#choose-how-many-rows)), `calls` (a file to write the calls to; see [above](#compare-two-checkers)), and
+`verifiers`. For a function, also `style` (how it is
 called, found from its parameters if not given: `bare`, `verl`, `trl`, `openrlhf`, `areal`, `rllm`, `easyr1` or `positional`),
 `kwargs` (extra keyword arguments), `reference_col` (a column to pass as the reference), `reference_template` (such as
 `"\\boxed{{{answer}}}"`), `ground_truth_json`, and `prompt_in_completion` (pass prompt and reply as one string).

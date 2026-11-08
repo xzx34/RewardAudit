@@ -59,6 +59,19 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
     from one up to all, at most 8 steps and closer together at both ends. Like M24 it stays out of the rate; its note gives
     the acceptance rate of each k, such as `accepted: k1 100%, k2 0%, all 0%`, and where some scores fall between nothing
     and full, each k's mean share of the score. Its severity is that of the reply with every item wrong, as a wrong answer.
+- `--calls FILE`, and `audit(calls=...)`, write each call of the audit to a file, one JSON object a line and nothing else:
+  `task_id`, `probe_id`, `variant`, `completion`, `kind`, `score` and `accepted`, whether the audit counted the reply as
+  accepted, the last two `null` for a call with no score. The calls with the reference answer have `probe_id` `reference`
+  and the format, or `wrong_answer`, as `variant`, and are written even when the audit stops after them. Calls that only
+  check other calls are left out: the repeats that see whether a score stays the same, those that confirm a high defect, and
+  the reference answer put into a reply that scored above it. Each probe's calls are written as they come in, so a large
+  sample is not held in memory.
+- `rewardaudit compare A B`, and `compare(a, b)` from Python, line up two such files by row, probe and variant and show where
+  the two checkers decide differently: how many calls line up and the share they agree on, the calls in one file only, each
+  probe where they differ with how often each side accepted what the other did not and up to three examples of each, and
+  the rates of the summary for both sides, worked out from the calls alone and so not the audit's own. Where the two audits
+  wrote their replies in different formats, it says on how many calls and the examples show both replies. Two files with no
+  `task_id` in common exit with 2.
 
 ## 0.2.0 - 2026-11-07
 

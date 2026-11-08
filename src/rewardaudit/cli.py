@@ -1,4 +1,4 @@
-"""Command line: audit | demo | probes."""
+"""Command line: audit | demo | compare | probes."""
 
 from __future__ import annotations
 
@@ -98,6 +98,7 @@ def audit(
     answer_col: str | None = typer.Option(None, help="column holding the reference answer (found by name if not given)"),
     reference_col: str | None = typer.Option(None, help="column the checker receives as the reference, if not the answer column, such as a list of accepted answers"),
     out: str | None = typer.Option(None, help="directory for report.md, report.json and repro.py"),
+    calls: str | None = typer.Option(None, help="file to write the reference-answer and probe calls to, one JSON object a line, for rewardaudit compare"),
     workers: int | None = typer.Option(None, help="parallel worker processes (default: 4, or the CPUs if fewer)"),
     timeout: float = typer.Option(10.0, help="seconds allowed per checker call"),
     budget: str | None = typer.Option(None, help="time the whole audit may take, such as 90s, 10m or 1h; past it no further probe is sent (default: no limit)"),
@@ -115,7 +116,7 @@ def audit(
     except AuditError as e:
         _fail(str(e))
     result = _execute(lambda **kw: run(target, dataset, n=size, seed=seed, prompt_col=prompt_col, answer_col=answer_col,
-                                       workers=workers, timeout=timeout, budget_s=budget_s,
+                                       workers=workers, timeout=timeout, budget_s=budget_s, calls=calls,
                                        probes=probes.split(",") if probes else None,
                                        reference_col=reference_col, reply_format=reply_format, answer_field=answer_field,
                                        verifiers=verifiers, **kw), quiet)
@@ -137,6 +138,21 @@ def demo(
         console.rule(f"demo: {name}")
         result = _execute(lambda name=name, **kw: run(f"demo:{name}", n=n, workers=1, **kw), True)
         render_terminal(result, console, full=full, out=write_outputs(result, f"{out}/{name}") if out else None)
+
+
+@app.command("compare")
+def compare_calls(
+    a: str = typer.Argument(..., help="the calls of one audit, as audit --calls writes them"),
+    b: str = typer.Argument(..., help="the calls of another audit on the same dataset, --n and --seed"),
+) -> None:
+    """Show where two checkers, or two versions of one, decide differently on the same rows."""
+    from rewardaudit.comparison import compare, render_compare
+
+    try:
+        result = compare(a, b)
+    except AuditError as e:
+        _fail(str(e))
+    render_compare(result, console)
 
 
 @app.command()

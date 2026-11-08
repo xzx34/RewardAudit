@@ -14,7 +14,7 @@ from rewardaudit.errors import AuditError, NotAuditable
 
 __version__ = "0.2.0"
 
-__all__ = ["AuditError", "NotAuditable", "__version__", "audit"]
+__all__ = ["AuditError", "NotAuditable", "__version__", "audit", "compare"]
 
 
 def __getattr__(name: str) -> Any:  # workers import this package under an environment's own interpreter, so it stays light
@@ -22,4 +22,8 @@ def __getattr__(name: str) -> Any:  # workers import this package under an envir
         from rewardaudit.api import audit
 
         return audit
+    if name == "compare":
+        from rewardaudit.comparison import compare
+
+        return compare
     raise AttributeError(f"module 'rewardaudit' has no attribute {name!r}")

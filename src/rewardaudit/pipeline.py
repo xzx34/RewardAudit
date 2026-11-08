@@ -2,25 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import random
 import statistics
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from rewardaudit import __version__
 from rewardaudit.adapters.function_adapter import reference_aliases
 from rewardaudit.confirm import MAX_CUT_CALLS, RESENDS, confirm
-from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract
+from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract, is_full
+from rewardaudit.errors import AuditError
 from rewardaudit.gate import check_contract, check_loaded
 from rewardaudit.goldtype import infer_dataset_type, infer_task_type
-from rewardaudit.metrics import EPS, Tally, collect_defects, nondeterminism_finding
+from rewardaudit.metrics import EPS, Tally, collect_defects, hit, nondeterminism_finding
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.runner import RunnerPool
-from rewardaudit.types import Kind, Observation, Task
+from rewardaudit.types import Kind, Label, Observation, Task, Verdict
 
 TIER_RANK = {"natural": 0, "amplified": 1, "contrived": 2}
 DETERMINISM_REPEATS = 3
@@ -41,6 +44,7 @@ class AuditConfig:
     formats: list[str] = field(default_factory=list)  # reply formats of the checker's own, such as "<sol>{answer}</sol>"
     answer_field: bool = False  # the checker takes a reply to be its answer field; False: inferred from the probes
     budget_s: float | None = None  # seconds from the start of the audit; past them no further probe is sent. None: no limit
+    calls_path: str | None = None  # a file to write each reference-answer and probe call to, one JSON object a line
 
 
 @dataclass
@@ -174,6 +178,35 @@ def _stage(progress: Callable[[str, int, int], None] | None, stage: str, total: 
     return step
 
 
+REFERENCE = "reference"  # the probe_id of the reference-answer calls in a calls file; their variant is the format
+
+
+def _calls_file(path: str | None) -> AbstractContextManager[IO[str] | None]:
+    """The file the calls are written to, emptied as the audit starts."""
+    if path is None:
+        return nullcontext()
+    try:
+        return open(path, "w", encoding="utf-8")
+    except OSError as e:
+        raise AuditError(f"Cannot write the calls to {path}: {e.strerror or e}") from None
+
+
+def _write_calls(f: IO[str] | None, calls: list[tuple[str, str, str, str, Verdict, bool]]) -> None:
+    """One JSON object a line, and nothing else in the file. score and accepted are None for a call with no score."""
+    if f is None:
+        return
+    for task_id, probe_id, variant, completion, v, accepted in calls:
+        f.write(json.dumps({"task_id": task_id, "probe_id": probe_id, "variant": variant, "completion": completion,
+                            "kind": v.kind.value, "score": v.score if v.ok else None,
+                            "accepted": accepted if v.ok else None}) + "\n")
+
+
+def _accepted(o: Observation, contract: Contract, gold_blind: bool) -> bool:
+    """Whether the checker accepted a probe's reply, as the statistics judge it: for a right answer, a hit is a rejection."""
+    h = hit(o, contract, gold_blind)[0]
+    return not h if o.label == Label.SOLVING else h
+
+
 def run_audit(
     spec: dict[str, Any],
     config: AuditConfig | None = None,
@@ -186,8 +219,9 @@ def run_audit(
     log = log or (lambda s: None)
     t_start = time.perf_counter()
 
-    with RunnerPool(spec, workers=config.workers, timeout_s=config.timeout_s, python=config.python,
-                    memory_limit_mb=config.memory_limit_mb) as runner:
+    with (_calls_file(config.calls_path) as calls,
+          RunnerPool(spec, workers=config.workers, timeout_s=config.timeout_s, python=config.python,
+                     memory_limit_mb=config.memory_limit_mb) as runner):
         log(f"loaded {runner.name}" + (f" ({config.workers} workers)" if config.workers > 1 else ""))
         tasks = runner.tasks(config.n_tasks, config.seed)
         n_rows = int(runner.meta.get("n_rows") or len(tasks))
@@ -200,6 +234,11 @@ def run_audit(
         t_contract = time.perf_counter()
         contract = infer_contract(runner, answerable, formats=config.formats, progress=_stage(progress, "reference answers", (len(COMMON_WRAPPERS) + 1) * len(answerable)))
         s_per_call = (time.perf_counter() - t_contract) / max(1, contract.calls)
+        # before the checks that may stop the audit, so two checkers can still be compared on the reference answers. One is
+        # accepted where it earned the row's full score, as an accepted format is counted: not against the row's best, which
+        # on a row whose reference answer fails everywhere would make its best call look accepted
+        _write_calls(calls, [(tid, REFERENCE, wid, comp, v, is_full(contract.signal(v), contract.task_full[tid]))
+                             for wid, tid, comp, v in contract.observations])
         check_contract(contract, tasks, runner.meta)
         if contract.signal_keys:
             log(f"composite score; correctness judged on {' + '.join(contract.signal_keys)}")
@@ -234,6 +273,8 @@ def run_audit(
             observations = [Observation(probe.id, probe.family, vname, task.id, comp, v, probe.label, probe.expect, probe.tier)
                             for (task, vname, comp), v in zip(pending, verdicts, strict=True)]
             tally.add(observations, _gold_controls(runner, observations, by_id, contract))
+            _write_calls(calls, [(o.task_id, o.probe_id, o.variant, o.completion, o.verdict,
+                                  _accepted(o, contract, probe.gold_blind)) for o in observations])
             if config.keep_observations:
                 kept.extend(observations)
         metrics = tally.finish(answer_field=config.answer_field)

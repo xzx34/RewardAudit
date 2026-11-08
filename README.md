@@ -89,6 +89,8 @@ that only the last number counts.
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
 `rewardaudit probes` lists all 82 probes and `rewardaudit probes O11` explains one.
+`rewardaudit compare v1.jsonl v2.jsonl` shows where two checkers, or two versions of one, decide differently, probe by
+probe, from two audits of the same rows run with `--calls`.
 
 A finding says how the checker behaved, not whether that was intended. A strict format rule may be what you want, so read
 the example before you change anything.
