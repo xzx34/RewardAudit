@@ -1,4 +1,5 @@
-"""The probes on how answers are compared: attached characters, units, tolerance, other spellings, fixed answers."""
+"""The probes on how answers are compared: attached characters, units, relation signs, tolerance, other spellings, fixed
+answers."""
 
 import random
 import re
@@ -124,6 +125,82 @@ def test_a_tolerance_is_reported_as_the_widest_error_accepted_and_stays_out_of_t
     probes = {p["id"]: p for p in r.metrics["probes"]}
     wrong = next(h for h in r.metrics["head"] if h["key"] == "wrong_accepted")
     assert wrong["n"] == sum(p["n_scored"] for p in probes.values() if p["family"] == "M" and p["headline"])
+
+
+@pytest.mark.parametrize(("answer", "expected"), [
+    ("x > 3", {"flipped": "x < 3", "adjacent": "x \\ge 3"}),
+    ("x \\le \\frac{1}{2}", {"flipped": "x \\ge \\frac{1}{2}", "adjacent": "x < \\frac{1}{2}"}),
+    ("1 \\leq n \\leq 10", {"flipped": "1 \\geq n \\geq 10", "adjacent": "1 < n < 10"}),  # every sign of the kind
+    ("-2 < x \\le 3", {"flipped": "-2 > x \\le 3", "adjacent": "-2 \\le x \\le 3"}),  # the first kind only
+    ("x < 1 or x > 1", {"flipped": "x > 1 or x > 1", "adjacent": "x \\le 1 or x > 1"}),  # both kinds at once: x ≠ 1 again
+    ("x ≥ 2", {"flipped": "x ≤ 2", "adjacent": "x > 2"}),
+    ("a <= b", {"flipped": "a >= b", "adjacent": "a < b"}),
+    ("x<y", {"flipped": "x>y", "adjacent": "x\\le y"}),  # not \ley
+    ("x>-1", {"flipped": "x<-1", "adjacent": "x\\ge-1"}),
+    ("a \\neq 0", {"flipped": "a = 0"}),
+    ("<b>x</b> > 2", {"flipped": "<b>x</b> < 2", "adjacent": "<b>x</b> \\ge 2"}),
+])
+def test_m26_turns_one_kind_of_relation_sign_around(answer, expected):
+    assert _gen("M26", answer) == expected
+
+
+@pytest.mark.parametrize("answer", ["f: A -> B", "p => q", "x <=> y", "a << 2", "\\left< x \\right>", "the <em>red</em> one",
+                                    "x \\leqslant 2", "\\neg p", "\\leftarrow", "42", "Paris", "def f(x):\n    return x > 0"])
+def test_m26_needs_a_relation_sign(answer):
+    assert _gen("M26", answer) == {}
+
+
+def test_a_checker_that_keeps_only_the_digits_accepts_a_relation_turned_around():
+    def digits(completion, answer):
+        return float(re.findall(r"\d+", completion) == re.findall(r"\d+", answer))
+
+    rows = [{"prompt": f"Solve x - {i} > 0 for x.", "answer": f"x > {i}"} for i in range(2, 14)]
+    r = audit(digits, rows, workers=1)
+    f = next(f for f in r.findings if f["probe_id"] == "M26")
+    assert f["severity"] == "high" and f["rate"] == 1.0 and f["category"] == "wrong_accepted"
+    assert next(d for d in r.defects if d["id"] == "D1")["severity"] == "high"
+    assert "M26" not in {f["probe_id"] for f in audit(lambda completion, answer: float(completion == answer), rows, workers=1).findings}
+
+
+@pytest.mark.parametrize(("answer", "expected"), [
+    ("0", {"5e-5": "0.00005", "9e-5": "0.00009"}),  # not 5e-05, which a checker reading digits takes for 5
+    ("0.0", {"5e-5": "0.00005", "9e-5": "0.00009"}),
+    ("0.000216", {"5e-5": "0.000266", "9e-5": "0.000306"}),
+    ("-0.0003", {"5e-5": "-0.00025", "9e-5": "-0.00021"}),
+    ("0.0008", {"9e-5": "0.00089"}),  # 0.00085 is less than a tenth off
+    ("0.00005", {"5e-5": "0.0001", "9e-5": "0.00014"}),
+    ("-0.00005", {"5e-5": "0", "9e-5": "0.00004"}),
+    ("0.005", {}),  # 0.00505 is 1% off, which M24 sends
+])
+def test_m27_adds_less_than_1e_4_where_that_is_more_than_a_tenth_of_the_answer(answer, expected):
+    assert _gen("M27", answer) == expected
+
+
+def test_m27_is_for_numbers_under_a_hundredth():
+    assert _gen("M27", "0.01") == _gen("M27", "-0.5") == _gen("M27", "42") == _gen("M27", "Paris") == {}
+
+
+def test_an_absolute_tolerance_is_found_and_a_relative_one_is_not():
+    # 0.0002 apart, so that another row's answer, which the tool sends as a wrong one first, is outside the tolerance
+    rows = [{"prompt": f"What is {i} times 0.0002?", "answer": f"{i * 0.0002:.4f}"} for i in range(-4, 5)]
+
+    def absolute(completion, answer):
+        try:
+            return float(abs(float(completion) - float(answer)) < 1e-4)
+        except ValueError:
+            return 0.0
+
+    def relative(completion, answer):  # within 4%, as some checkers allow
+        try:
+            return float(abs(float(completion) - float(answer)) <= 0.04 * abs(float(answer)))
+        except ValueError:
+            return 0.0
+
+    r = audit(absolute, rows, workers=1)
+    f = next(f for f in r.findings if f["probe_id"] == "M27")
+    assert f["severity"] == "high" and f["rate"] == 1.0 and f["n"] == 14  # 0.00005 only where the answer is under 0.0005
+    assert "M27" in [e["probe_id"] for e in next(d for d in r.defects if d["id"] == "D3")["evidence"]]
+    assert "M27" not in {f["probe_id"] for f in audit(relative, rows, workers=1).findings}
 
 
 @pytest.mark.parametrize(("answer", "expected"), [

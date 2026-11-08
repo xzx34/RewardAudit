@@ -20,19 +20,20 @@ REWRITES, FIXED_ANSWER, RUN_AS_CODE, ROBUSTNESS, WRONG_PARTIAL, ABOVE_REFERENCE 
 
 DEFECTS = (
     Defect("D1", "Signs and punctuation ignored",
-           "A number with its sign flipped or its decimal point moved compares equal to the reference answer.",
-           ("M2", "M3", "M22")),
+           "A number with its sign flipped or its decimal point moved, or an answer with its relation sign turned around, "
+           "compares equal to the reference answer.",
+           ("M2", "M3", "M22", "M26")),
     Defect("D2", "Substring match",
            "A reply counts when the reference answer appears somewhere inside it, or when it is a part of the reference answer.",
            ("M21", "M18", "E1", "E5", "O6")),
-    Defect("D3", "Numeric tolerance too wide", "A number that differs from the reference answer still compares equal.", ("M24", "M25", "M1")),
+    Defect("D3", "Numeric tolerance too wide", "A number that differs from the reference answer still compares equal.", ("M24", "M25", "M1", "M27")),
     Defect("D4", "One of several answers is read",
            "With several answers marked in one reply, the checker reads one of them, often the first, and ignores the others.",
            ("O5", "O12", "O4", "E6")),
     Defect("D5", "Reads the thinking block", "An answer in the thinking block counts, though the final answer is wrong or missing.",
            ("O10", "O13")),
     Defect("D6", "Hedged answers accepted", "A reply that commits to no single answer earns full score.",
-           ("O7", "O11", "O14", "O15", "E2", "E3", "E8")),
+           ("O7", "O11", "O14", "O15", "O16", "E2", "E3", "E8")),
     Defect("D7", "Negation ignored", "The right answer earns full score though the reply retracts it, negates it or only supposes it.",
            ("O3",)),
     Defect("D8", "Only a fixed-length window is read", "A right answer loses the score once enough text comes before or after it.",
@@ -56,7 +57,7 @@ DEFECTS = (
     Defect("D19", "Close answers accepted", "An answer a few characters away from the reference answer compares equal.", ("M5", "M6", "M7")),
     Defect("D20", "Parts of a structured answer ignored",
            "A list, JSON object or grid with a definite error compares equal to the reference answer.",
-           ("M8", "M9", "M10", "M11", "M12", "M13", "M17")),
+           ("M8", "M9", "M10", "M11", "M12", "M13", "M17", "M28")),
     Defect("D21", "A different answer accepted", "An answer that is plainly another one earns full score.", ("M16", "M19", "M20")),
 )
 

@@ -1,5 +1,5 @@
-"""What the O family's wrong answer is, wrong grid cells, symbolic golds, what counts as LaTeX, which prompts ask for only
-the answer, and which numbers get Q8."""
+"""What the O family's wrong answer is, wrong grid cells, lists and grids with k items wrong, symbolic golds, what counts as
+LaTeX, which prompts ask for only the answer, which numbers get Q8, and two option letters in one reply."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import re
 import pytest
 
 from rewardaudit.contract import Contract
-from rewardaudit.equiv import equiv, parse_json, parse_seq, strip_wrappers
+from rewardaudit.equiv import equiv, parse_grid, parse_json, parse_seq, strip_wrappers
 from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, infer_gold_type
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.base import ProbeContext
@@ -198,6 +198,55 @@ def test_other_kinds_of_cell():
     assert {c for row in json.loads(strip_wrappers(comp)) for c in row} == {True, False}
 
 
+# --- lists and grids with k items wrong ----------------------------------------------------------------------
+
+def _wrong_items(comp: str, gold: str) -> set[int]:
+    return {i for i, (a, b) in enumerate(zip(parse_seq(comp), parse_seq(gold), strict=True)) if a != b}
+
+
+def test_m28_replaces_k_list_items_with_new_ones_for_every_k():
+    gold = "1, 2, 3"
+    m28 = _gen("M28", Task("t", "List them.", gold))
+    assert list(m28) == ["k1", "k2", "all"]
+    wrong = [_wrong_items(comp, gold) for comp in m28.values()]
+    assert [len(w) for w in wrong] == [1, 2, 3] and wrong[0] < wrong[1] < wrong[2]  # each holds the wrong items of the one before
+    for comp in m28.values():
+        items = parse_seq(comp)
+        assert len(set(items)) == 3 and not equiv(strip_wrappers(comp), gold, "set")
+    assert not set(parse_seq(m28["all"])) & {"1", "2", "3"}
+
+
+def test_m28_steps_are_close_together_at_both_ends_of_a_long_list():
+    gold = str(list(range(1, 13)))
+    m28 = _gen("M28", Task("t", "List them.", gold))
+    assert list(m28) == ["k1", "k2", "k3", "k6", "k10", "k11", "all"]
+    assert [len(_wrong_items(comp, gold)) for comp in m28.values()] == [1, 2, 3, 6, 10, 11, 12]
+
+
+def test_m28_takes_words_from_another_row_and_keeps_json_strings():
+    t = Task("t", "Name them.", "[red, green, blue]")
+    assert _gen("M28", t) == {}  # no other row to take a word from
+    m28 = _gen("M28", t, [t, Task("o", "Name them.", "[cyan, red, teal]")])
+    assert strip_wrappers(m28["all"], keep_parens=True) in ("[cyan, teal, cyan]", "[teal, cyan, cyan]", "[cyan, cyan, teal]")
+    assert all(json.loads(strip_wrappers(c, keep_parens=True))[0] in "abcxyz" for c in _gen("M28", Task("t", "q", '["x", "y", "z"]')).values())
+
+
+@pytest.mark.parametrize("gold", ["1 0 1\n0 1 0", ARC, "#.#\n.#."])
+def test_m28_changes_k_cells_of_a_grid_to_values_it_already_uses(gold):
+    m28 = _gen("M28", Task("t", "Predict the output grid.", gold))
+    assert list(m28) == ["k1", "k2", "k3", "k4", "k5", "all"]
+    ref = parse_grid(gold)
+    for k, comp in enumerate(m28.values(), 1):
+        grid = parse_grid(strip_wrappers(comp, keep_punct=True))
+        assert sum(a != b for ra, rb in zip(grid, ref, strict=True) for a, b in zip(ra, rb, strict=True)) == k
+        assert {c for row in grid for c in row} <= {c for row in ref for c in row}
+
+
+@pytest.mark.parametrize("gold", ["[11, 58]", "Paris", "42", '{"a": 1, "b": 2, "c": 3}'])
+def test_m28_needs_three_items(gold):
+    assert _gen("M28", Task("t", "List them.", gold)) == {}
+
+
 # --- short symbolic golds ------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("gold", ["BE", "EB", "ABC", "xy", "Fe", "PQ, RS"])
@@ -382,6 +431,26 @@ def test_o3_is_retracted_negated_and_hypothetical():
     assert o3["hypo"].endswith(f"the result is \\boxed{{{wrong}}}") and wrong != "42"
 
 
+MCQ = "Which planet is the largest?\nA. Mars\nB. Jupiter\nC. Venus\nD. Earth"
+
+
+def test_o16_sends_the_right_letter_with_another_in_three_spellings():
+    first = set()
+    for seed in SEEDS:
+        o16 = _gen("O16", Task("t", MCQ, "B"), seed=seed)
+        a, b = strip_wrappers(o16["comma"]).split(", ")
+        assert "B" in (a, b) and a < b and {a, b} <= set("ABCD")
+        assert o16 == {"joined": f"\\boxed{{{a}{b}}}", "comma": f"\\boxed{{{a}, {b}}}", "slash": f"\\boxed{{{a}/{b}}}"}
+        first.add(a == "B")
+    assert first == {True, False}  # the right letter comes first on some rows and second on others
+    assert _gen("O16", Task("t", "Pick one.", "c"))["joined"] in ("\\boxed{AC}", "\\boxed{BC}", "\\boxed{CD}")  # options A to D
+
+
+@pytest.mark.parametrize("gold", ["Jupiter", "42", "yes"])
+def test_o16_is_for_option_letters(gold):
+    assert _gen("O16", Task("t", MCQ, gold)) == {}
+
+
 def test_n10_is_every_placeholder():
     n10 = _gen("N10", Task("t", "Compute it.", "42"))
     assert len(n10) == 14 and n10["empty"] == "\\boxed{}" and n10["TODO"] == "\\boxed{TODO}" and n10["NaN"] == "\\boxed{NaN}"
@@ -468,6 +537,26 @@ def score(prompt, completion, answer):
 def test_a_hedge_between_lists_is_not_accepted_by_a_checker_that_reads_the_whole_reply(tmp_path, probe_id):
     golds = [f"{10 + i}, {50 + i}" for i in range(12)]
     assert _accepted(_run(tmp_path, UNION, golds, ["O"]), probe_id) == 0.0
+
+
+FIRST_LETTER = """
+import re
+
+def score(prompt, completion, answer):
+    m = re.search(r"[ABCD]", completion)
+    return float(m is not None and m.group() == answer)
+"""
+
+
+def test_a_checker_that_reads_the_first_letter_accepts_two_letters(tmp_path):
+    golds = ["ABCD"[i % 4] for i in range(16)]
+    r = _run(tmp_path, FIRST_LETTER, golds, ["O"])
+    f = next(f for f in r.findings if f["probe_id"] == "O16")
+    assert f["category"] == "hedging_accepted" and 0.2 <= f["rate"] < 1
+    assert re.search("[ABCD]", f["example"]["completion"]).group() == golds[int(f["example"]["task_id"])]
+    assert "O16" in [e["probe_id"] for e in next(d for d in r.defects if d["id"] == "D6")["evidence"]]
+    exact = "def score(prompt, completion, answer):\n    return float(completion.strip() == answer)\n"
+    assert "O16" not in {f["probe_id"] for f in _run(tmp_path, exact, golds, ["O"]).findings}
 
 
 @pytest.mark.parametrize("prompt,asked", [

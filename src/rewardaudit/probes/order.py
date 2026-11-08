@@ -144,6 +144,17 @@ def o14_letter_and_other_text(task, rng, ctx):
     return [("right_letter", ctx.wrap(f"{letter}) {texts[other]}")), ("right_text", ctx.wrap(f"{other}) {texts[letter]}"))]
 
 
+def o16_two_letters(task, rng, ctx):
+    """The right letter and another option's, in the order of the alphabet, as a reply naming several options writes them;
+    the other one at random, so the right one comes first on about half the rows."""
+    letter = to_letter(ctx.gold(task))
+    others = [o for o in ctx.options(task) if o != letter]
+    if not letter or not others:
+        return []
+    a, b = sorted((letter, rng.choice(others)))
+    return [("joined", ctx.wrap(a + b)), ("comma", ctx.wrap(f"{a}, {b}")), ("slash", ctx.wrap(f"{a}/{b}"))]
+
+
 def o15_interval(task, rng, ctx):
     g = ctx.gold(task)
     x = to_number(g)
@@ -197,4 +208,9 @@ PROBES = [
           applies=lambda t, c: c.numeric(t) and plain_number(c.gold(t)),
           description="Sends a range that holds the numeric reference answer: 'between 41 and 43', '42 ± 1', '40 < x < 45'; "
                       "a sound checker gives zero, since a range commits to no answer."),
+    Probe("O16", "O", "two option letters, one of them right", "natural", "zero", NS, o16_two_letters,
+          applies=lambda t, c: c.gtype(t) == "mcq", by_variant=True,
+          description="Sends the right option letter together with another one, as BC, B, C and B/C in the accepted "
+                      "format; a checker that reads the first or the last letter, or looks for the right one anywhere, "
+                      "accepts some of them, a sound one gives zero."),
 ]

@@ -43,6 +43,22 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   fewer probes.` `report.json` lists them under `meta.probes_not_run`, a key that is there only then, and `report.md` gives
   the budget under How this was run. Under a budget the progress bar of the probes has no total. There is no limit by
   default.
+- 4 new probes, 82 in all:
+  - O16, under D6: on multiple-choice rows, the right letter with another option's, as `BC`, `B, C` and `B/C`. A checker
+    that reads the first or the last letter accepts the replies where the right one stands there.
+  - M26, under D1: where the reference answer holds a relation sign (`<`, `>`, `\le`, `\ge`, `\neq`, `≤`, `≥`), the
+    sign turned around (`x < 3` for `x > 3`, `=` for `\neq`) and made strict or not strict (`x \le 3` for `x < 3`). A
+    checker that keeps only the numbers, or drops what is not a letter or digit, accepts them. D1 now reads "A number with
+    its sign flipped or its decimal point moved, or an answer with its relation sign turned around, compares equal to the
+    reference answer."
+  - M27, under D3: where the numeric reference answer is under 0.01 in size, zero among them, the answer plus 0.00005 and
+    plus 0.00009, written in decimals, each only where that is more than a tenth of the answer, wider than any error M24
+    sends. A checker with an absolute tolerance such as `abs(a - b) < 1e-4` accepts them and a relative tolerance does
+    not; on zero, M24 sends nothing.
+  - M28, under D20: where the reference answer is a list or a grid of 3 items or more, k of them replaced by wrong ones,
+    from one up to all, at most 8 steps and closer together at both ends. Like M24 it stays out of the rate; its note gives
+    the acceptance rate of each k, such as `accepted: k1 100%, k2 0%, all 0%`, and where some scores fall between nothing
+    and full, each k's mean share of the score. Its severity is that of the reply with every item wrong, as a wrong answer.
 
 ## 0.2.0 - 2026-11-07
 

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 from rewardaudit.equiv import equiv, flip_bool, to_letter, to_number
 from rewardaudit.goldtype import asks_percent
-from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, ProbeContext, fmt_num, plain_number
+from rewardaudit.probes.base import MIN_WORD, NOT_LATEX, UNIT_RE, Probe, ProbeContext, fmt_num, plain_number
 from rewardaudit.types import Label, Task
 
 NS = Label.NOT_SOLVING
@@ -176,6 +177,48 @@ def m25_percent_scale(task, rng, ctx):
     return _keep(ctx, task, [("x100", _spelled(x * 100)), ("div100", fmt_num(x / 100))]) if x else []
 
 
+# A relation sign. Not one in an arrow or a shift (->, =>, <->, <<), nor \left< and \right>; tags are masked first.
+_RELATION = re.compile(r"\\(?:leq|geq|neq|le|ge|ne)(?![A-Za-z])|(?<![<>=-])(?:<=|>=)(?![<>=])"
+                       r"|(?<![<>=-])(?<!\\left)(?<!\\right)(?:<(?![<>=]|-+>)|>(?![<>=]))|[≤≥≠]")
+_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
+_FLIPPED = {"<": ">", ">": "<", "<=": ">=", ">=": "<=", "\\le": "\\ge", "\\ge": "\\le", "\\leq": "\\geq", "\\geq": "\\leq",
+            "≤": "≥", "≥": "≤", "\\ne": "=", "\\neq": "=", "≠": "="}
+_ADJACENT = {"<": "\\le", ">": "\\ge", "<=": "<", ">=": ">", "\\le": "<", "\\leq": "<", "\\ge": ">", "\\geq": ">",
+             "≤": "<", "≥": ">"}
+
+
+def _relations(g: str) -> list[re.Match]:
+    return list(_RELATION.finditer(_TAG.sub(lambda m: " " * len(m.group()), g)))
+
+
+def m26_relation(task, rng, ctx):
+    """One kind of sign replaced wherever it stands, the first in the reference answer that the table replaces: replacing
+    every kind at once can give the same answer back ('x < 1 or x > 1'). Not through `_keep`: the tool's own comparison
+    reads 'x \\le 3' and 'x \\ge 3' as the number 3, which is what the probe looks for in a checker."""
+    g = ctx.gold(task)
+    found, out = _relations(g), []
+    for name, table in (("flipped", _FLIPPED), ("adjacent", _ADJACENT)):
+        kind = next((m.group() for m in found if m.group() in table), None)
+        if kind is None:
+            continue
+        text, end = "", 0
+        for m in (m for m in found if m.group() == kind):
+            sign = table[kind] + " " * (table[kind][-1].isalpha() and g[m.end():m.end() + 1].isalpha())  # \le y, not \ley
+            text, end = text + g[end:m.start()] + sign, m.end()
+        out.append((name, ctx.wrap(text + g[end:])))
+    return out
+
+
+def m27_near_zero(task, rng, ctx):
+    """Only an error of more than a tenth of the answer, wider than any M24 sends, so that a relative tolerance does not
+    accept it and what does is an absolute one: for 0.005, 0.00505 is 1% off, which M24 measures already. Exact decimals
+    from the shortest spelling of the value: fmt_num gives 5e-05 for 0.00005, which a checker that reads digits takes for 5.
+    The tool's own comparison allows only 1e-9, so `_keep` keeps them."""
+    x = Decimal(repr(to_number(ctx.gold(task))))
+    return _keep(ctx, task, [(off, format((x + Decimal(off)).normalize(), "f")) for off in ("5e-5", "9e-5")
+                             if Decimal(off) > abs(x) / 10])
+
+
 PROBES = [
     Probe("M1", "M", "off by one", "natural", "zero", NS, m1_off_by_one, applies=_is_int,
           description="Sends the integer reference answer plus or minus one; a sound checker gives zero."),
@@ -233,4 +276,16 @@ PROBES = [
           description="Sends the numeric reference answer multiplied or divided by a hundred, unless the question asks for "
                       "a percentage; a checker that allows for a percentage in every comparison accepts them, a sound one "
                       "gives zero."),
+    Probe("M26", "M", "relation sign turned around", "natural", "zero", NS, m26_relation,
+          applies=lambda t, c: c.gtype(t) not in NOT_LATEX and bool(_relations(c.gold(t))),
+          description="Where the reference answer holds a relation sign (<, >, \\le, \\ge, \\neq, ≤, ≥), sends it with "
+                      "the sign turned around (x > 3 for x < 3, = for \\neq) and with the sign made strict or not strict "
+                      "(x \\le 3 for x < 3, x > 3 for x \\ge 3). A checker that keeps only the numbers, or drops what is "
+                      "not a letter or digit, accepts them, a sound one gives zero."),
+    Probe("M27", "M", "number near zero off by less than 1e-4", "natural", "zero", NS, m27_near_zero,
+          applies=lambda t, c: c.numeric(t) and abs(to_number(c.gold(t)) or 0) < 0.01,
+          description="Where the numeric reference answer is under 0.01 in size, zero among them, sends it plus 0.00005 "
+                      "and plus 0.00009, each only where that is more than a tenth of the answer, wider than any error M24 "
+                      "sends. A checker with an absolute tolerance such as abs(a - b) < 1e-4 accepts them, a relative "
+                      "tolerance does not, and on zero M24 sends nothing; a sound checker gives zero."),
 ]

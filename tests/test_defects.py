@@ -1,6 +1,7 @@
 """The defect catalog: every probe has a place in it, a defect takes the worst of its evidence, and too few calls rate low."""
 
 import json
+import random
 import re
 
 import pytest
@@ -11,7 +12,7 @@ from rewardaudit.contract import Contract
 from rewardaudit.defects import BY_PROBE, DEFECTS
 from rewardaudit.metrics import PROSE_PROBES, TOO_FEW, collect_defects, compute, nondeterminism_finding
 from rewardaudit.pipeline import exit_code
-from rewardaudit.probes.base import Probe
+from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import render_markdown, render_terminal
 from rewardaudit.types import Kind, Label, Observation, Task, Verdict
@@ -166,6 +167,39 @@ def test_a_sweep_reports_the_rate_of_each_variant_and_where_the_behaviour_ends(l
         assert f["example"]["variant"] == "5%" and f["rate"] == 0.5 and f["n"] == 12
     else:  # the shortest text that loses the score at least half the time
         assert f["example"]["variant"] == "5%" and f["rate"] == 0.5
+
+
+def _m28(score):
+    """M28's finding where `score(reply items, reference items)` grades its replies on 12 lists of three numbers."""
+    probe = next(p for p in all_probes() if p.id == "M28")
+    tasks = [Task(str(i), "List the three numbers.", f"{i}, {i + 1}, {i + 2}") for i in range(12)]
+    contract = _contract([t.id for t in tasks])
+    ctx = ProbeContext(contract, "list", tasks, gold_types={t.id: "list" for t in tasks})
+    obs = []
+    for t in tasks:
+        ctx.task = t
+        for name, comp in probe.generate(t, random.Random(t.id), ctx):
+            verdict = Verdict(Kind.SCORE, score=score(re.findall(r"\d+", comp), re.findall(r"\d+", t.answer)))
+            obs.append(Observation(probe.id, probe.family, name, t.id, comp, verdict, probe.label, probe.expect, probe.tier))
+    return next(f for f in compute(obs, [probe], tasks, contract, "list")["findings"] if f["probe_id"] == "M28")
+
+
+def test_a_list_checked_only_for_its_length_is_high_on_every_item_wrong():
+    f = _m28(lambda got, ref: float(len(got) == len(ref)))
+    assert f["severity"] == "high" and f["note"] == "accepted: k1 100%, k2 100%, all 100%" and f["example"]["variant"] == "all"
+    assert BY_PROBE["M28"] == "D20" and f["category"] == "wrong_accepted"
+
+
+def test_items_wrong_rate_by_how_many_and_the_share_of_the_score_where_it_is_paid_in_part():
+    def right(got, ref):
+        return sum(a == b for a, b in zip(got, ref, strict=True))
+
+    two_of_three = _m28(lambda got, ref: float(right(got, ref) >= 2))
+    assert two_of_three["note"] == "accepted: k1 100%, k2 0%, all 0%"
+    assert two_of_three["severity"] == "low" and two_of_three["rate"] == 1.0 and two_of_three["example"]["variant"] == "k1"
+    in_part = _m28(lambda got, ref: 1.0 if right(got, ref) >= 2 else right(got, ref) / 3)
+    assert in_part["note"] == "accepted: k1 100%, k2 0%, all 0%; mean score share: k1 100%, k2 33%, all 0%"
+    assert in_part["severity"] == "low"
 
 
 def test_the_terminal_lists_defects_first_and_keeps_findings_for_full(tmp_path):

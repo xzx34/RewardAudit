@@ -88,7 +88,7 @@ that only the last number counts.
 | Pays wrong answers in part | Does a definite error earn more than nothing? | off by one, one word changed |
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
-`rewardaudit probes` lists all 78 probes and `rewardaudit probes O11` explains one.
+`rewardaudit probes` lists all 82 probes and `rewardaudit probes O11` explains one.
 
 A finding says how the checker behaved, not whether that was intended. A strict format rule may be what you want, so read
 the example before you change anything.

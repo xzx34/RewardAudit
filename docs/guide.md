@@ -193,12 +193,12 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 
 | Id | Defect | Evidence |
 |---|---|---|
-| D1 | Signs and punctuation ignored | M2, M3, M22 |
+| D1 | Signs and punctuation ignored | M2, M3, M22, M26 |
 | D2 | Substring match | M21, M18, E1, E5, O6 |
-| D3 | Numeric tolerance too wide | M24, M25, M1 |
+| D3 | Numeric tolerance too wide | M24, M25, M1, M27 |
 | D4 | One of several answers is read | O5, O12, O4, E6 |
 | D5 | Reads the thinking block | O10, O13 |
-| D6 | Hedged answers accepted | O7, O11, O14, O15, E2, E3, E8 |
+| D6 | Hedged answers accepted | O7, O11, O14, O15, O16, E2, E3, E8 |
 | D7 | Negation ignored | O3 |
 | D8 | Only a fixed-length window is read | Q28, Q29, when 100 characters of text keep the score and more lose it |
 | D9 | Equivalent rewrites rejected | the other Q probes, and Q28 and Q29 when even 100 characters lose the score |
@@ -212,7 +212,7 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 | D17 | Units ignored | M23 |
 | D18 | Score does not follow the answer | any wrong answer earning the reference answer's score, or a reply that should earn nothing scoring above it |
 | D19 | Close answers accepted | M5, M6, M7 |
-| D20 | Parts of a structured answer ignored | M8, M9, M10, M11, M12, M13, M17 |
+| D20 | Parts of a structured answer ignored | M8, M9, M10, M11, M12, M13, M17, M28 |
 | D21 | A different answer accepted | M16, M19, M20 |
 
 **Findings.** Each finding is one probe, with an example reply and a rate; `--full` prints them, and `report.md` always has them.
@@ -249,7 +249,7 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists all 78; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists all 82; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
 M (definite errors), Q (right answers rewritten), G (the row's other accepted answers; G1, the finding of a reference answer
 rejected in every format, is listed with them), P (malformed and extreme input, a reply run as code).

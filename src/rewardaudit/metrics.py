@@ -31,6 +31,7 @@ from rewardaudit.equiv import normalize
 from rewardaudit.goldtype import infer_gold_type, mcq_options
 from rewardaudit.labels import states_the_answer
 from rewardaudit.probes.base import Probe
+from rewardaudit.probes.structured import ALL
 from rewardaudit.types import MARKER_MODULE, SCORE_NOT_A_NUMBER, Kind, Label, Observation, Task, Verdict
 
 
@@ -69,6 +70,7 @@ class ProbeStats:
     variant_hits: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # [hits, scored]
     variant_examples: dict[str, Observation] = field(default_factory=dict)  # sweeps: the first hit of each variant
     variant_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))  # sweeps: time of each scored call
+    variant_score: dict[str, float] = field(default_factory=lambda: defaultdict(float))  # sweeps: sum of score / gold's score
     reached_import: int = 0  # calls whose text got as far as importing MARKER_MODULE
     import_example: Observation | None = None
 
@@ -286,7 +288,9 @@ def _non_solving_finding(probe: Probe, rate: float, lo: float, floor: float) -> 
 
 
 def _variant_size(name: str) -> float:
-    return float(re.search(r"\d+(?:\.\d+)?", name).group())
+    """The number in a sweep variant's name; M28's variant with every item wrong has none and comes last."""
+    m = re.search(r"\d+(?:\.\d+)?", name)
+    return float(m.group()) if m else math.inf
 
 
 def _sweep_severity(label: Label, variant: str, rate: float) -> str:
@@ -471,6 +475,7 @@ class Tally:
                     st.variant_examples.setdefault(o.variant, o)
                 if probe.sweep and o.verdict.ok:
                     st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
+                    st.variant_score[o.variant] += contract.signal(o.verdict) / contract.gold_score.get(tid, contract.full_score)
                 if _reached_import(o.verdict):
                     st.reached_import += 1
                     st.import_example = st.import_example or o
@@ -538,6 +543,16 @@ def _sweep(s: ProbeStats) -> tuple[str, int, int, str]:
     half = [v for v in order if s.variant_hits[v][1] and 2 * s.variant_hits[v][0] >= s.variant_hits[v][1]]
     variant = (half[0] if solving else half[-1]) if half else s.most_accepted_variant()[0]
     return variant, *s.variant_hits[variant], "accepted: " + ", ".join(shown)
+
+
+def _items_wrong(s: ProbeStats, note: str) -> tuple[str, str]:
+    """M28's severity and note. Its scale is how many items are wrong, so the reply with all of them wrong decides, as a
+    wrong answer would; where some scores fall between nothing and full, the note adds each k's mean share of the score."""
+    k, n = s.variant_hits.get(ALL, (0, 0))
+    if s.partial:
+        shares = [f"{v} {s.variant_score[v] / m:.0%}" for v in sorted(s.variant_hits, key=_variant_size) if (m := s.variant_hits[v][1])]
+        note += "; mean score share: " + ", ".join(shares)
+    return _wrong_severity(k / n if n else 0.0), note
 
 
 def _reached_import_finding(s: ProbeStats) -> dict[str, Any]:
@@ -655,7 +670,10 @@ def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
             category, sev = "right_rejected", _rejected_severity(s.probe.id, rate)
         else:
             category, sev = _non_solving_finding(s.probe, rate, lo, floor)
-        sev = _sweep_severity(s.probe.label, variant, rate) if s.probe.sweep else sev
+        if s.probe.id == "M28":
+            sev, note = _items_wrong(s, note)
+        elif s.probe.sweep:
+            sev = _sweep_severity(s.probe.label, variant, rate)
         if s.probe.id == "O13" and "</think>" not in contract.wrap("x"):  # no thinking block in its format: it reads the whole reply
             sev = "low"
         if s.probe.id == "G2":  # which of the dataset's accepted answers lost the score, as the dataset writes them

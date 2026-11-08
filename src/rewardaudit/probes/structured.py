@@ -1,4 +1,5 @@
-"""Probes for structured golds: lists (M8 M9 M10 Q10), JSON objects (M11 M12 M13) and grids (M17).
+"""Probes for structured golds: lists (M8 M9 M10 Q10), JSON objects (M11 M12 M13), grids (M17), and lists or grids with
+k items wrong (M28).
 
 Every variant is written in the gold's own spelling (separators, spacing, brackets), so the only thing
 that differs from the gold is the one change the probe makes. Whether element order matters is read from
@@ -275,22 +276,85 @@ def _other_cell(cell: str, alphabet: list[str]) -> str:
     return "0"
 
 
-def _cell(task, rng, ctx):
+def _grid(task: Task, ctx: ProbeContext) -> tuple[str, list | None, list]:
+    """A grid gold's text, its JSON value (None for a text grid) and its cells: (row, column) pairs or spans of the text."""
     if ctx.gtype(task) != "grid":
-        return []
+        return "", None, []
     raw = _raw(task, keep_punct=True)
     v = parse_json(raw)
     if isinstance(v, list):
-        r, c = rng.choice([(r, c) for r, row in enumerate(v) for c in range(len(row))])
-        x, grid = v[r][c], [list(row) for row in v]
-        alphabet = sorted({str(y) for row in v for y in row if type(y) is type(x)})
-        grid[r][c] = _changed(x) if x is None or isinstance(x, bool) else type(x)(_other_cell(str(x), alphabet))
-        return [("cell", dumps_like(grid, raw))]
-    spans = _cell_spans(raw)
-    if not spans:
+        return raw, v, [(r, c) for r, row in enumerate(v) for c in range(len(row))]
+    return raw, None, _cell_spans(raw)
+
+
+def _change_cells(raw: str, v: list | None, cells: list) -> str:
+    """The grid with each of `cells` changed to another value of its own kind, in the grid's spelling."""
+    if v is not None:
+        grid = [list(row) for row in v]
+        alphabets = {t: sorted({str(y) for row in v for y in row if type(y) is t}) for t in {type(y) for row in v for y in row}}
+        for r, c in cells:
+            x = v[r][c]
+            grid[r][c] = _changed(x) if x is None or isinstance(x, bool) else type(x)(_other_cell(str(x), alphabets[type(x)]))
+        return dumps_like(grid, raw)
+    alphabet, out = sorted({raw[s:e] for s, e in _cell_spans(raw)}), raw
+    for a, b in sorted(cells, reverse=True):  # from the end, so the spans before it stay where they are
+        out = out[:a] + _other_cell(raw[a:b], alphabet) + out[b:]
+    return out
+
+
+def _cell(task, rng, ctx):
+    raw, v, cells = _grid(task, ctx)
+    return [("cell", _change_cells(raw, v, [rng.choice(cells)]))] if cells else []
+
+
+# --- partly wrong: k items of a list or grid replaced ----------------------------------------------------------
+
+STEPS = 8  # variants per row at most
+NEW = 8  # new elements for a list at most: telling one from each element can take milliseconds where they are strings
+ALL = "all"  # the variant with every item replaced
+
+
+def _items(task: Task, ctx: ProbeContext) -> int:
+    seq = _seq(task, ctx)
+    return len(seq.tokens) if seq else len(_grid(task, ctx)[2])
+
+
+def _steps(n: int) -> list[int]:
+    """How many items to replace: each number up to n when there are few, else close together at both ends."""
+    return list(range(1, n + 1)) if n <= STEPS else sorted({1, 2, 3, n // 2, n - 2, n - 1, n})
+
+
+def _new_elements(seq: Seq, task: Task, ctx: ProbeContext, k: int) -> list[str]:
+    """Up to k elements that are not in the list and differ from each other, by `_new_element` on the list so far."""
+    out: list[str] = []
+    while len(out) < k and (new := _new_element(seq, task, ctx)) is not None:
+        out.append(new)
+        seq = Seq(seq.open, [*seq.tokens, new], [*seq.values, json.loads(new) if seq.is_json else new], seq.sep, seq.close,
+                  seq.is_json)
+    return out
+
+
+def _partly_wrong(task, rng, ctx):
+    """The same random order of items for every k, so each variant holds the wrong items of the one before. A list takes
+    new elements as M10 does, used in turn when there are fewer than the items replaced; a grid each cell's other value, as
+    M17 does."""
+    seq = _seq(task, ctx)
+    n = _items(task, ctx)
+    steps = [(f"k{k}" if k < n else ALL, k) for k in _steps(n)]
+    order = rng.sample(range(n), n)
+    if seq is None:
+        raw, v, cells = _grid(task, ctx)
+        return [(name, _change_cells(raw, v, [cells[i] for i in order[:k]])) for name, k in steps]
+    news = _new_elements(seq, task, ctx, min(n, NEW))
+    if not news:
         return []
-    a, b = rng.choice(spans)
-    return [("cell", raw[:a] + _other_cell(raw[a:b], sorted({raw[s:e] for s, e in spans})) + raw[b:])]
+    out = []
+    for name, k in steps:
+        toks = list(seq.tokens)
+        for j, i in enumerate(order[:k]):
+            toks[i] = news[j % len(news)]
+        out.append((name, seq.write(toks)))
+    return out
 
 
 Maker = Callable[[Task, random.Random, ProbeContext], list[tuple[str, str | None]]]
@@ -358,6 +422,13 @@ PROBES_M = [
           applies=lambda t, c: c.gtype(t) == "grid",
           description="Sends the reference grid with exactly one cell changed to another value the grid uses; a "
                       "sound checker gives zero."),
+    Probe("M28", "M", "k items of a list or grid wrong", "natural", "zero", NS, _not_gold(_partly_wrong),
+          applies=lambda t, c: _items(t, c) >= 3, headline=False, sweep=True,
+          description="Where the reference answer is a list or a grid of 3 items or more, sends it with k of them replaced "
+                      "by wrong ones, as M10 and M17 make them, from one item up to all (at most 8 steps, closer together "
+                      "at both ends). Its finding gives the acceptance rate of each k, and the mean share of the score "
+                      "where scores fall between nothing and full; its severity is that of the reply with every item "
+                      "wrong. A sound checker gives zero."),
 ]
 
 PROBES_Q = [

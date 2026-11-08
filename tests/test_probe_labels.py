@@ -44,6 +44,8 @@ TASKS = [
     Task("money", "A pen costs 3 dollars. How many dollars do 4 pens cost?", "12"),
     Task("percent", "What percentage of 200 is 50?", "25%"),
     Task("date", "When did the library open?", "2020-03-05"),
+    Task("inequality", "Solve 2x + 1 > 7 for x.", "x > 3"),
+    Task("near_zero", "What is 4 divided by 5000?", "0.0008"),
 ]
 # Their replies are right by construction, in spellings the tool's own comparison does not read.
 SPELLINGS = ("Q23", "Q24", "Q25", "Q26", "Q27", "Q30")
@@ -83,7 +85,7 @@ def test_not_solving_variants_do_not_contain_gold_alone(primary):
         if probe.label != Label.NOT_SOLVING or probe.family == "O":
             continue
         gt = ctx.gtype(task)
-        if probe.id == "M23":  # the tool's own comparison reads '5 km' and '5 m' as the number 5
+        if probe.id in ("M23", "M26"):  # the tool's own comparison reads '5 km' and '5 m' as 5, 'x > 3' and 'x < 3' as 3
             assert strip_wrappers(comp) != task.answer
         elif probe.family == "M":
             inner = strip_wrappers(comp)
@@ -160,14 +162,16 @@ def test_the_probes():
         "N": ["N1", "N2", "N3", "N5", "N9", "N10"],
         "E": ["E1", "E5", "E2", "E3", "E6", "E9", "E8"],
         "L": ["L1", "L2", "L3", "L4", "L5", "L6"],
-        "O": ["O3", "O4", "O5", "O6", "O7", "O11", "O10", "O12", "O13", "O14", "O15"],
-        "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M25", "M8", "M9", "M10", "M11", "M12", "M13", "M17"],
+        "O": ["O3", "O4", "O5", "O6", "O7", "O11", "O10", "O12", "O13", "O14", "O15", "O16"],
+        "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M25", "M26", "M27",
+              "M8", "M9", "M10", "M11", "M12", "M13", "M17", "M28"],
         "Q": ["Q1", "Q3", "Q5", "Q6", "Q22", "Q21", "Q8", "Q9", "Q2", "Q23", "Q24", "Q25", "Q26", "Q27", "Q28", "Q29", "Q30", "Q31", "Q10"],
         "G": ["G2"],
         "P": ["P1", "P2", "P15", "P5", "P16", "P17"],
     }
     assert {p.expect for p in all_probes()} == {"zero", "full"} and {p.label for p in all_probes()} == {Label.NOT_SOLVING, Label.SOLVING}
-    assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "P16", "P17", "M24", "Q23", "Q28", "Q29", "G2"}
+    assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "P16", "P17", "M24", "M28", "Q23", "Q28", "Q29",
+                                                              "G2"}
 
 
 @pytest.mark.parametrize("primary", PRIMARIES)
