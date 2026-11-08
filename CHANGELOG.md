@@ -14,9 +14,10 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   out when nothing could be taken out. These calls count in no rate or finding; the calls in the top line include them.
   The progress bar shows them as a stage of its own, `confirming defects`.
 - `--answer-field`, and `audit(answer_field=True)`, state that the checker takes the reply to be its answer field, as a script
-  scoring a file of predictions does. A right answer with text around it then stays out of Rejects right answers and its
-  findings stay low, as when this is inferred from Q5 and Q6; without the option it is still inferred. The note at the top of
-  the report then says it was stated.
+  scoring a file of predictions does. Replies then write the answer bare wherever the checker accepts that as well as any
+  other format, where a checker that also takes `$\boxed{...}$` would otherwise get that. A right answer with text around it
+  stays out of Rejects right answers and its findings stay low, as when this is inferred from Q5 and Q6; without the option
+  it is still inferred. The note at the top of the report then says it was stated.
 - A line after the dataset checks, in the terminal and in `report.md`, names the third-party packages imported as the checker
   loaded and scored, with their versions, the first 8 by name, or `none`, such as
   `Checker imports: antlr4-python3-runtime 4.11.0, mpmath 1.3.0, sympy 1.14.0`. Packages imported to read the dataset, such

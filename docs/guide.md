@@ -93,9 +93,10 @@ A format that is a mark and then the answer, such as `RESULT>> {answer}`, is mos
 
 **A checker that takes only the answer.** Some checkers are given an answer already extracted from the reply, not the reply
 itself: the official scripts of DROP, SQuAD, TAT-QA and WikiTableQuestions score a file of predictions, one answer each. Add
-`--answer-field` for such a checker (`answer_field=True` from Python): a right answer with text around it then stays out of
-Rejects right answers, and its findings stay low. Without it, rewardaudit infers this from Q5 and Q6, when the bare answer
-passes and text before or after it mostly loses the score; where it infers right, the result is the same.
+`--answer-field` for such a checker (`answer_field=True` from Python): replies then write the answer bare wherever the
+checker accepts that as well as any other format, and a right answer with text around it stays out of Rejects right
+answers, its findings low. Without it, rewardaudit infers this from Q5 and Q6, when the bare answer passes and text before
+or after it mostly loses the score; where it infers right, the result is the same.
 
 ### Several accepted answers
 

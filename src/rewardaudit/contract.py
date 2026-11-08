@@ -370,17 +370,20 @@ def ends_open_think(tasks: list[Task]) -> bool:
 
 
 def _choose_primary(accepted: list[str], rates: dict[str, float], best_rate: float, tasks: list[Task],
-                    derived: Iterable[str] = ()) -> str:
+                    derived: Iterable[str] = (), answer_field: bool = False) -> str:
     """The wrapper probes will use. A policy under training writes reasoning and then a marked answer, so
     prefer the format the prompt asks for (a derived format first: the parser's answer tag, a tag or answer
     line the prompt names), then any marked format whose reasoning-prefixed variant is also accepted, then the
-    plain answer. Prompts that open <think> themselves get the open-think wrappers. A format the user gave comes first."""
+    plain answer. Prompts that open <think> themselves get the open-think wrappers. A format the user gave comes first;
+    a checker said to take the reply as its answer field gets the plain answer next, where it accepts that."""
     if not accepted:
         return "bare"
     tied = [w for w in accepted if rates[w] >= best_rate - 1e-9]
     for w in derived:
         if "{answer}" in w and w in tied:
             return w
+    if answer_field and "bare" in tied:
+        return "bare"
     prompts = " ".join(t.prompt[-600:] for t in tasks[:20]).lower()
     if ends_open_think(tasks):
         order = OPEN_THINK[::-1] if ("\\boxed" in prompts or "boxed{" in prompts) else OPEN_THINK
@@ -594,11 +597,13 @@ def infer_contract(
     formats: Iterable[str] = (),
     progress: Callable[[int, int], None] | None = None,
     two_stage: bool = True,
+    answer_field: bool = False,
 ) -> Contract:
     """Two stages unless `wrappers` is given or `two_stage` is off: the 8 common wrappers, the `formats` the user gave and
     the derived ones (`derive_wrappers`: from the runner's meta and the prompts) first, plus the families of the accepted
     ones; every wrapper only when those settle nothing. On a composite rubric the wrong answers and the signal keys come
-    before that decision, since a continuous term in the total leaves most golds below its maximum in any format."""
+    before that decision, since a continuous term in the total leaves most golds below its maximum in any format.
+    `answer_field`: the user says the checker takes the reply to be its answer field (see `_choose_primary`)."""
     derived = {} if wrappers else {**dict.fromkeys(formats, "the format given"),
                                    **derive_wrappers(tasks, getattr(runner, "meta", None))}
     pool = wrappers or WRAPPERS + [(wid, wrapper_fn(wid)) for wid in derived]
@@ -655,7 +660,7 @@ def infer_contract(
             c.wrapper_rates[wid] = (sum(is_full(scores[wid][tid], c.task_full[tid]) for tid in passing) / len(passing)) if passing else 0.0
         best_rate = max(c.wrapper_rates.values()) if c.wrapper_rates else 0.0
         c.accepted = [wid for wid in ran if best_rate > 0 and c.wrapper_rates[wid] >= max(0.5, 0.8 * best_rate)]
-        c.primary = _choose_primary(c.accepted, c.wrapper_rates, best_rate, tasks, derived)
+        c.primary = _choose_primary(c.accepted, c.wrapper_rates, best_rate, tasks, derived, answer_field)
         c.gold_total = {t.id: _gold_total(c, by_wrapper, t.id) for t in tasks}
         return c
 

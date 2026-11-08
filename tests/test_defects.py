@@ -288,6 +288,20 @@ def test_answer_field_where_it_is_inferred_changes_only_the_note():
     assert "not inferred" not in render_markdown(inferred) and "not inferred" in render_markdown(stated)
 
 
+def test_a_checker_of_the_answer_field_gets_the_plain_answer():
+    def field(completion, answer):  # an answer field, which may hold LaTeX, as a grader that renders it to text reads it
+        text = completion.strip().strip("$")
+        if text.startswith("\\boxed{") and text.endswith("}"):
+            text = text[len("\\boxed{"):-1]
+        return float(text == answer)
+
+    inferred, stated = (audit(field, ROWS, workers=1, probes=["Q"], answer_field=a) for a in (False, True))
+    assert {"bare", "boxed_dollar"} <= set(stated.contract.accepted)
+    assert inferred.contract.primary == "boxed_dollar" and stated.contract.primary == "bare"
+    q3 = next(f for f in stated.findings if f["probe_id"] == "Q3")
+    assert not q3["example"]["completion"].startswith("$")
+
+
 def test_only_a_high_defect_fails_the_audit():
     def rejects_a_period(completion, answer):
         return float(completion.strip().split()[-1] == answer)  # reads the last word: no period, but no high defect either

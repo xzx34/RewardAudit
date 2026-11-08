@@ -234,7 +234,8 @@ def run_audit(
 
         answerable = [t for t in tasks if t.answer.strip()] or tasks  # an empty gold is a dataset issue, not a rejection
         t_contract = time.perf_counter()
-        contract = infer_contract(runner, answerable, formats=config.formats, progress=_stage(progress, "reference answers", (len(COMMON_WRAPPERS) + 1) * len(answerable)))
+        contract = infer_contract(runner, answerable, formats=config.formats, answer_field=config.answer_field,
+                                  progress=_stage(progress, "reference answers", (len(COMMON_WRAPPERS) + 1) * len(answerable)))
         s_per_call = (time.perf_counter() - t_contract) / max(1, contract.calls)
         # before the checks that may stop the audit, so two checkers can still be compared on the reference answers. One is
         # accepted where it earned the row's full score, as an accepted format is counted: not against the row's best, which
