@@ -293,6 +293,12 @@ def test_rows_with_an_empty_reference_answer_are_left_out_and_counted(tmp_path):
     (tmp_path / "squad.jsonl").write_text("\n".join(json.dumps(r) for r in squad), encoding="utf-8")
     tasks, left_out = load_tasks(str(tmp_path / "squad.jsonl"), answer_col="answers.text.0")  # an empty list: no item 0
     assert [t.answer for t in tasks] == ["Paris"] and left_out == 1
+    pairs = [{"question": "q0", "answers": [["yes", ["c1"]]]}, {"question": "q1", "answers": []}]  # [answer, conditions]
+    (tmp_path / "pairs.jsonl").write_text("\n".join(json.dumps(r) for r in pairs), encoding="utf-8")
+    tasks, left_out = load_tasks(str(tmp_path / "pairs.jsonl"), answer_col="answers.0.0")  # nothing below a missing item
+    assert [t.answer for t in tasks] == ["yes"] and left_out == 1
+    with pytest.raises(AuditError, match="The dataset has no column 'answers.0.text'"):  # a column absent is still absent
+        load_tasks(str(tmp_path / "pairs.jsonl"), answer_col="answers.0.text")
 
 
 def test_a_dataset_whose_answers_are_all_empty_says_so(tmp_path):

@@ -26,13 +26,16 @@ MISSING = object()
 
 def get_path(row: dict[str, Any], key: str) -> Any:
     """row[key], or the nested value of a dotted key ('reward_model.ground_truth', 'answers.text.0'); MISSING if absent.
-    An item past the end of a list is None: a row whose list of answers is empty has no answer, and that is no missing column."""
+    An item past the end of a list is None, and so is anything below it ('answers.0.0' of an empty list): a row whose list of
+    answers is empty has no answer, and that is no missing column."""
     if key in row:
         return row[key]
     cur: Any = row
     for part in key.split("."):
         if isinstance(cur, list) and part.isdigit():
-            cur = cur[int(part)] if int(part) < len(cur) else None
+            if int(part) >= len(cur):
+                return None
+            cur = cur[int(part)]
         elif isinstance(cur, dict) and part in cur:
             cur = cur[part]
         else:

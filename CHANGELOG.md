@@ -99,6 +99,9 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   regard to case.
 - Q8 writes the trailing zero of a percentage on its number: `21.460%` for `21.46%`. Before, it was put after the percent
   sign, `21.46%0`, which is not the same number, and a checker that rejected it was counted as rejecting a right answer.
+- A row whose list of answers is empty is left out under a column name that reaches below an item of the list, such as
+  `answers.0.0` for answers kept as `[answer, conditions]` pairs, as it already was under `answers.text.0`. Before, the
+  audit stopped, saying the row had no such column.
 
 ## 0.2.0 - 2026-11-07
 
