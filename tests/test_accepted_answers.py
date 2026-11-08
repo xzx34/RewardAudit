@@ -130,7 +130,8 @@ def test_the_note_names_the_answer_without_the_format():
 def test_without_the_list_the_checker_gets_one_answer_and_g2_sends_nothing():
     r = audit(lambda completion, answer: float(completion.strip() == answer), ROWS, n="all", probes=["G"], workers=1,
               answer_col="answers.text.0")
-    assert "G2" not in {p["id"] for p in r.metrics["probes"]} and not r.findings
+    assert "G2" not in {p["id"] for p in r.metrics["probes"]}
+    assert [f["probe_id"] for f in r.findings] == ["G3"]  # that answer with a period is another string to this checker
 
 
 @pytest.mark.parametrize("primary, reply, answer", [

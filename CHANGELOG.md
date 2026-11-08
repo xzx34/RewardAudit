@@ -72,6 +72,18 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   the rates of the summary for both sides, worked out from the calls alone and so not the audit's own. Where the two audits
   wrote their replies in different formats, it says on how many calls and the examples show both replies. Two files with no
   `task_id` in common exit with 2.
+- G3, under a new defect D22, Reference formatting changes the verdict: the reply is the reference answer as it passed, in
+  the accepted format, while the checker gets the reference answer written another way, one way per call and each only where
+  it applies: spaces at its operators and commas taken out or put in (`x + 1` and `x+1`), `\frac` and `\dfrac` swapped, a
+  period at the end, words in `\text{}` under a `\boxed{}` format, a percentage as a decimal and back, the unit taken off or
+  the one the question names added, thousands separators added to a quantity or taken out. A checker that loses the score
+  there scores the rows of a dataset that does not write its answers uniformly by how they are written. Like G2 it is a
+  finding under Rejects right answers, outside its rate, medium at most, from one in ten; its note gives the rate of each
+  writing, such as `rejected: period 100%, commas 0%`. It is sent where the checker gets the answer itself or a
+  `reference_template` with `{answer}` in it: not with `--reference-col` or `ground_truth_json`, not in a verifiers
+  environment, and not on a reference answer that is JSON. In `report.json` the example of a G3 finding has a new key,
+  `reference`, the writing the checker got; `report.md` shows it next to the row's own, and `repro.py` scores the reply
+  against it. The calls file has no such key. 83 probes in all.
 
 ## 0.2.0 - 2026-11-07
 

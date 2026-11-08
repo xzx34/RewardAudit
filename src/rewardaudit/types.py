@@ -85,6 +85,7 @@ class Observation:
     label: Label
     expect: str  # zero | full
     tier: str  # natural | amplified | contrived
+    reference: str | None = None  # the reference answer the checker got, where the probe wrote the row's another way (G3)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -97,4 +98,4 @@ class Observation:
             "label": self.label.value,
             "expect": self.expect,
             "tier": self.tier,
-        }
+        } | ({} if self.reference is None else {"reference": self.reference})

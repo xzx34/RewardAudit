@@ -678,6 +678,10 @@ def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
             sev = "low"
         if s.probe.id == "G2":  # which of the dataset's accepted answers lost the score, as the dataset writes them
             note = "rejected: " + ", ".join(repr(contract.answer_of(o.completion, o.task_id)) for o in s.examples)
+        if s.probe.id == "G3":  # how often each writing of the reference answer lost the reply its score, most often first
+            shares = sorted(((hits / scored, v) for v, (hits, scored) in s.variant_hits.items() if scored),
+                            key=lambda x: (-x[0], x[1]))
+            note = "rejected: " + ", ".join(f"{v} {share:.0%}" for share, v in shares)
         findings.append(_require_evidence({
             "probe_id": s.probe.id, "name": s.probe.name, "family": s.probe.family, "tier": s.probe.tier,
             "category": category, "severity": sev, "rate": rate, "ci": [lo, hi], "n": n,

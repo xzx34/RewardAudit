@@ -433,9 +433,10 @@ def _md_finding(f: dict[str, Any], result: AuditResult) -> list[str]:
     ex = f.get("example")
     if ex:
         gold = next((t.answer for t in result.tasks if t.id == ex["task_id"]), "")
+        written = f" written as {_code(_reply(ex['reference'], 60))}" if "reference" in ex else ""  # what G3's checker got
         body = ex["completion"][:1500].replace("\x00", "␀") if ex["completion"].strip() else _reply(ex["completion"])
         fence = "`````" if "```" in body else "```"
-        L += [f"Example (row {_code(ex['task_id'])}, reference answer {_code(_reply(gold, 60))}, "
+        L += [f"Example (row {_code(ex['task_id'])}, reference answer {_code(_reply(gold, 60))}{written}, "
               f"{_example_scores(result.contract, ex)}):", "", fence, body, fence, ""]
     return L
 
@@ -552,9 +553,11 @@ def write_outputs(result: AuditResult, out_dir: str | Path) -> Path:
     if _from_python(result):
         return report
     tasks = {t.id: t for t in result.tasks}
-    cases = [{"probe_id": f["probe_id"], "expect": f["example"]["expect"], "task": tasks[f["example"]["task_id"]].to_dict(),
-              "completion": f["example"]["completion"]}
-             for f in result.findings if f.get("example") and f["example"]["task_id"] in tasks]
+    # G3's reply was scored against the reference answer written another way, which its example holds
+    cases = [{"probe_id": f["probe_id"], "expect": ex["expect"],
+              "task": tasks[ex["task_id"]].to_dict() | ({"answer": ex["reference"]} if "reference" in ex else {}),
+              "completion": ex["completion"]}
+             for f in result.findings if (ex := f.get("example")) and ex["task_id"] in tasks]
     spec = dict(result.spec)
     target, sep, func = str(spec.get("path") or "").partition(":")
     if target and Path(target).exists():  # so that repro.py runs from any directory
@@ -611,20 +614,21 @@ def sample_context() -> ProbeContext:
                         task_wrappers={i: ["boxed"] for i in ids})
     ctx = ProbeContext(contract=contract, gold_type="int", tasks=SAMPLE_TASKS,
                        gold_types={t.id: infer_gold_type(t.answer) for t in SAMPLE_TASKS},
-                       aliases={"words": ["Victor-Marie Hugo", "Hugo"]})
+                       aliases={"words": ["Victor-Marie Hugo", "Hugo"]}, reference_is_answer=True)
     ctx._numeric_dataset = True  # the samples mix answer types on purpose; Q8 still shows its examples
     return ctx
 
 
-def probe_examples(probe: Probe, k: int = 2) -> list[tuple[Task, str]]:
-    """Up to k (sample task, reply), of different variants of the probe."""
+def probe_examples(probe: Probe, k: int = 2) -> list[tuple[Task, str, str | None]]:
+    """Up to k (sample task, reply, the reference answer written another way where the checker gets that), of different
+    variants of the probe."""
     ctx = sample_context()
-    out: dict[str, tuple[Task, str]] = {}
+    out: dict[str, tuple[Task, str, str | None]] = {}
     for task in SAMPLE_TASKS:
         ctx.task = task
         try:
-            for variant, reply in probe.generate(task, random.Random(f"0:{probe.id}:{task.id}"), ctx):
-                out.setdefault(variant, (task, reply))
+            for variant, reply, *reference in probe.generate(task, random.Random(f"0:{probe.id}:{task.id}"), ctx):
+                out.setdefault(variant, (task, reply, reference[0] if reference else None))
         except Exception:  # noqa: BLE001 - a probe that cannot handle a sample task just shows no example from it
             continue
     return list(out.values())[:k]
@@ -676,6 +680,8 @@ def render_explain(key: str, console: Console | None = None) -> bool:
         _say(console, f"  Counts toward: {_row_label(obj)}\n")
         _say(console, "  Examples on built-in sample tasks, with \\boxed{} as the accepted format" if examples
              else "  No example: it sends nothing on the built-in sample tasks.", "bold" if examples else "dim")
-        for task, reply in examples:
-            console.print(Padding(Text(f"reference answer {_reply(task.answer, 40)}: {_reply(reply, 200)}"), (0, 0, 0, 4), expand=False))
+        for task, reply, reference in examples:
+            written = "" if reference is None else f" written as {_reply(reference, 40)}"
+            console.print(Padding(Text(f"reference answer {_reply(task.answer, 40)}{written}: {_reply(reply, 200)}"), (0, 0, 0, 4),
+                                  expand=False))
     return True

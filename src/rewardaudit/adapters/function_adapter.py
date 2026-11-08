@@ -41,6 +41,7 @@ import importlib
 import importlib.util
 import inspect
 import json
+import string
 import sys
 import typing
 from collections.abc import Callable
@@ -207,6 +208,16 @@ def reference_aliases(spec: dict[str, Any], task: Task) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         return []
     return list(dict.fromkeys(a for v in value if (a := v.strip()) and a != task.answer.strip()))
+
+
+def reference_is_answer(spec: dict[str, Any]) -> bool:
+    """The checker gets the reference answer itself, or a `reference_template` around it, as `reference` builds it, so
+    writing the answer another way (G3) changes what it gets: no `reference_col`, which it gets instead, and no
+    `ground_truth_json`, which parses it. A row's structured ground truth is the answer as JSON, which G3 leaves alone. An
+    environment hands its rewards the answer of its own rows."""
+    template = spec.get("reference_template")
+    return (spec.get("kind", "function") != "verifiers" and not spec.get("reference_col") and not spec.get("ground_truth_json")
+            and (not template or "answer" in {name for _, name, _, _ in string.Formatter().parse(template)}))
 
 
 class FunctionAdapter(Adapter):

@@ -59,6 +59,9 @@ DEFECTS = (
            "A list, JSON object or grid with a definite error compares equal to the reference answer.",
            ("M8", "M9", "M10", "M11", "M12", "M13", "M17", "M28")),
     Defect("D21", "A different answer accepted", "An answer that is plainly another one earns full score.", ("M16", "M19", "M20")),
+    Defect("D22", "Reference formatting changes the verdict",
+           "A right reply is rejected when the reference answer is written another way, so on a dataset whose reference "
+           "answers are not written uniformly the score follows the writing.", ("G3",)),
 )
 
 BY_PROBE = {p: d.id for d in DEFECTS for p in d.probes}

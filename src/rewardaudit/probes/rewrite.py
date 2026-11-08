@@ -136,11 +136,16 @@ def brace_depth(s: str) -> int:
     return best
 
 
+def frac_swap(g: str) -> str:
+    """\\frac written as \\dfrac, or where there is none, \\dfrac as \\frac (the same in an answer)."""
+    return g.replace("\\frac", "\\dfrac") if "\\frac" in g else g.replace("\\dfrac", "\\frac")
+
+
 def q9_latex_forms(task, rng, ctx):
     g = ctx.gold(task)
     out = []
     if "\\frac" in g:
-        out.append(("dfrac", g.replace("\\frac", "\\dfrac")))
+        out.append(("dfrac", frac_swap(g)))
     short = tex_shorthand(g)
     if short != g:
         out.append(("shorthand", short))
@@ -213,22 +218,34 @@ _UNIT_WORDS = ("dollars|cents|meters|metres|kilometers|kilometres|miles|feet|inc
 _ASKS_UNIT = re.compile(rf"\b(?:in|how many|number of)\s+({_UNIT_WORDS})\b", re.I)
 
 
-def q24_unit(task, rng, ctx):
-    g = ctx.gold(task)
+def unit_form(task, g: str) -> tuple[str, str] | None:
+    """(variant, answer): `g` without its unit, or a plain number with the unit the question names ('how many dollars')."""
     if m := UNIT_RE.fullmatch(g):
-        return [("without_unit", ctx.wrap(m["number"]))]
+        return "without_unit", m["number"]
     asked = _ASKS_UNIT.findall(question_part(task.prompt))
-    return [("with_unit", ctx.wrap(f"{g} {asked[-1].lower()}"))] if asked and plain_number(g) and _prose_allowed(task, ctx) else []
+    return ("with_unit", f"{g} {asked[-1].lower()}") if asked and plain_number(g) else None
+
+
+def q24_unit(task, rng, ctx):
+    form = unit_form(task, ctx.gold(task))
+    if not form or (form[0] == "with_unit" and not _prose_allowed(task, ctx)):  # a word after the answer is text around it
+        return []
+    return [(form[0], ctx.wrap(form[1]))]
+
+
+def percent_form(task, g: str) -> tuple[str, str] | None:
+    """(variant, answer): 25% as 0.25, and a number with a percent sign where the question asks for a percentage. A plain
+    number below 1 under a question in percent could mean either, so it stays out."""
+    if m := re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*\\?%", g):
+        return "as_decimal", fmt_num(float(m[1]) / 100)
+    if plain_number(g) and abs(float(g)) >= 1 and asks_percent(task.prompt):
+        return "percent_sign", f"{g}%"
+    return None
 
 
 def q25_percent(task, rng, ctx):
-    """A plain number below 1 under a question in percent could mean either, so it stays out."""
-    g = ctx.gold(task)
-    if m := re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*\\?%", g):
-        return [("as_decimal", ctx.wrap(fmt_num(float(m[1]) / 100)))]
-    if plain_number(g) and abs(float(g)) >= 1 and asks_percent(task.prompt):
-        return [("percent_sign", ctx.wrap(f"{g}%"))]
-    return []
+    form = percent_form(task, ctx.gold(task))
+    return [(form[0], ctx.wrap(form[1]))] if form else []
 
 
 _MONTHS = "January February March April May June July August September October November December".split()
@@ -314,11 +331,16 @@ def q30_option_text(task, rng, ctx):
     return out if re.search(r"\bletter\b|\(X\)", task.prompt, re.I) else [("text", ctx.wrap(texts[letter])), *out]
 
 
+def text_markup(g: str, ctx) -> str | None:
+    """`g` in \\text{}, as a model writes words inside \\boxed{}: words, and not 'p - q'. None for other answers, and where
+    the accepted format has no box."""
+    words = re.fullmatch(r"[^\W\d_ ,'-]+(?:[ ,'-]+[^\W\d_ ,'-]+)*", g) and re.search(rf"[^\W\d_]{{{MIN_WORD},}}", g)
+    return f"\\text{{{g}}}" if "\\boxed{" in ctx.wrap("x") and words else None
+
+
 def q31_latex_markup(task, rng, ctx):
     g = ctx.gold(task)
-    # what a model writes in \text{} inside a box: words, and not 'p - q'
-    words = re.fullmatch(r"[^\W\d_ ,'-]+(?:[ ,'-]+[^\W\d_ ,'-]+)*", g) and re.search(rf"[^\W\d_]{{{MIN_WORD},}}", g)
-    out = [("text", ctx.wrap(f"\\text{{{g}}}"))] if "\\boxed{" in ctx.wrap("x") and words else []
+    out = [("text", ctx.wrap(t))] if (t := text_markup(g, ctx)) else []
     if plain_number(g) and re.search(r"\b(?:angle|degrees?)\b", question_part(task.prompt), re.I):
         out.append(("degrees", ctx.wrap(f"{g}^\\circ")))
     return out

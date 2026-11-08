@@ -59,7 +59,8 @@ def _ctx(primary="boxed"):
                         self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
                         task_wrappers={i: [primary] for i in ids})
     ctx = ProbeContext(contract=contract, gold_type="int", tasks=TASKS,
-                       gold_types={t.id: infer_gold_type(t.answer) for t in TASKS}, aliases={"t8": ["NYC", "New York City"]})
+                       gold_types={t.id: infer_gold_type(t.answer) for t in TASKS}, aliases={"t8": ["NYC", "New York City"]},
+                       reference_is_answer=True)
     ctx._numeric_dataset = True  # the fixture mixes gold types on purpose; Q8's labels stay covered
     return ctx
 
@@ -69,7 +70,7 @@ def _variants(primary="boxed", families=None):
     for probe in all_probes(families):
         for task in TASKS:
             ctx.task = task
-            for name, comp in probe.generate(task, random.Random(0), ctx):
+            for name, comp, *_ in probe.generate(task, random.Random(0), ctx):  # G3's own reference answer left out
                 yield ctx, probe, task, name, comp
 
 
@@ -166,12 +167,12 @@ def test_the_probes():
         "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M25", "M26", "M27",
               "M8", "M9", "M10", "M11", "M12", "M13", "M17", "M28"],
         "Q": ["Q1", "Q3", "Q5", "Q6", "Q22", "Q21", "Q8", "Q9", "Q2", "Q23", "Q24", "Q25", "Q26", "Q27", "Q28", "Q29", "Q30", "Q31", "Q10"],
-        "G": ["G2"],
+        "G": ["G2", "G3"],
         "P": ["P1", "P2", "P15", "P5", "P16", "P17"],
     }
     assert {p.expect for p in all_probes()} == {"zero", "full"} and {p.label for p in all_probes()} == {Label.NOT_SOLVING, Label.SOLVING}
     assert {p.id for p in all_probes() if not p.headline} == {"P1", "P2", "P15", "P5", "P16", "P17", "M24", "M28", "Q23", "Q28", "Q29",
-                                                              "G2"}
+                                                              "G2", "G3"}
 
 
 @pytest.mark.parametrize("primary", PRIMARIES)

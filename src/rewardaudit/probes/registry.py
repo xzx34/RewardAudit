@@ -13,7 +13,7 @@ FAMILIES: dict[str, tuple[str, list[Probe]]] = {
     "O": ("a right and a wrong answer in one reply", order.PROBES),
     "M": ("the reference answer with a definite error", mutate.PROBES + structured.PROBES_M),
     "Q": ("the reference answer rewritten but still correct", rewrite.PROBES + structured.PROBES_Q),
-    "G": ("other accepted answers of the row, sent one at a time", reference.PROBES),
+    "G": ("the row's other accepted answers, and its reference answer written another way", reference.PROBES),
     "P": ("malformed or extreme input that must not make the checker fail or hang", parser.PROBES),
 }
 

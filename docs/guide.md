@@ -116,6 +116,13 @@ Some checkers want the reference in a particular form. Wrap them as above, for e
 If your dataset holds a worked solution, extract the final answer into a column first: rewardaudit rewrites the reference
 answer to build its replies, so it has to be the answer itself.
 
+G3 turns this around: it sends the reference answer as it passed, while the checker gets the reference answer written
+another way, one way per call, such as `1,200` for `1200`, `\dfrac` for `\frac` or a period at the end. A checker that then
+loses the score gives a dataset's rows different scores for how their answers are written (D22). G3 is sent only where the
+checker gets the answer itself, or a `reference_template` with `{answer}` in it, which then holds the other writing: not
+with `--reference-col` or `ground_truth_json`, nor in a verifiers environment, nor on a reference answer that is JSON. The
+example of its finding has `reference`, the writing the checker got; `report.md` shows it and `repro.py` scores against it.
+
 ## Choose how many rows
 
 `--n` is yours to choose. rewardaudit always reads the whole dataset and draws that many rows at random, without replacement,
@@ -215,6 +222,7 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 | D19 | Close answers accepted | M5, M6, M7 |
 | D20 | Parts of a structured answer ignored | M8, M9, M10, M11, M12, M13, M17, M28 |
 | D21 | A different answer accepted | M16, M19, M20 |
+| D22 | Reference formatting changes the verdict | G3 |
 
 **Findings.** Each finding is one probe, with an example reply and a rate; `--full` prints them, and `report.md` always has them.
 Where a probe sends distinct kinds of reply, the rate is that of the kind that went that way most often. Severity is a rule of
@@ -250,10 +258,11 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists all 82; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists all 83; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
-M (definite errors), Q (right answers rewritten), G (the row's other accepted answers; G1, the finding of a reference answer
-rejected in every format, is listed with them), P (malformed and extreme input, a reply run as code).
+M (definite errors), Q (right answers rewritten), G (the row's other accepted answers, and its reference answer written another
+way; G1, the finding of a reference answer rejected in every format, is listed with them), P (malformed and extreme input, a
+reply run as code).
 
 **Dataset checks.** Rows whose reference answer is empty (blank, or an empty list, as SQuAD 2.0 keeps its unanswerable
 questions) are left out before the draw, and a line says how many; the other row counts in the report are of the rows left.

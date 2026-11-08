@@ -8,12 +8,12 @@ import statistics
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import IO, Any
 
 from rewardaudit import __version__
-from rewardaudit.adapters.function_adapter import reference_aliases
+from rewardaudit.adapters.function_adapter import reference_aliases, reference_is_answer
 from rewardaudit.confirm import MAX_CUT_CALLS, RESENDS, confirm
 from rewardaudit.contract import COMMON_WRAPPERS, Contract, infer_contract, is_full
 from rewardaudit.errors import AuditError
@@ -153,14 +153,16 @@ def _gold_controls(runner: RunnerPool, observations: list[Observation], tasks_by
 def _variants(probe: Probe, tasks: list[Task], ctx: ProbeContext, seed: int,
               deadline: float | None = None) -> list[tuple[Task, str, str]] | None:
     """None when the deadline (a time.perf_counter() value) passes before every task has its replies: building them can
-    take longer than scoring them, as where telling a wrong answer from a long LaTeX reference takes seconds."""
+    take longer than scoring them, as where telling a wrong answer from a long LaTeX reference takes seconds. A variant
+    with a reference answer of its own is sent with a copy of the task holding it, under the same id."""
     out: list[tuple[Task, str, str]] = []
     for task in tasks:
         if deadline is not None and time.perf_counter() > deadline:
             return None
         ctx.task = task
         rng = random.Random(f"{seed}:{probe.id}:{task.id}")
-        out.extend((task, vname, comp) for vname, comp in probe.generate(task, rng, ctx))
+        for vname, comp, *reference in probe.generate(task, rng, ctx):
+            out.append((replace(task, answer=reference[0]) if reference else task, vname, comp))
     return out
 
 
@@ -251,7 +253,8 @@ def run_audit(
             log("the checker gave different scores to identical inputs")
 
         aliases = {t.id: a for t in answerable if (a := reference_aliases(spec, t))}  # none for an environment
-        ctx = ProbeContext(contract=contract, gold_type=gold_type, tasks=answerable, gold_types=gold_types, aliases=aliases)
+        ctx = ProbeContext(contract=contract, gold_type=gold_type, tasks=answerable, gold_types=gold_types, aliases=aliases,
+                           reference_is_answer=reference_is_answer(spec))
         probes: list[Probe] = sorted(all_probes(config.families), key=lambda p: TIER_RANK.get(p.tier, 9))
         passing = [t for t in tasks if contract.self_pass.get(t.id)]
         head = passing[:ESTIMATE_TASKS]
@@ -270,7 +273,8 @@ def run_audit(
                 not_run = [p.id for p in probes[i:]]
                 break
             verdicts = runner.score_many([(t, comp) for t, _, comp in pending], progress=step)
-            observations = [Observation(probe.id, probe.family, vname, task.id, comp, v, probe.label, probe.expect, probe.tier)
+            observations = [Observation(probe.id, probe.family, vname, task.id, comp, v, probe.label, probe.expect, probe.tier,
+                                        None if task.answer == by_id[task.id].answer else task.answer)
                             for (task, vname, comp), v in zip(pending, verdicts, strict=True)]
             tally.add(observations, _gold_controls(runner, observations, by_id, contract))
             _write_calls(calls, [(o.task_id, o.probe_id, o.variant, o.completion, o.verdict,

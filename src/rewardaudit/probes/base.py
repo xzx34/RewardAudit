@@ -22,7 +22,8 @@ from rewardaudit.equiv import (
 from rewardaudit.goldtype import is_numeric, mcq_options
 from rewardaudit.types import Label, Task
 
-Variant = tuple[str, str]  # (variant name, completion)
+# (variant name, completion), or with a third item, the reference answer written another way for that call only (G3)
+Variant = tuple[str, str] | tuple[str, str, str]
 _SENTINEL = "QQANSWERQQ"
 NOT_LATEX = ("json", "grid", "code")  # gold types whose variants are not LaTeX; the LaTeX guard skips them
 MIN_WORD = 4  # fewer letters can name a math object, where order or case carries meaning: BE and EB are one line
@@ -152,6 +153,7 @@ class ProbeContext:
     tasks: list[Task]
     gold_types: dict[str, str] = field(default_factory=dict)  # per-task
     aliases: dict[str, list[str]] = field(default_factory=dict)  # per task: the row's other accepted answers, for G2
+    reference_is_answer: bool = False  # the checker gets the row's reference answer itself, or a template around it, for G3
     task: Task | None = None  # the task currently being probed; set by the audit loop
     _commands: frozenset[str] | None = field(default=None, init=False, repr=False)
     _numeric_dataset: bool | None = field(default=None, init=False, repr=False)
@@ -320,12 +322,13 @@ class Probe:
 
     def generate(self, task: Task, rng: random.Random, ctx: ProbeContext) -> list[Variant]:
         """The probe's variants for one task. M variants that are malformed LaTeX are dropped: a grader may
-        repair them back to the gold, so they are not definite wrong answers."""
+        repair them back to the gold, so they are not definite wrong answers. A variant with a reference answer of its own
+        keeps it."""
         if not self.applies(task, ctx):
             return []
-        out = [(name, comp) for name, comp in self.make(task, rng, ctx) if comp is not None]
+        out = [v for v in self.make(task, rng, ctx) if v[1] is not None]
         if self.family == "M":
-            out = [(name, comp) for name, comp in out if not ctx.malformed(comp, task)]
+            out = [v for v in out if not ctx.malformed(v[1], task)]
         return out
 
 
