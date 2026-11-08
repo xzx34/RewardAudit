@@ -130,7 +130,7 @@ def _is_conversational(fn: Callable[..., Any]) -> bool | None:
         ann = inspect.signature(fn).parameters["completions"].annotation
     except (KeyError, ValueError):
         return None
-    text = str(ann)
+    text = str(ann).lower()  # typing.Dict as well as dict
     if "dict" in text:
         return True
     if "str" in text:

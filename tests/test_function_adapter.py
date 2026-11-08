@@ -146,6 +146,15 @@ def test_easyr1_batch_and_sequential(tmp_path):
     assert _calls(seq)[-1]["reward_input"] == item and _calls(batch)[-1]["reward_inputs"] == [item]
 
 
+def test_trl_messages_from_a_typing_annotation(tmp_path):
+    """list[Dict[str, str]] (open-r1's len_reward) asks for chat messages as list[dict] does; list[str] for plain text."""
+    body = "    return [float(completions[0][0]['content'] == 'C')]\n"
+    chat = _adapter(tmp_path, f"from typing import Dict\n\ndef f(completions: list[Dict[str, str]], **kwargs):\n{body}", "f")
+    assert chat.conversational is True and chat.score_raw(TASK, "C").score == 1.0
+    text = _adapter(tmp_path, "from typing import List\n\ndef f(completions: List[str], **kwargs):\n    return [1.0]\n", "f")
+    assert text.conversational is False
+
+
 def test_trl_columns_include_the_reference(tmp_path):
     a = _echo(tmp_path, "completions, solution, **kwargs", body="return [1.0]", reference_col="full_solution")
     assert a.score_raw(TASK, "C").score == 1.0
