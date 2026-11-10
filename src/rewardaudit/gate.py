@@ -21,8 +21,13 @@ ACCEPTED_ANSWERS = ("The answer column holds lists. If each list holds the accep
                     "the checker the whole list: --answer-col COLUMN.0 --reference-col COLUMN")
 TIMING_OUT = "Give the checker more time with --timeout"
 FAILED = "Fewer --workers may help if the machine ran out of memory"
-# 0.1.14 refuses a plain-string `task` column (0.1.13 was never released), and from 0.1.11 reward functions get message
-# objects, not dicts.
+# An environment brings its own rows and rubric: there is no column to name and no function to wrap.
+NO_REFERENCE_ENV = ("rewardaudit rewrites the right answer and compares scores, so it needs the right answer in each row; "
+                    "an environment whose rows do not hold it is out of its scope")
+NOT_PASSING_ENV = ("Check that the checker gets the answer in the form it expects: pass the reply format the prompts ask for "
+                   "with --format, such as '<sol>{answer}</sol>'")
+# For the Environment API (verifiers < 0.2): 0.1.14 refuses a plain-string `task` column (0.1.13 was never released), and
+# from 0.1.11 reward functions get message objects, not dicts. A taskset needs a later verifiers, which these predate.
 OLD_VERIFIERS = ("This environment may have been written for an older verifiers: rerun with --verifiers '<0.1.11' "
                  "or --verifiers '<0.1.13'")
 
@@ -181,8 +186,11 @@ def classify_contract(contract: Any, tasks: list[Task], min_passing: int = MIN_P
     # no gold was ever scored, and a real run on this verifiers version stops at the same place
     unrun = [v for v in gold if v.kind == Kind.ERROR and UNRUN_ERROR.search(v.error or "")]
     if len(unrun) >= 0.5 * len(gold):
-        cause = re.sub(r"(?:^|(?<=: ))[\w.]*(?:RolloutError: |\.(?=\w+Error\b))", "", short_error(unrun[0].error or ""), count=1)
-        return "load_failed", f"{len(unrun)} of {len(gold)} rollouts with the reference answer failed on this verifiers: {cause}", OLD_VERIFIERS
+        first = unrun[0].error or ""
+        cause = re.sub(r"(?:^|(?<=: ))[\w.]*(?:RolloutError: |\.(?=\w+Error\b))", "", short_error(first), count=1)
+        old_api = "RolloutError" in UNRUN_ERROR.search(first)[0]  # the adapter's, on the Environment API; else verifiers.v1's
+        return ("load_failed", f"{len(unrun)} of {len(gold)} rollouts with the reference answer failed on this verifiers: {cause}",
+                OLD_VERIFIERS if old_api else "")
     k = len(contract.passing_tasks())
     if k == 0:
         errors = [v for v in gold if v.kind == Kind.ERROR]
@@ -203,24 +211,26 @@ def check_loaded(meta: dict[str, Any], tasks: list[Task]) -> None:
         raise NotAuditable(*verdict)
     reason = no_reference_reason(tasks)
     if reason:
-        raise NotAuditable("no_reference", reason, NO_REFERENCE)
+        raise NotAuditable("no_reference", reason, NO_REFERENCE_ENV if meta.get("framework") else NO_REFERENCE)
 
 
 def check_contract(contract: Any, tasks: list[Task], meta: dict[str, Any]) -> None:
     """After the calls with the reference answer: raises NotAuditable when they show the probes would measure nothing."""
+    framework = meta.get("framework")  # set by the verifiers adapters: an environment
+    no_reference = NO_REFERENCE_ENV if framework else NO_REFERENCE
     verdict = classify_contract(contract, tasks)
     if (verdict and verdict[0] == "gold_never_passes") or (not verdict and contract.no_discrimination):
         reason = label_gold_reason(tasks)
         if reason:
-            raise NotAuditable("no_reference", reason, NO_REFERENCE)
+            raise NotAuditable("no_reference", reason, no_reference)
     if verdict:
         cls, reason, advice = verdict
-        if cls == "gold_never_passes" and meta.get("framework"):
-            advice = f"{advice}. {OLD_VERIFIERS}"
-        if cls == "gold_never_passes" and _holds_lists(tasks):
+        if cls == "gold_never_passes" and framework:
+            advice = NOT_PASSING_ENV + (f". {OLD_VERIFIERS}" if "(v0 API)" in str(framework) else "")
+        elif cls == "gold_never_passes" and _holds_lists(tasks):
             advice = f"{ACCEPTED_ANSWERS}. {advice}"
         raise NotAuditable(cls, reason, advice)
     if not contract.no_discrimination:
         reason = low_gold_share_reason(contract, meta)
         if reason:
-            raise NotAuditable("no_reference", reason, NO_REFERENCE)
+            raise NotAuditable("no_reference", reason, no_reference)

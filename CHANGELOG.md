@@ -133,6 +133,11 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - P2 no longer sends twenty layers of a format that adds nothing to the answer, which are the plain wrong answer.
 - A finding that scoring time grows with the length of the reply, measured on one long reply, is low with "too few calls to
   rate", as other findings resting on one row are. Before, it was medium.
+- When the audit of a verifiers environment stops, the message names only what applies to an environment. Rows without a
+  usable reference answer say that such an environment is out of scope, and reference answers that earn nothing point to
+  `--format`; before, both pointed to `--answer-col`, `--reference-col` or a wrapper function, which an environment does
+  not take. The suggestion to rerun with `--verifiers '<0.1.11'` or `'<0.1.13'` is made only for environments written for
+  the Environment API of verifiers before 0.2, not for tasksets, which need a later verifiers than those.
 
 ## 0.2.0 - 2026-11-07
 

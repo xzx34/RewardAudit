@@ -182,7 +182,7 @@ def _four() -> list[Task]:
 
 def test_a_typed_v1_error_on_the_gold_calls_is_load_failed_with_its_cause():
     cls, reason, advice = classify_contract(_errors(4, TASK_ERROR), _four())
-    assert cls == "load_failed" and "--verifiers" in advice
+    assert cls == "load_failed" and advice == ""  # the versions OLD_VERIFIERS names predate tasksets
     assert reason == ("4 of 4 rollouts with the reference answer failed on this verifiers: TaskError: task LegalTask scoring: "
                       "TypeError: An asyncio.Future, a coroutine or an awaitable is required")
     other = TASK_ERROR.replace("verifiers.v1.errors.TaskError", "verifiers.v1.errors.SandboxError")
@@ -191,7 +191,9 @@ def test_a_typed_v1_error_on_the_gold_calls_is_load_failed_with_its_cause():
 
 def test_the_adapters_rollout_error_gives_its_cause():
     error = "Traceback (most recent call last):\nrewardaudit.adapters.verifiers_adapter.RolloutError: ValueError: x\n"
-    assert classify_contract(_errors(4, error), _four())[1] == "4 of 4 rollouts with the reference answer failed on this verifiers: ValueError: x"
+    _, reason, advice = classify_contract(_errors(4, error), _four())
+    assert reason == "4 of 4 rollouts with the reference answer failed on this verifiers: ValueError: x"
+    assert "--verifiers '<0.1.11'" in advice
 
 
 def test_the_cause_keeps_its_place_in_an_environment_of_ones_own():
@@ -218,9 +220,31 @@ def test_a_few_typed_errors_are_not_a_framework_failure():
 
 def test_golds_that_fail_on_an_environment_suggest_another_verifiers():
     on_env = _stops(_contract(ZEROS), _tasks(ZEROS), {"framework": "verifiers 0.1.14 (v0 API)"})
-    assert on_env.cls == "gold_never_passes" and "--verifiers" in on_env.advice and "answer column" in on_env.advice
+    assert on_env.cls == "gold_never_passes" and "--verifiers '<0.1.11'" in on_env.advice and "--format" in on_env.advice
     on_function = _stops(_contract(ZEROS), _tasks(ZEROS), {"style": "bare"})
     assert on_function.cls == "gold_never_passes" and "--verifiers" not in on_function.advice
+
+
+@pytest.mark.parametrize("framework", ["verifiers 0.4.1", "verifiers 0.1.15.dev170 (v0 API, taskset + harness)"])
+def test_golds_that_fail_on_a_taskset_do_not_suggest_a_verifiers_that_predates_it(framework):
+    stop = _stops(_contract(ZEROS), _tasks(ZEROS), {"framework": framework})
+    assert stop.cls == "gold_never_passes" and "--format" in stop.advice and "--verifiers" not in stop.advice
+
+
+def test_an_environment_is_not_told_to_name_a_column_or_wrap_its_checker():
+    """An environment brings its own rows and rubric: --answer-col, --reference-col and a wrapper do nothing for it."""
+    env = {"framework": "verifiers 0.1.14 (v0 API)"}
+    with pytest.raises(NotAuditable) as e:
+        check_loaded(env, [Task(str(i), "Return the json and nothing else.", "") for i in range(6)])
+    assert e.value.cls == "no_reference" and "environment" in e.value.advice and "--answer-col" not in e.value.advice
+    lists = {f"t{i}": 0.0 for i in range(6)}
+    tasks = [Task(t, "q", json.dumps([f"a{t}", f"b{t}"])) for t in lists]
+    stop = _stops(_contract(lists), tasks, env)
+    assert stop.cls == "gold_never_passes" and "--answer-col" not in stop.advice and "wrap" not in stop.advice
+    assert "--answer-col" in _stops(_contract(lists), tasks, {}).advice
+    scores = {f"t{i}": 0.15 for i in range(10)}
+    low_share = _stops(_contract(scores, wrong=0.0, gold_total=dict(scores)), _tasks(scores), {**env, "reward_weights": [0.3, 0.7]})
+    assert low_share.cls == "no_reference" and "--answer-col" not in low_share.advice
 
 
 # --- golds that label the row --------------------------------------------------------------------------------------------
