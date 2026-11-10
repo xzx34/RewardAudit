@@ -20,7 +20,7 @@ TASKS = [
     Task("t2", "Compute 2^5.", "32"),
     Task("t3", "Simplify 2/4.", "\\frac{1}{2}"),
     Task("t4", "Is the sky blue?", "yes"),
-    Task("countdown", "Using the numbers [37, 15, 4, 13], create an equation that equals 16.", "(37 + 15) * (4 / 13)"),
+    Task("equation", "Using the numbers [37, 15, 4, 13], create an equation that equals 16.", "(37 + 15) * (4 / 13)"),
     Task("t5", "Name the capital of France.", "Paris"),
     Task("t6", "Solve for x: 2x = -3.", "-1.5"),
     Task("t7", "Expand (n+1)^2.", "n^2+2n+1"),
@@ -181,15 +181,15 @@ def test_variant_names_are_unique_inside_a_probe(primary):
 
 # --- construction guards ----------------------------------------------------------------------------------
 
-MATH = [Task("mixed", "q", "1\\frac{4}{5}"), Task("frac", "q", "\\frac{3840}{289}"), Task("date", "q", "March 26, 1973"),
+MATH_ANSWERS = [Task("mixed", "q", "1\\frac{4}{5}"), Task("frac", "q", "\\frac{3840}{289}"), Task("date", "q", "March 26, 1973"),
         Task("nested", "q", "\\frac{\\sqrt{3}}{2}"), Task("poly", "q", "2x+3y"), Task("word", "q", "Paris"),
         Task("matrix", "q", "\\begin{pmatrix} -7 \\\\ 16 \\\\ 5 \\end{pmatrix}")]
 
 
 def _math_ctx(primary="boxed"):
     ctx = _ctx(primary)
-    ctx.tasks = MATH
-    for t in MATH:
+    ctx.tasks = MATH_ANSWERS
+    for t in MATH_ANSWERS:
         ctx.contract.self_pass[t.id] = True
         ctx.contract.task_wrappers[t.id] = [primary]
         ctx.gold_types[t.id] = infer_gold_type(t.answer)
@@ -217,24 +217,24 @@ def test_m_variants_are_never_malformed_latex():
     for primary in PRIMARIES:
         ctx = _math_ctx(primary)
         for probe in all_probes(["M"]):
-            for task in MATH:
+            for task in MATH_ANSWERS:
                 for name, comp in _gen(ctx, probe.id, task).items():
                     assert not ctx.malformed(comp, task), (probe.id, name, comp)
     bad = Probe("Mx", "M", "test", "natural", "zero", Label.NOT_SOLVING,
                 lambda t, r, c: [("broken", c.wrap("1\\frac{4}{}5")), ("fine", c.wrap("1\\frac{5}{4}"))])
     ctx = _math_ctx()
-    ctx.task = MATH[0]
-    assert [n for n, _ in bad.generate(MATH[0], random.Random(0), ctx)] == ["fine"]
+    ctx.task = MATH_ANSWERS[0]
+    assert [n for n, _ in bad.generate(MATH_ANSWERS[0], random.Random(0), ctx)] == ["fine"]
 
 
 def test_m5_swaps_two_digits_or_two_letters_of_a_word():
     ctx = _math_ctx()
-    assert _gen(ctx, "M5", MATH[0]) == {}  # 1\frac{4}{5}: no adjacent digits, letters of \frac are a command
-    assert _gen(ctx, "M5", MATH[1]) == {"swap": "\\boxed{\\frac{3840}{829}}"}
-    assert _gen(ctx, "M5", MATH[4]) == {}  # 2x+3y: never x2 or yx (the same product)
-    (swap,) = _gen(ctx, "M5", MATH[5]).values()
+    assert _gen(ctx, "M5", MATH_ANSWERS[0]) == {}  # 1\frac{4}{5}: no adjacent digits, letters of \frac are a command
+    assert _gen(ctx, "M5", MATH_ANSWERS[1]) == {"swap": "\\boxed{\\frac{3840}{829}}"}
+    assert _gen(ctx, "M5", MATH_ANSWERS[4]) == {}  # 2x+3y: never x2 or yx (the same product)
+    (swap,) = _gen(ctx, "M5", MATH_ANSWERS[5]).values()
     assert sorted(strip_wrappers(swap)) == sorted("Paris") and strip_wrappers(swap) != "Paris"
-    for task in MATH:
+    for task in MATH_ANSWERS:
         for comp in _gen(ctx, "M5", task).values():
             inner = strip_wrappers(comp)
             assert sorted(inner) == sorted(task.answer)
@@ -243,18 +243,18 @@ def test_m5_swaps_two_digits_or_two_letters_of_a_word():
 
 def test_equivalent_tex_forms():
     ctx = _math_ctx()
-    assert _gen(ctx, "Q1", MATH[0])["boxed_space"] == "\\boxed {1\\frac{4}{5}}"
-    assert "boxed_space" not in _gen(_math_ctx("bare"), "Q1", MATH[0])
-    q9 = _gen(ctx, "Q9", MATH[0]) | {f"n_{k}": v for k, v in _gen(ctx, "Q9", MATH[3]).items()}
+    assert _gen(ctx, "Q1", MATH_ANSWERS[0])["boxed_space"] == "\\boxed {1\\frac{4}{5}}"
+    assert "boxed_space" not in _gen(_math_ctx("bare"), "Q1", MATH_ANSWERS[0])
+    q9 = _gen(ctx, "Q9", MATH_ANSWERS[0]) | {f"n_{k}": v for k, v in _gen(ctx, "Q9", MATH_ANSWERS[3]).items()}
     assert q9["shorthand"] == "\\boxed{1\\frac45}" and q9["n_shorthand"] == "\\boxed{\\frac{\\sqrt3}{2}}"
     assert q9["n_grouped"] == "\\boxed{{\\frac{\\sqrt{3}}{2}}}" and "grouped" not in q9  # three levels inside the box
     assert tex_shorthand("\\frac{8}{21}") == "\\frac8{21}" and tex_shorthand("\\dfrac{3}{4}") == "\\dfrac34"
     for a, b in (("\\frac34", "\\frac{3}{4}"), ("\\frac8{21}", "\\frac{8}{21}"), ("1\\frac45", "1\\frac{4}{5}"),
                  ("\\sqrt3", "\\sqrt{3}")):
         assert equiv(a, b, "latex") and contains_equiv(f"\\boxed{{{a}}}", b, "latex"), (a, b)
-    q6 = _gen(ctx, "Q6", MATH[0])
+    q6 = _gen(ctx, "Q6", MATH_ANSWERS[0])
     assert q6["boxed_word_after"].endswith("I have boxed the final answer above.")
-    assert "the answer is consistent" in q6["answer_is_after"] and "boxed_word_after" not in _gen(_math_ctx("bare"), "Q6", MATH[0])
+    assert "the answer is consistent" in q6["answer_is_after"] and "boxed_word_after" not in _gen(_math_ctx("bare"), "Q6", MATH_ANSWERS[0])
 
 
 def test_hedges_in_both_orders():
@@ -282,8 +282,8 @@ def test_power_towers_stay_small():
     p5 = _gen(ctx, "P5", TASKS[1])
     assert {"py_tower", "tex_tower", "tex_tower2", "py_tower_pi"} <= set(p5)
     assert all(len(p5[k]) < 40 for k in ("py_tower", "tex_tower", "tex_tower2", "py_tower_pi"))
-    countdown = next(t for t in TASKS if t.id == "countdown")
-    assert _gen(ctx, "P15", countdown) == {"gold_numbers": "\\boxed{37**15**13**4}"}
+    equation = next(t for t in TASKS if t.id == "equation")
+    assert _gen(ctx, "P15", equation) == {"gold_numbers": "\\boxed{37**15**13**4}"}
     assert gold_tower("\\frac{14}{3}") is None and gold_tower("(1) a\n(2) b\n(3) c") is None
     assert not contains_equiv("\\boxed{9^{9^{9^{9}}}}", "\\frac{1}{2}", "fraction")  # never handed to sympy
 

@@ -144,7 +144,7 @@ def test_nan_on_two_rows_is_a_medium_finding_and_on_one_row_low():
 
 
 def test_a_negative_score_is_a_scale_and_not_a_finding():
-    def minus_one(completion, answer):  # verl's math_dapo scores a wrong answer -1
+    def minus_one(completion, answer):  # some checkers score a wrong answer -1
         return 1.0 if completion == answer else -1.0
 
     r = audit(minus_one, ROWS, workers=1, probes=["M"])

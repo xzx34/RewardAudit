@@ -289,9 +289,9 @@ def test_rows_with_an_empty_reference_answer_are_left_out_and_counted(tmp_path):
     (tmp_path / "rows.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
     tasks, left_out = load_tasks(str(tmp_path / "rows.jsonl"))
     assert left_out == 4 and [(t.id, t.answer) for t in tasks] == [("0", "a0"), ("5", "0"), ("6", "a6"), ("7", '["x"]'), ("8", "{}")]
-    squad = [{"question": "q0", "answers": {"text": ["Paris"]}}, {"question": "q1", "answers": {"text": []}}]
-    (tmp_path / "squad.jsonl").write_text("\n".join(json.dumps(r) for r in squad), encoding="utf-8")
-    tasks, left_out = load_tasks(str(tmp_path / "squad.jsonl"), answer_col="answers.text.0")  # an empty list: no item 0
+    nested = [{"question": "q0", "answers": {"text": ["Paris"]}}, {"question": "q1", "answers": {"text": []}}]
+    (tmp_path / "nested.jsonl").write_text("\n".join(json.dumps(r) for r in nested), encoding="utf-8")
+    tasks, left_out = load_tasks(str(tmp_path / "nested.jsonl"), answer_col="answers.text.0")  # an empty list: no item 0
     assert [t.answer for t in tasks] == ["Paris"] and left_out == 1
     pairs = [{"question": "q0", "answers": [["yes", ["c1"]]]}, {"question": "q1", "answers": []}]  # [answer, conditions]
     (tmp_path / "pairs.jsonl").write_text("\n".join(json.dumps(r) for r in pairs), encoding="utf-8")

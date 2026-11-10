@@ -91,16 +91,16 @@ def test_m22_writes_a_positive_number_with_a_unicode_minus():
     assert _gen("M22", "-42") == _gen("M22", "0") == _gen("M22", "Paris") == {}
 
 
-MUSR = ("Where would Ricky look for the earphones given the story?\n\nPick one of the following choices:\n1 - piano\n"
+CHOICE_PROMPT = ("Where would Ricky look for the earphones given the story?\n\nPick one of the following choices:\n1 - piano\n"
         "2 - producer's desk\n3 - recording booth\n\nYou must pick one option.")
 
 
 def test_a_minus_before_the_number_of_a_listed_choice_is_not_sent():
-    assert _gen("M2", "2", MUSR) == _gen("M22", "2", MUSR) == {}
-    assert _gen("M2", "5", MUSR) == {"neg": "-5"} and _gen("M22", "5", MUSR) == {"unicode_minus": "−5"}  # no such choice
+    assert _gen("M2", "2", CHOICE_PROMPT) == _gen("M22", "2", CHOICE_PROMPT) == {}
+    assert _gen("M2", "5", CHOICE_PROMPT) == {"neg": "-5"} and _gen("M22", "5", CHOICE_PROMPT) == {"unicode_minus": "−5"}  # no such choice
     rules = "1. a#b = a + b\n2. a#b = a - b if a > b\n3. otherwise 7\nCompute 1#2."  # numbered rules are no choices
     assert _gen("M2", "2", rules) == {"neg": "-2"}
-    assert _gen("M3", "2", MUSR) == {"x10": "20", "div10": "0.2"}  # 20 is no choice either, and the sign is not involved
+    assert _gen("M3", "2", CHOICE_PROMPT) == {"x10": "20", "div10": "0.2"}  # 20 is no choice either, and the sign is not involved
 
 
 @pytest.mark.parametrize(("answer", "expected"), [
