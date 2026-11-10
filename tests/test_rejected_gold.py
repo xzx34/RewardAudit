@@ -10,9 +10,10 @@ from typer.testing import CliRunner
 
 from rewardaudit import NotAuditable, cli
 from rewardaudit.contract import WRAPPERS, infer_contract
+from rewardaudit.explain import find_explainable
 from rewardaudit.metrics import REJECTED_GOLD_NAME
 from rewardaudit.pipeline import AuditConfig, exit_code, run_audit
-from rewardaudit.report import find_explainable, render_markdown, render_terminal, write_outputs
+from rewardaudit.report import render_markdown, render_terminal, write_outputs
 from rewardaudit.types import Kind, Task, Verdict
 
 BAD = {"10", "11"}  # golds the checkers below handle differently

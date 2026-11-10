@@ -160,7 +160,7 @@ def probes(
     key: str | None = typer.Argument(None, help="a probe (Q6) or a family (Q): show what it sends and what a sound checker does"),
 ) -> None:
     """List every probe, or explain one."""
-    from rewardaudit.report import render_explain, render_probe_list
+    from rewardaudit.explain import render_explain, render_probe_list
 
     if key is None:
         render_probe_list(console)
