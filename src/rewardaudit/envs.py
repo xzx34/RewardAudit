@@ -160,8 +160,12 @@ def install_env(env: str, *, verifiers: str | None = None, python_version: str =
             raise
     info = detect_api(py, name)
     pin = f"verifiers{verifiers}" if verifiers and verifiers[0] in "<>=!~" else verifiers or _pin_for(info)
+    pinned = d / "rewardaudit-verifiers-pin"  # a pin stays in the venv: a later audit that applies none is measured on it too
     if pin:
         log(f"installing {pin} for {env}")
         _run([uv, "pip", "install", "--python", str(py), pin], f"Installing {pin} for {env}", timeout_s)
+        pinned.write_text(pin, encoding="utf-8")
         info["verifiers"] = pin
+    elif pinned.exists():
+        info["verifiers"] = pinned.read_text(encoding="utf-8").strip()
     return py, info

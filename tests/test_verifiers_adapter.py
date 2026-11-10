@@ -848,6 +848,14 @@ def test_verifiers_given_by_the_user_decides(installed, asked, pin):
     assert installed({"api": "v0", "verifiers": "0.4.1", "verifiers_req": ["verifiers>=0.3"]}, verifiers=asked) == ([pin], pin)
 
 
+def test_a_pin_stays_with_the_venv_and_is_reported_when_it_is_reused(installed):
+    """A venv is reused as it is: an audit that applies no pin of its own is still measured on the one applied before."""
+    assert installed({"api": "v0", "verifiers": "0.4.1"}) == ([envs.V0_PIN], envs.V0_PIN)
+    assert installed({"api": "v0", "verifiers": "0.1.14"}) == ([], envs.V0_PIN)
+    assert installed({"api": "v0", "verifiers": "0.1.14"}, verifiers="<0.1.13") == (["verifiers<0.1.13"], "verifiers<0.1.13")
+    assert installed({"api": "v0", "verifiers": "0.1.12"}) == ([], "verifiers<0.1.13")
+
+
 def test_a_version_asked_for_gets_a_venv_of_its_own(tmp_path, monkeypatch):
     """A venv is reused once installed: `o/n@0.1.4` put into the venv of `o/n` would audit the version that one holds."""
     monkeypatch.setattr(envs, "CACHE", tmp_path)

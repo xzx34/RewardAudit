@@ -143,6 +143,9 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   was reported as accepting a close answer.
 - `owner/name@1.2.0` installs that version into a venv of its own. Before, once `owner/name` or another version was
   installed, its venv was reused and the audit measured the version it held, while the report named the one asked for.
+- The verifiers pinned in a Hub environment's venv, by the tool or with `--verifiers`, is reported on every later audit
+  that reuses the venv ("Measured on ..."), and the generated `repro.py` pins it again. Before, only the audit that applied
+  the pin said so, and a later one was measured on it without a word.
 
 ## 0.2.0 - 2026-11-07
 
