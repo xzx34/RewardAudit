@@ -45,28 +45,16 @@ answer that is a dict or list is passed on as it is. An `id` column names the ro
 
 ## Connect your checker
 
-Point rewardaudit at a file: `reward.py` looks for a function named `score`, `compute_score`, `reward`, `reward_fn`,
-`reward_func`, `accuracy_reward` or `verify`; `reward.py:my_function` names one.
+rewardaudit calls your checker through one function: it takes a reply and the reference answer and returns the score.
+Put that function in a file, name it `score`, and pass the file (`audit_me.py:my_function` names a function with another
+name):
 
-Parameters are matched by name, so these work as they are:
-
-```python
-def score(completion, answer): ...                       # also response, prediction, gold, target, label, ...
-def score(prompt, completion, answer): ...
-def compute_score(solution_str, ground_truth): ...       # verl; data_source and extra_info are filled in too
-def reward(prompts, completions, **columns): ...         # TRL and open-r1; returns a list, other columns are passed
+```bash
+rewardaudit audit audit_me.py --dataset data.jsonl
 ```
 
-Parameters with other names get the reply and then the reference by position. Parameters named `prompt`, `messages`, `info`,
-`metadata`, `data_source` or `extra_info` get those values from the row.
-
-A function can return a number, a bool, a one-element list or tensor, or a dict. From a dict the main value is taken from
-`score`, `overall`, `reward`, `rewards`, `total` or `accuracy`, and other numbers count as sub-scores. A dict with none of those
-keys counts all its numbers, bools included, as parts of a total, so return one number if that is not what they are.
-
-**Anything else: wrap it.** rewardaudit needs only a function that takes a reply and a reference answer and returns a score,
-so a few lines in your own file connect any benchmark, including a checker that is a class or a method. Call your checker from
-it without changing what the checker decides:
+If your checker is a class or a method, or needs more than the reply and the reference, a few lines of your own connect
+it. Here the checker is a class in another module:
 
 ```python
 # audit_me.py, next to the code it imports
@@ -77,6 +65,34 @@ grader = Grader(strict=True)
 def score(completion, answer):
     return grader.grade(response=completion, expected=answer)["points"]
 ```
+
+rewardaudit passes each reply it writes as `completion` and the row's reference answer as `answer`, and takes the number
+the function returns as the score.
+
+A wrapper like this may import the checker, build the object it needs as your evaluation builds it, call it for one
+reply and pick the score out of what it returns. It must not change what the checker decides: no cleaning or parsing of
+the reply that your real evaluation does not do, and no arguments other than those your real evaluation passes.
+Otherwise the audit describes the wrapper and not the checker.
+
+**Functions that work as they are.** A checker that already takes the reply and the reference needs no wrapper: pass the
+file it is in. The shapes below are shortcuts for the same interface. Given a file without a function name, rewardaudit
+looks for a function named `score`, `compute_score`, `reward`, `reward_fn`, `reward_func`, `accuracy_reward` or `verify`.
+Parameters are matched by name, so these work as they are:
+
+```python
+def score(completion, answer): ...                       # also response, prediction, gold, target, label, ...
+def score(prompt, completion, answer): ...
+def compute_score(solution_str, ground_truth): ...       # verl; data_source and extra_info are filled in too
+def reward(prompts, completions, **columns): ...         # TRL and open-r1; returns a list, other columns are passed
+```
+
+Parameters with other names get the reply and then the reference by position. Parameters named `prompt`, `messages`,
+`info`, `metadata`, `data_source` or `extra_info` get those values from the row.
+
+A function can return a number, a bool, a one-element list or tensor, or a dict. From a dict the main value is taken from
+`score`, `overall`, `reward`, `rewards`, `total` or `accuracy`, and other numbers count as sub-scores. A dict with none of
+those keys counts all its numbers, bools included, as parts of a total, so return one number if that is not what they
+are.
 
 ### The reply format
 
@@ -113,7 +129,8 @@ others as well, one per reply and up to 8 per row, since a checker given the lis
 
 ### The reference answer is not what the checker expects
 
-Some checkers want the reference in a particular form. Wrap them as above, for example to add `\boxed{}`, or to parse JSON.
+Some checkers want the reference in a particular form. Wrap them as above and pass the reference in the form your
+evaluation passes it, for example in `\boxed{}` or parsed from JSON.
 If your dataset holds a worked solution, extract the final answer into a column first: rewardaudit rewrites the reference
 answer to build its replies, so it has to be the answer itself.
 
