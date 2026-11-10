@@ -4,6 +4,7 @@ import json
 import re
 
 import pytest
+from conftest import FakeRunner
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -13,24 +14,6 @@ from rewardaudit.metrics import REJECTED_GOLD_NAME
 from rewardaudit.pipeline import AuditConfig, exit_code, run_audit
 from rewardaudit.report import find_explainable, render_markdown, render_terminal, write_outputs
 from rewardaudit.types import Kind, Task, Verdict
-
-
-class FakeRunner:
-    """In-process runner around `score(completion, answer) -> float | Exception`."""
-
-    max_score = None
-    meta: dict = {}
-
-    def __init__(self, fn):
-        self.fn, self.calls = fn, 0
-
-    def score(self, task: Task, completion: str) -> Verdict:
-        self.calls += 1
-        out = self.fn(completion, task.answer)
-        if isinstance(out, Exception):
-            return Verdict(Kind.ERROR, error=repr(out))
-        return Verdict(Kind.SCORE, score=float(out))
-
 
 BAD = {"10", "11"}  # golds the checkers below handle differently
 

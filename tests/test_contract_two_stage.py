@@ -3,25 +3,13 @@
 import json
 
 import pytest
+from conftest import FakeRunner
 
 from rewardaudit.contract import COMMON_WRAPPERS, OPEN_THINK, WRAPPERS, ends_open_think, infer_contract
 from rewardaudit.runner import RunnerPool
 from rewardaudit.types import Kind, Task, Verdict
 
 N_ALL = len(WRAPPERS)
-
-
-class FakeRunner:
-    """In-process runner around a plain `score(completion, answer) -> float`."""
-
-    max_score = None
-
-    def __init__(self, fn):
-        self.fn, self.calls = fn, 0
-
-    def score(self, task: Task, completion: str) -> Verdict:
-        self.calls += 1
-        return Verdict(Kind.SCORE, score=float(self.fn(completion, task.answer)))
 
 
 def _tasks(n=10, prompt="Compute it."):

@@ -3,6 +3,7 @@
 import random
 
 import pytest
+from conftest import FakeRunner
 
 from rewardaudit.contract import (
     COMMON_WRAPPERS,
@@ -15,23 +16,7 @@ from rewardaudit.contract import (
 )
 from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.order import o4_retract_to_gold, single_block
-from rewardaudit.types import Kind, Task, Verdict
-
-
-class FakeRunner:
-    """In-process runner around `score(completion, answer) -> float | (float, sub_scores)`."""
-
-    max_score = None
-
-    def __init__(self, fn, meta=None):
-        self.fn, self.calls, self.meta = fn, 0, meta or {}
-
-    def score(self, task: Task, completion: str) -> Verdict:
-        self.calls += 1
-        out = self.fn(completion, task.answer)
-        if isinstance(out, tuple):
-            return Verdict(Kind.SCORE, score=float(out[0]), sub_scores=out[1])
-        return Verdict(Kind.SCORE, score=float(out))
+from rewardaudit.types import Task
 
 
 def _tasks(n=10, prompt="Compute it.", system=None):
@@ -97,12 +82,6 @@ def test_derivation_is_capped_and_needs_a_recurring_instruction():
     tasks = _tasks(10)
     tasks[0] = Task(id="t0", prompt="Put your answer in <odd_one> tags.", answer="10")
     assert derive_wrappers(tasks) == {}  # one prompt in ten is task content, not the format
-
-
-def test_user_given_wrappers_add_nothing():
-    r = FakeRunner(lambda c, a: _parse_tag(c, "x") == a, meta={"answer_tag": "x"})
-    c = infer_contract(r, _tasks(), wrappers=[("bare", lambda a: a)])
-    assert c.wrappers_run == ["bare"] and c.derived == {}
 
 
 # --- contracts with derived wrappers --------------------------------------------------------------------

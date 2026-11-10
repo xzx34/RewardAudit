@@ -503,21 +503,6 @@ class Tally:
         return _summarize(self, answer_field)
 
 
-def compute(
-    observations: list[Observation],
-    probes: list[Probe],
-    tasks: list[Task],
-    contract: Contract,
-    gold_type: str,
-    *,
-    discovery_frac: float = 0.4,
-    controls: dict[tuple[str, str], float] | None = None,
-) -> dict[str, Any]:
-    tally = Tally(probes, tasks, contract, gold_type, discovery_frac)
-    tally.add(observations, controls)
-    return tally.finish()
-
-
 def _compares_whole_reply(stats: dict[str, ProbeStats], contract: Contract, answer_field: bool) -> bool:
     """The checker takes a reply to be its answer field, as a script scoring a file of predictions does: the user says so,
     or the bare answer passes and text before or after it mostly loses the score. Its protocol has no reasoning for a

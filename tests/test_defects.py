@@ -5,12 +5,13 @@ import random
 import re
 
 import pytest
+from conftest import compute
 from rich.console import Console
 
 from rewardaudit import audit, cli
 from rewardaudit.contract import Contract
 from rewardaudit.defects import BY_PROBE, DEFECTS
-from rewardaudit.metrics import PROSE_PROBES, TOO_FEW, collect_defects, compute, nondeterminism_finding
+from rewardaudit.metrics import PROSE_PROBES, TOO_FEW, collect_defects, nondeterminism_finding
 from rewardaudit.pipeline import exit_code
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import all_probes

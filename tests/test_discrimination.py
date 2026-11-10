@@ -5,32 +5,14 @@ import json
 from collections import Counter
 
 import pytest
+from conftest import FakeRunner, compute
 from rich.console import Console
 
 from rewardaudit.contract import Contract, infer_contract
-from rewardaudit.metrics import compute
 from rewardaudit.pipeline import AuditConfig, exit_code, run_audit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import no_discrimination_line, render_markdown, render_terminal, write_outputs
 from rewardaudit.types import Kind, Label, Observation, Task, Verdict
-
-
-class FakeRunner:
-    """In-process runner around `score(completion, answer) -> float | (float, sub_scores)`."""
-
-    max_score = None
-    meta: dict = {}
-
-    def __init__(self, fn):
-        self.fn = fn
-
-    def score(self, task: Task, completion: str) -> Verdict:
-        out = self.fn(completion, task.answer)
-        if isinstance(out, Exception):
-            return Verdict(Kind.ERROR, error=repr(out))
-        if isinstance(out, tuple):
-            return Verdict(Kind.SCORE, score=float(out[0]), sub_scores=out[1])
-        return Verdict(Kind.SCORE, score=float(out))
 
 
 def _tasks(n=10):

@@ -6,9 +6,10 @@ import json
 import random
 
 import pytest
+from conftest import FakeRunner, compute
 
 from rewardaudit.contract import Contract, _find_signal_keys, _task_full, infer_contract
-from rewardaudit.metrics import REJECTED_GOLD_NAME, compute, floor_estimate, hit
+from rewardaudit.metrics import REJECTED_GOLD_NAME, floor_estimate, hit
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import render_markdown
@@ -446,15 +447,11 @@ def test_the_contract_reports_the_gold_total(tmp_path):
     runner_golds = [str(10 + i) for i in range(10)]
     tasks = [Task(id=f"t{i}", prompt="p", answer=g) for i, g in enumerate(runner_golds)]
 
-    class Runner:
-        max_score = None
-        meta: dict = {}
+    def score(completion, answer):
+        correct = float(f"\\boxed{{{answer}}}" in completion)
+        return correct + 0.2, {"correct": correct, "fmt": 0.2}
 
-        def score(self, task, completion):
-            correct = float(f"\\boxed{{{task.answer}}}" in completion)
-            return Verdict(Kind.SCORE, score=correct + 0.2, sub_scores={"correct": correct, "fmt": 0.2})
-
-    c = infer_contract(Runner(), tasks)
+    c = infer_contract(FakeRunner(score), tasks)
     assert c.signal_keys == ["correct"] and c.gold_total["t0"] == pytest.approx(1.2) and c.gold_score["t0"] == 1.0
 
 

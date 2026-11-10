@@ -6,6 +6,7 @@ import random
 import time
 
 import pytest
+from conftest import compute
 from rich.console import Console
 
 from rewardaudit.adapters.base import sample_tasks
@@ -14,7 +15,7 @@ from rewardaudit.adapters.function_adapter import FunctionAdapter
 from rewardaudit.api import audit
 from rewardaudit.contract import Contract
 from rewardaudit.gate import label_gold_reason
-from rewardaudit.metrics import Tally, compute
+from rewardaudit.metrics import Tally
 from rewardaudit.pipeline import TIER_RANK, AuditConfig, run_audit
 from rewardaudit.probes import mutate
 from rewardaudit.probes.base import ProbeContext

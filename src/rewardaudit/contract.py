@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from rewardaudit.runner import Runner
+from rewardaudit.runner import RunnerPool
 from rewardaudit.types import Kind, Task, Verdict
 
 Wrapper = Callable[[str], str]
@@ -418,18 +418,6 @@ def _choose_primary(accepted: list[str], rates: dict[str, float], best_rate: flo
     return accepted[0]
 
 
-def _score_all(runner: Runner, items: list[tuple[Task, str]], progress: Callable[[int, int], None] | None) -> list[Verdict]:
-    score_many = getattr(runner, "score_many", None)
-    if score_many is not None:
-        return score_many(items, progress=progress)
-    out = []
-    for i, (t, comp) in enumerate(items):
-        out.append(runner.score(t, comp))
-        if progress:
-            progress(i + 1, len(items))
-    return out
-
-
 WRONG_SCAN = 100  # tasks to look through for another answer; a dataset with one answer throughout would be quadratic
 
 
@@ -590,23 +578,22 @@ def _stage_one_gap(c: Contract, tasks: list[Task], verdicts: list[Verdict], decl
 
 
 def infer_contract(
-    runner: Runner,
+    runner: RunnerPool,
     tasks: list[Task],
     *,
-    wrappers: list[tuple[str, Wrapper]] | None = None,
     formats: Iterable[str] = (),
-    progress: Callable[[int, int], None] | None = None,
+    progress: Callable[[int], None] | None = None,
     two_stage: bool = True,
     answer_field: bool = False,
 ) -> Contract:
-    """Two stages unless `wrappers` is given or `two_stage` is off: the 8 common wrappers, the `formats` the user gave and
-    the derived ones (`derive_wrappers`: from the runner's meta and the prompts) first, plus the families of the accepted
-    ones; every wrapper only when those settle nothing. On a composite rubric the wrong answers and the signal keys come
-    before that decision, since a continuous term in the total leaves most golds below its maximum in any format.
-    `answer_field`: the user says the checker takes the reply to be its answer field (see `_choose_primary`)."""
-    derived = {} if wrappers else {**dict.fromkeys(formats, "the format given"),
-                                   **derive_wrappers(tasks, getattr(runner, "meta", None))}
-    pool = wrappers or WRAPPERS + [(wid, wrapper_fn(wid)) for wid in derived]
+    """Two stages unless `two_stage` is off: the 8 common wrappers, the `formats` the user gave and the derived ones
+    (`derive_wrappers`: from the runner's meta and the prompts) first, plus the families of the accepted ones; every
+    wrapper only when those settle nothing. On a composite rubric the wrong answers and the signal keys come before that
+    decision, since a continuous term in the total leaves most golds below its maximum in any format. `progress` is
+    called with the number of calls just finished. `answer_field`: the user says the checker takes the reply to be its
+    answer field (see `_choose_primary`)."""
+    derived = {**dict.fromkeys(formats, "the format given"), **derive_wrappers(tasks, getattr(runner, "meta", None))}
+    pool = WRAPPERS + [(wid, wrapper_fn(wid)) for wid in derived]
     order = [wid for wid, _ in pool]
     fns = dict(pool)
     obs: list[tuple[str, str, str, Verdict]] = []
@@ -617,7 +604,7 @@ def infer_contract(
         nonlocal n_calls
         ids = [w for w in order if w in ids and w not in by_wrapper]
         items = [(wid, t, fns[wid](t.answer)) for wid in ids for t in tasks]
-        verdicts = _score_all(runner, [(t, comp) for _, t, comp in items], progress)
+        verdicts = runner.score_many([(t, comp) for _, t, comp in items], progress=progress)
         n_calls += len(items)
         for wid in ids:
             by_wrapper[wid] = {}
@@ -692,7 +679,7 @@ def infer_contract(
         todo = [(t, w) for t in tasks if (w := _gold_wrapper(base, by_wrapper, t)) is not None
                 and (t.id not in wrong or (w != wrong[t.id][0] and not valid(t.id)))]
         items = [(t, w, fns[w](_wrong_answer(t, tasks))) for t, w in todo]
-        verdicts = _score_all(runner, [(t, comp) for t, _, comp in items], None)
+        verdicts = runner.score_many([(t, comp) for t, _, comp in items])
         n_calls += len(items)
         for (t, w, comp), v in zip(items, verdicts, strict=True):
             obs.append(("wrong_answer", t.id, comp, v))
@@ -704,10 +691,9 @@ def infer_contract(
         base.signal_note = note
         return base
 
-    staged = two_stage and wrappers is None
     stage, gap = "all", ""
     judged: list[str] | None = None
-    if staged:
+    if two_stage:
         run(list(COMMON_WRAPPERS) + (list(OPEN_THINK) if ends_open_think(tasks) else []) + list(derived))
         first = build(None, "")
         # On a composite rubric the signal decides, so the wrong answers come first; every other checker pays for them
@@ -724,7 +710,7 @@ def infer_contract(
         run(order)
 
     contract = settle()
-    if staged and stage != "all" and contract.signal_keys != judged and add_families(contract):
+    if two_stage and stage != "all" and contract.signal_keys != judged and add_families(contract):
         stage = "common+families"  # the signal changed with the wrappers, and it may accept other families
         contract = settle()
     _compare_with_wrong(contract, {tid: v for tid, (_, v) in wrong.items()})
@@ -732,7 +718,7 @@ def infer_contract(
     rest = [w for w in order if w not in by_wrapper]
     rejected = set(contract.rejected_golds())
     items = [(w, t, fns[w](t.answer)) for t in tasks if t.id in rejected for w in rest]
-    verdicts = _score_all(runner, [(t, comp) for _, t, comp in items], None)
+    verdicts = runner.score_many([(t, comp) for _, t, comp in items])
     n_calls += len(items)
     for (w, t, comp), v in zip(items, verdicts, strict=True):
         obs.append((w, t.id, comp, v))
