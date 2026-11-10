@@ -1,4 +1,4 @@
-"""Lenient equivalence between answer strings.
+"""Lenient equivalence between answer strings, and whether a reply states the reference answer.
 
 Deliberately generous: anything that *might* be the same answer is treated as the same.
 Over-accepting only loses recall (a finding goes unreported); under-accepting would create
@@ -561,3 +561,21 @@ def contains_equiv(text: str, gold: str, gold_type: str | None = None, derived: 
         words = ("true", "yes", "correct") if bg else ("false", "no", "incorrect")
         return any(re.search(rf"\b{w}\b", nt) for w in words)
     return False
+
+
+def states_the_answer(text: str, gold: str, gold_type: str | None = None, derived: Iterable[str] = ()) -> bool:
+    """Whether a reply's text states the reference answer: exactly one final-answer candidate, equivalent to it; hedges and
+    lists of numbers do not count. A reply built without reading the reference answer can happen to be it (a constant 1
+    on a reference answer of 1), and that is not counted as accepted. `derived`: wrapper ids of the checker's own answer
+    fields (`Contract.derived`), read as candidates too. A reply that is only the answer has no mark for a candidate to
+    be read from, so it counts as it stands."""
+    if equiv(text, gold, gold_type):
+        return True
+    if not contains_equiv(text, gold, gold_type, derived):
+        return False
+    cands = distinct_candidates(text, gold_type, derived)
+    if len(cands) != 1 or not equiv(cands[0], gold, gold_type):
+        return False
+    if to_number(gold) is None:
+        return True
+    return len({v for tok in extract_numbers(text) if (v := to_number(tok)) is not None}) < 20

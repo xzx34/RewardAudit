@@ -12,8 +12,8 @@ from typing import Any
 
 from rewardaudit.contract import Contract
 from rewardaudit.defects import RUN_AS_CODE
+from rewardaudit.equiv import states_the_answer
 from rewardaudit.goldtype import infer_gold_type
-from rewardaudit.labels import states_the_answer
 from rewardaudit.metrics import hit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.runner import RunnerPool

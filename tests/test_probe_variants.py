@@ -12,9 +12,8 @@ import pytest
 from conftest import probe_context
 
 from rewardaudit import audit
-from rewardaudit.equiv import equiv, parse_grid, parse_json, parse_seq, strip_wrappers
+from rewardaudit.equiv import equiv, parse_grid, parse_json, parse_seq, states_the_answer, strip_wrappers
 from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, infer_gold_type, listed_names
-from rewardaudit.labels import states_the_answer
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.types import Task

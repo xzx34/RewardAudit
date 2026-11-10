@@ -1,7 +1,6 @@
 import pytest
 
-from rewardaudit.equiv import candidates, contains_equiv, equiv, flip_bool, to_number
-from rewardaudit.labels import states_the_answer
+from rewardaudit.equiv import candidates, contains_equiv, equiv, flip_bool, states_the_answer, to_number
 
 
 def test_numeric_equivalence():

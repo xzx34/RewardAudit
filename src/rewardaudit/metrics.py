@@ -27,9 +27,8 @@ from rewardaudit.defects import (
     RUN_AS_CODE,
     WRONG_PARTIAL,
 )
-from rewardaudit.equiv import normalize
+from rewardaudit.equiv import normalize, states_the_answer
 from rewardaudit.goldtype import infer_gold_type, mcq_options
-from rewardaudit.labels import states_the_answer
 from rewardaudit.probes.base import Probe
 from rewardaudit.probes.structured import ALL
 from rewardaudit.types import MARKER_MODULE, SCORE_NOT_A_NUMBER, Kind, Label, Observation, Task, Verdict
