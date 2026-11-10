@@ -5,13 +5,12 @@ import random
 import re
 
 import pytest
+from conftest import probe_context
 
 from rewardaudit import audit
 from rewardaudit.contract import Contract
 from rewardaudit.equiv import equiv
-from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.metrics import Tally, _sweep_severity
-from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.probes.rewrite import parse_date
 from rewardaudit.types import Kind, Label, Observation, Task, Verdict
@@ -19,18 +18,10 @@ from rewardaudit.types import Kind, Label, Observation, Task, Verdict
 PROBES = {p.id: p for p in all_probes()}
 
 
-def _ctx(tasks):
-    ids = [t.id for t in tasks]
-    contract = Contract(full_score=1.0, accepted=["bare"], primary="bare", wrapper_rates={"bare": 1.0},
-                        self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
-                        task_wrappers={i: ["bare"] for i in ids})
-    return ProbeContext(contract=contract, gold_type="int", tasks=tasks, gold_types={t.id: infer_gold_type(t.answer) for t in tasks})
-
-
 def _gen(probe_id, answer, prompt="What is the answer?", others=()):
     task = Task("t", prompt, answer)
     tasks = [task, *(Task(f"o{i}", "p", a) for i, a in enumerate(others))]
-    ctx = _ctx(tasks)
+    ctx = probe_context(tasks, "bare")
     ctx.task = task
     return dict(PROBES[probe_id].generate(task, random.Random(0), ctx))
 
@@ -86,7 +77,7 @@ def test_m6_leaves_the_number_of_a_line_alone():
     assert re.fullmatch(r"(\*1\*: Sam has )\d( apples)", next(iter(_gen("M6", "*1*: Sam has 5 apples").values())))
     assert re.fullmatch(r"(1\. Sam has )\d( apples)", next(iter(_gen("M6", "1. Sam has 5 apples").values())))
     task = Task("t", "What is it?", "20.09369")  # a decimal point is not a line number: every digit can change
-    ctx = _ctx([task])
+    ctx = probe_context([task], "bare")
     ctx.task = task
     positions = set()
     for seed in range(60):

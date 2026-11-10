@@ -4,16 +4,14 @@ loses the score is a finding of D16, apart from the head metrics."""
 import random
 
 import pytest
+from conftest import probe_context
 from typer.testing import CliRunner
 
 from rewardaudit import audit, cli
 from rewardaudit.adapters.function_adapter import reference_aliases
-from rewardaudit.contract import Contract
 from rewardaudit.defects import BY_PROBE
-from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.metrics import REJECTED_GOLD_NAME
 from rewardaudit.pipeline import exit_code
-from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.reference import MAX_ALIASES
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import render_markdown
@@ -47,17 +45,8 @@ def test_no_other_answers_when_the_checker_receives_no_list_of_them(spec, info):
     assert reference_aliases(spec, _task("Paris", info)) == []
 
 
-def _ctx(tasks, aliases, primary="boxed"):
-    ids = [t.id for t in tasks]
-    contract = Contract(full_score=1.0, accepted=[primary], primary=primary, wrapper_rates={primary: 1.0},
-                        self_pass=dict.fromkeys(ids, True), gold_score=dict.fromkeys(ids, 1.0),
-                        task_wrappers={i: [primary] for i in ids})
-    return ProbeContext(contract=contract, gold_type="short_str", tasks=tasks, aliases=aliases,
-                        gold_types={t.id: infer_gold_type(t.answer) for t in tasks})
-
-
 def _replies(task, aliases, primary="boxed"):
-    ctx = _ctx([task], {task.id: aliases} if aliases else {}, primary)
+    ctx = probe_context([task], primary, "short_str", aliases={task.id: aliases} if aliases else {})
     ctx.task = task
     return dict(G2.generate(task, random.Random(0), ctx))
 
@@ -150,7 +139,7 @@ def test_without_the_list_the_checker_gets_one_answer_and_g2_sends_nothing():
     ("json", '{"answer": "Paris"}', "Paris"), ("boxed", "Paris", "Paris"),  # not written in the format: as it is
 ])
 def test_the_answer_of_a_reply_in_the_accepted_format(primary, reply, answer):
-    assert _ctx([Task("t", "q", "x")], {}, primary).contract.answer_of(reply, "t") == answer
+    assert probe_context([Task("t", "q", "x")], primary, "short_str").contract.answer_of(reply, "t") == answer
 
 
 def test_the_g_family_lists_g1_with_g2():

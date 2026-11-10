@@ -15,14 +15,14 @@ from rewardaudit.api import DEFAULT_N
 from rewardaudit.api import audit as run
 from rewardaudit.errors import AuditError, WorkerError, short_error
 from rewardaudit.pipeline import AuditResult, exit_code
-from rewardaudit.report import render_terminal, write_outputs
+from rewardaudit.report import ROWS, render_terminal, write_outputs
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Test the checker of an RL environment, without a model.",
                   pretty_exceptions_enable=False)
 console = Console()
 errors = Console(stderr=True)
 USAGE_ERROR = 2
-RATES = ("non_solving_accepted", "wrong_accepted", "hedging_accepted", "right_rejected", "wrong_partial")
+RATES = tuple(ROWS)  # the rates of the summary, by the names --fail-on takes
 
 
 def _sample_size(n: str) -> int | str:

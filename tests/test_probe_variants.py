@@ -9,14 +9,13 @@ import random
 import re
 
 import pytest
+from conftest import probe_context
 
 from rewardaudit import audit
-from rewardaudit.contract import Contract
 from rewardaudit.equiv import equiv, parse_grid, parse_json, parse_seq, strip_wrappers
 from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, infer_gold_type, listed_names
 from rewardaudit.labels import states_the_answer
 from rewardaudit.pipeline import AuditConfig, run_audit
-from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.types import Task
 
@@ -26,23 +25,14 @@ PROSE_PROBES = ("Q5", "Q6", "Q21", "Q22", "O4")
 SEEDS = range(20)
 
 
-def _ctx(tasks, primary="boxed"):
-    ids = [t.id for t in tasks]
-    contract = Contract(full_score=1.0, accepted=[primary], primary=primary, wrapper_rates={primary: 1.0},
-                        self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
-                        task_wrappers={i: [primary] for i in ids})
-    return ProbeContext(contract=contract, gold_type="short_str", tasks=tasks,
-                        gold_types={t.id: infer_gold_type(t.answer) for t in tasks})
-
-
 def _gen(probe_id, task, tasks=None, primary="boxed", seed=0):
-    ctx = _ctx(tasks or [task], primary)
+    ctx = probe_context(tasks or [task], primary, "short_str")
     ctx.task = task
     return dict(PROBES[probe_id].generate(task, random.Random(seed), ctx))
 
 
 def _wrongs(task, tasks=None):
-    ctx = _ctx(tasks or [task])
+    ctx = probe_context(tasks or [task], gold_type="short_str")
     ctx.task = task
     return [ctx.wrong_answer(task, random.Random(s)) for s in SEEDS]
 
@@ -576,7 +566,7 @@ def test_a_zero_gold_leaves_out_negative_zero():
 
 def test_without_a_wrong_answer_p2_only_loses_the_nested_replies():
     t = Task("t", "Compute it.", "42")
-    ctx = _ctx([t])
+    ctx = probe_context([t], gold_type="short_str")
     ctx.task = t
     ctx.wrong_answer = lambda task, rng: None
     assert {n for n, _ in PROBES["P2"].generate(t, random.Random(0), ctx)} == P2_ALWAYS | P2_NUMBERS

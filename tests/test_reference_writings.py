@@ -7,16 +7,15 @@ import subprocess
 import sys
 
 import pytest
+from conftest import probe_context
 from typer.testing import CliRunner
 
 from rewardaudit import audit, cli
 from rewardaudit.adapters.function_adapter import reference_is_answer
-from rewardaudit.contract import Contract
 from rewardaudit.defects import BY_PROBE, DEFECTS
-from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.metrics import TOO_FEW, _rejected_severity
 from rewardaudit.pipeline import _variants
-from rewardaudit.probes.base import Probe, ProbeContext
+from rewardaudit.probes.base import Probe
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import render_markdown, write_outputs
 from rewardaudit.types import Label, Task
@@ -27,19 +26,10 @@ PERCENT = "What percentage of 200 is 50?"
 DOLLARS = "A pen costs 3 dollars. How many dollars do 4 pens cost?"
 
 
-def _ctx(tasks, primary="boxed", reaches=True):
-    ids = [t.id for t in tasks]
-    contract = Contract(full_score=1.0, accepted=[primary], primary=primary, wrapper_rates={primary: 1.0},
-                        self_pass=dict.fromkeys(ids, True), gold_score=dict.fromkeys(ids, 1.0),
-                        task_wrappers={i: [primary] for i in ids})
-    return ProbeContext(contract=contract, gold_type="short_str", tasks=tasks, reference_is_answer=reaches,
-                        gold_types={t.id: infer_gold_type(t.answer) for t in tasks})
-
-
 def _written(answer, prompt="Compute it.", primary="boxed", reaches=True):
     """variant -> (reply, the reference answer the checker gets)."""
     task = Task("t", prompt, answer)
-    ctx = _ctx([task], primary, reaches)
+    ctx = probe_context([task], primary, "short_str", reference_is_answer=reaches)
     ctx.task = task
     return {name: (reply, reference) for name, reply, reference in G3.generate(task, random.Random(0), ctx)}
 
@@ -88,7 +78,7 @@ def test_words_in_text_only_under_a_format_with_a_box():
 def test_thousands_separators_only_on_a_quantity_as_q8():
     year = Task("y", "In which year did the library open?", "2005")
     words = [Task(str(i), "Which city is it?", name) for i, name in enumerate(("Paris", "Rome", "Oslo"))]
-    ctx = _ctx([year, *words])
+    ctx = probe_context([year, *words], gold_type="short_str", reference_is_answer=True)
     ctx.task = year
     assert {name for name, *_ in G3.generate(year, random.Random(0), ctx)} == {"period"}  # no one writes 2,005
     assert "commas" in _written("2005", "How many people came?")
@@ -123,7 +113,7 @@ def test_whether_the_checker_gets_the_reference_answer(spec, reaches):
 def test_a_variant_with_a_reference_answer_is_sent_with_a_copy_of_its_task():
     task = Task("t7", "q", "1200", info={"k": 1})
     probe = Probe("Gx", "G", "test", "natural", "full", Label.SOLVING, lambda t, r, c: [("as_is", "1200"), ("commas", "1200", "1,200")])
-    (same, _, _), (copy, name, reply) = _variants(probe, [task], _ctx([task]), seed=0)
+    (same, _, _), (copy, name, reply) = _variants(probe, [task], probe_context([task], gold_type="short_str", reference_is_answer=True), seed=0)
     assert same is task and (name, reply) == ("commas", "1200")
     assert copy.answer == "1,200" and (copy.id, copy.prompt, copy.info) == ("t7", "q", {"k": 1}) and task.answer == "1200"
 

@@ -13,10 +13,10 @@ from rich.padding import Padding
 from rich.text import Text
 
 from rewardaudit.errors import AuditError
+from rewardaudit.metrics import probe_category
 from rewardaudit.probes.base import Probe
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.report import ROWS, _grid, _reply, _say, _score
-from rewardaudit.types import Label
 
 KEYS = ("task_id", "probe_id", "variant", "completion", "kind", "score", "accepted")
 KINDS = ("a_accepts", "b_accepts", "no_score")  # how two aligned calls can differ; no_score: one has none, the other rejected
@@ -51,11 +51,7 @@ def _read(path: str | Path) -> dict[tuple[str, str, str], dict[str, Any]]:
 
 def _head(p: Probe | None) -> str | None:
     """The rate a probe's calls count toward in the audit's summary; None for a probe outside every rate."""
-    if p is None or not p.headline:
-        return None
-    if p.label == Label.SOLVING:
-        return "right_rejected"
-    return {"M": "wrong_accepted", "O": "hedging_accepted"}.get(p.family, "non_solving_accepted")
+    return probe_category(p) if p is not None and p.headline else None
 
 
 def _heads(calls: Iterable[dict[str, Any]]) -> dict[str, float]:

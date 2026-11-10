@@ -7,13 +7,13 @@ import random
 import re
 
 import pytest
+from conftest import probe_context
 
-from rewardaudit.contract import REASONING, WRAPPERS, Contract
+from rewardaudit.contract import REASONING, WRAPPERS
 from rewardaudit.equiv import contains_equiv
 from rewardaudit.errors import AuditError, NotAuditable
-from rewardaudit.goldtype import asks_answer_first, asks_answer_last, asks_answer_only, infer_gold_type
+from rewardaudit.goldtype import asks_answer_first, asks_answer_last, asks_answer_only
 from rewardaudit.pipeline import AuditConfig, run_audit
-from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.mutate import m7_insert_word
 from rewardaudit.probes.order import SINGLE_BLOCK, single_block
 from rewardaudit.probes.registry import all_probes
@@ -25,17 +25,8 @@ OBJECT = '{"name": "Ada", "age": 36}'
 PROSE_PROBES = ("Q5", "Q6", "Q21", "Q22", "O4")
 
 
-def _ctx(tasks, primary="boxed"):
-    ids = [t.id for t in tasks]
-    contract = Contract(full_score=1.0, accepted=[primary], primary=primary, wrapper_rates={primary: 1.0},
-                        self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
-                        task_wrappers={i: [primary] for i in ids})
-    return ProbeContext(contract=contract, gold_type="int", tasks=tasks,
-                        gold_types={t.id: infer_gold_type(t.answer) for t in tasks})
-
-
 def _gen(probe_id, task, tasks=None, primary="boxed"):
-    ctx = _ctx(tasks or [task], primary)
+    ctx = probe_context(tasks or [task], primary)
     ctx.task = task
     return dict(PROBES[probe_id].generate(task, random.Random(0), ctx))
 
@@ -285,9 +276,9 @@ def test_text_outside_the_two_blocks_a_prompt_writes_out_is_not_sent():
 # --- Q8 and the dataset's kind --------------------------------------------------------------------------------
 
 def test_a_numeric_dataset_is_a_strict_majority():
-    assert _ctx(_tasks("4.4", "12", "7", "Paris", "3")).numeric_dataset()
-    assert not _ctx(_tasks("1", "2", "Paris", "Rome")).numeric_dataset()
-    assert not _ctx(_tasks("Paris", "London", "4.4", "Rome", "Oslo")).numeric_dataset()
+    assert probe_context(_tasks("4.4", "12", "7", "Paris", "3")).numeric_dataset()
+    assert not probe_context(_tasks("1", "2", "Paris", "Rome")).numeric_dataset()
+    assert not probe_context(_tasks("Paris", "London", "4.4", "Rome", "Oslo")).numeric_dataset()
 
 
 def test_q8_leaves_a_version_number_in_a_word_dataset_alone():
@@ -306,7 +297,7 @@ def test_q8_puts_the_trailing_zero_on_the_number_not_after_its_percent_sign():
 @pytest.mark.parametrize("primary", ["boxed", "think_boxed", "bare"])
 def test_q8_variants_still_contain_the_gold(primary):
     tasks = _tasks("32", "-1.5", "13", "1000", "0.25")
-    ctx = _ctx(tasks, primary)
+    ctx = probe_context(tasks, primary)
     for t in tasks:
         ctx.task = t
         comps = [c for _, c in PROBES["Q8"].generate(t, random.Random(0), ctx)]
@@ -317,7 +308,7 @@ def test_q8_variants_still_contain_the_gold(primary):
 
 def test_the_inserted_word_is_never_last():
     t = Task("t", "Name the city.", "New York City")
-    ctx = _ctx([t], "bare")
+    ctx = probe_context([t], "bare")
     ctx.task = t
     places = set()
     for seed in range(60):

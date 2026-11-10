@@ -4,12 +4,12 @@ import random
 import re
 
 import pytest
+from conftest import probe_context
 
-from rewardaudit.contract import Contract
 from rewardaudit.equiv import candidates, contains_equiv, equiv, strip_wrappers
 from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.labels import states_the_answer
-from rewardaudit.probes.base import Probe, ProbeContext, latex_defects
+from rewardaudit.probes.base import Probe, latex_defects
 from rewardaudit.probes.parser import gold_tower
 from rewardaudit.probes.registry import FAMILIES, all_probes
 from rewardaudit.probes.rewrite import tex_shorthand
@@ -55,13 +55,8 @@ WORD_GOLD = re.compile(r"\bgolds?\b", re.I)
 
 
 def _ctx(primary="boxed"):
-    ids = [t.id for t in TASKS]
-    contract = Contract(full_score=1.0, accepted=[primary, "answer_tag"], primary=primary, wrapper_rates={primary: 1.0},
-                        self_pass={i: True for i in ids}, gold_score={i: 1.0 for i in ids},
-                        task_wrappers={i: [primary] for i in ids})
-    ctx = ProbeContext(contract=contract, gold_type="int", tasks=TASKS,
-                       gold_types={t.id: infer_gold_type(t.answer) for t in TASKS}, aliases={"t8": ["NYC", "New York City"]},
-                       reference_is_answer=True)
+    ctx = probe_context(TASKS, primary, aliases={"t8": ["NYC", "New York City"]}, reference_is_answer=True)
+    ctx.contract.accepted.append("answer_tag")  # a second accepted format
     ctx._numeric_dataset = True  # the fixture mixes gold types on purpose; Q8's labels stay covered
     return ctx
 

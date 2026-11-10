@@ -1,7 +1,21 @@
 """Helpers several test files share; they import them with `from conftest import ...`."""
 
+from rewardaudit.contract import Contract
+from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.metrics import Tally
+from rewardaudit.probes.base import ProbeContext
 from rewardaudit.types import Kind, Task, Verdict
+
+
+def probe_context(tasks, primary="boxed", gold_type="int", **kw):
+    """A ProbeContext over `tasks` for a checker that accepts the format `primary`, every reference answer passing in it.
+    `kw` go to ProbeContext: aliases, reference_is_answer."""
+    ids = [t.id for t in tasks]
+    contract = Contract(full_score=1.0, accepted=[primary], primary=primary, wrapper_rates={primary: 1.0},
+                        self_pass=dict.fromkeys(ids, True), gold_score=dict.fromkeys(ids, 1.0),
+                        task_wrappers={i: [primary] for i in ids})
+    return ProbeContext(contract=contract, gold_type=gold_type, tasks=tasks,
+                        gold_types={t.id: infer_gold_type(t.answer) for t in tasks}, **kw)
 
 
 class FakeRunner:

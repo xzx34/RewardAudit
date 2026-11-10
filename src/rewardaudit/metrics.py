@@ -276,15 +276,25 @@ def _wrong_severity(rate: float) -> str:
     return "high" if rate >= 0.5 else ("medium" if rate >= 0.1 else "low")
 
 
+def probe_category(probe: Probe) -> str:
+    """The category of a probe's findings, which is the summary row its calls count toward when it is a headline probe:
+    a right answer that loses the score, a wrong answer (M), a right and a wrong answer in one reply (O), or else a reply
+    that does not solve the task."""
+    if probe.label == Label.SOLVING:
+        return "right_rejected"
+    return {"M": "wrong_accepted", "O": "hedging_accepted"}.get(probe.family, "non_solving_accepted")
+
+
 def _non_solving_finding(probe: Probe, rate: float, lo: float, floor: float) -> tuple[str, str]:
     """(category, severity) of a probe that expects zero and got credit."""
-    if probe.family == "M":
-        return "wrong_accepted", _wrong_severity(rate)
-    if probe.family == "O":
-        return "hedging_accepted", "high" if lo > 0.5 else ("medium" if rate >= 0.2 else "low")
+    category = probe_category(probe)
+    if category == "wrong_accepted":
+        return category, _wrong_severity(rate)
+    if category == "hedging_accepted":
+        return category, "high" if lo > 0.5 else ("medium" if rate >= 0.2 else "low")
     above = lo > floor
     sev = "high" if (rate >= 0.5 and above) else ("medium" if above else "low")
-    return "non_solving_accepted", "medium" if probe.tier == "contrived" and sev == "high" else sev
+    return category, "medium" if probe.tier == "contrived" and sev == "high" else sev
 
 
 def _variant_size(name: str) -> float:
@@ -624,10 +634,10 @@ def _summarize(tally: Tally, answer_field: bool) -> dict[str, Any]:
         sel = [s for s in stats.values() if pred(s) and s.probe.headline]
         return sum(s.obs_hits for s in sel), sum(s.n_scored for s in sel)
 
-    hk, hn = pooled(lambda s: s.probe.family == "O" and s.probe.label == Label.NOT_SOLVING)
-    wk, wn = pooled(lambda s: s.probe.family == "M")
+    hk, hn = pooled(lambda s: probe_category(s.probe) == "hedging_accepted")
+    wk, wn = pooled(lambda s: probe_category(s.probe) == "wrong_accepted")
     whole_answer = _compares_whole_reply(stats, contract, answer_field)
-    rk, rn = pooled(lambda s: s.probe.label == Label.SOLVING and not (whole_answer and s.probe.id in PROSE_PROBES))
+    rk, rn = pooled(lambda s: probe_category(s.probe) == "right_rejected" and not (whole_answer and s.probe.id in PROSE_PROBES))
     head_hedge = _metric("hedging_accepted", "Hedged answers accepted", hk, hn,
                          "one right and one wrong answer in the same reply")
     head2 = _metric("wrong_accepted", "Wrong answers accepted", wk, wn, "the reference answer with a definite error")

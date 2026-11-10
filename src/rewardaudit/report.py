@@ -18,11 +18,18 @@ from rich.text import Text
 from rewardaudit.contract import REASONING, Contract, wrapper_fn
 from rewardaudit.errors import short_error
 from rewardaudit.goldtype import infer_gold_type
-from rewardaudit.metrics import FORMAT_ONLY, OUTRANKS, REJECTED_GOLD_ID, REJECTED_GOLD_NAME, wilson
+from rewardaudit.metrics import (
+    FORMAT_ONLY,
+    OUTRANKS,
+    REJECTED_GOLD_ID,
+    REJECTED_GOLD_NAME,
+    probe_category,
+    wilson,
+)
 from rewardaudit.pipeline import AuditResult
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import FAMILIES
-from rewardaudit.types import Label, Task
+from rewardaudit.types import Task
 
 SCHEMA_VERSION = "1"
 MAX_FORMATS, MAX_EVIDENCE, MAX_IMPORTS = 8, 6, 8
@@ -600,10 +607,9 @@ REJECTED_GOLD_HELP = (
 
 def _row_label(p: Probe) -> str:
     """The summary row a probe's calls count toward. Any probe's failed calls count toward Runs reliably as well."""
+    row = ROWS[probe_category(p)][0]
     if p.family == "P":
-        return f"{RELIABLE_ROW}; a reply the checker accepts is a finding under {ROWS['non_solving_accepted'][0]}"
-    row = ROWS["right_rejected" if p.label == Label.SOLVING else "wrong_accepted" if p.family == "M"
-               else "hedging_accepted" if p.family == "O" else "non_solving_accepted"][0]
+        return f"{RELIABLE_ROW}; a reply the checker accepts is a finding under {row}"
     return row if p.headline else f"{row}, as a finding but not in the rate"
 
 
