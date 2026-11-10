@@ -6,7 +6,7 @@ import random
 
 from rewardaudit.contract import _wrong_answer
 from rewardaudit.probes.base import ProbeContext
-from rewardaudit.probes.enum import e3_bool, e6_final_answer_lines
+from rewardaudit.probes.candidates import e3_bool, e6_final_answer_lines
 from rewardaudit.probes.mutate import m16_bool_flip
 from rewardaudit.types import Task
 

@@ -15,7 +15,7 @@ from rewardaudit.contract import (
     wrapper_fn,
 )
 from rewardaudit.probes.base import ProbeContext
-from rewardaudit.probes.order import o4_retract_to_gold, single_block
+from rewardaudit.probes.hedge import o4_retract_to_gold, single_block
 from rewardaudit.types import Task
 
 

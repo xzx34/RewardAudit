@@ -10,9 +10,9 @@ from rewardaudit.equiv import candidates, contains_equiv, equiv, strip_wrappers
 from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.labels import states_the_answer
 from rewardaudit.probes.base import Probe, latex_defects
-from rewardaudit.probes.parser import gold_tower
 from rewardaudit.probes.registry import FAMILIES, all_probes
 from rewardaudit.probes.rewrite import tex_shorthand
+from rewardaudit.probes.robustness import gold_tower
 from rewardaudit.probes.structured import semantics
 from rewardaudit.types import Label, Task
 

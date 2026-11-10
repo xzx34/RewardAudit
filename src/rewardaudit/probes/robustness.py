@@ -1,6 +1,6 @@
-"""P family: parser robustness. Malformed or extreme inputs that should score zero without an error, a timeout
-or a crash. A reply the checker accepts is a finding; these calls stay out of the summary's rates (headline=False),
-since they run on a few tasks only.
+"""P family: the robustness of the checker's parsing. Malformed or extreme inputs that should score zero without an
+error, a timeout or a crash. A reply the checker accepts is a finding; these calls stay out of the summary's rates
+(headline=False), since they run on a few tasks only.
 
 Each call that times out costs the full timeout plus a worker restart, so these probes run on the first five
 passing tasks only, with few variants, and every completion stays under 200 KB except P17's, which is a million

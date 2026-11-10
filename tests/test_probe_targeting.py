@@ -14,8 +14,8 @@ from rewardaudit.equiv import contains_equiv
 from rewardaudit.errors import AuditError, NotAuditable
 from rewardaudit.goldtype import asks_answer_first, asks_answer_last, asks_answer_only
 from rewardaudit.pipeline import AuditConfig, run_audit
+from rewardaudit.probes.hedge import SINGLE_BLOCK, single_block
 from rewardaudit.probes.mutate import m7_insert_word
-from rewardaudit.probes.order import SINGLE_BLOCK, single_block
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.probes.structured import _changed
 from rewardaudit.types import Task
