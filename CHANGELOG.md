@@ -138,6 +138,9 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   `--format`; before, both pointed to `--answer-col`, `--reference-col` or a wrapper function, which an environment does
   not take. The suggestion to rerun with `--verifiers '<0.1.11'` or `'<0.1.13'` is made only for environments written for
   the Environment API of verifiers before 0.2, not for tasksets, which need a later verifiers than those.
+- M6 leaves alone the numbers of lines written `*1*: ...`, as it already did `1. ...` and `(1) ...`. In a task that asks
+  for numbered blocks to be put in order, the numbers stay in place and are not the answer, so a checker that ignores them
+  was reported as accepting a close answer.
 
 ## 0.2.0 - 2026-11-07
 

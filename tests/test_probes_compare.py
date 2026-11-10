@@ -82,6 +82,8 @@ def test_one_digit_changed_in_a_long_answer_is_another_answer():
 def test_m6_leaves_the_number_of_a_line_alone():
     gold = "(1) Zoey is a knave\n(2) Oliver is a knight"
     assert _gen("M6", gold) == {}
+    assert _gen("M6", "*1*: Ice machines are rated.\n*2*: A new machine makes less ice.") == {}
+    assert re.fullmatch(r"(\*1\*: Sam has )\d( apples)", next(iter(_gen("M6", "*1*: Sam has 5 apples").values())))
     assert re.fullmatch(r"(1\. Sam has )\d( apples)", next(iter(_gen("M6", "1. Sam has 5 apples").values())))
     task = Task("t", "What is it?", "20.09369")  # a decimal point is not a line number: every digit can change
     ctx = _ctx([task])

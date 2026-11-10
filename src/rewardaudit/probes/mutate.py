@@ -76,7 +76,8 @@ def m5_swap_chars(task, rng, ctx):
 
 def m6_digit(task, rng, ctx):
     g = ctx.gold(task)
-    labels = {i for m in re.finditer(r"(?m)^\s*\(?\d+[.)](?=\s)", g) for i in range(*m.span())}  # (1) numbers a line, it is not the answer
+    # (1), 1. and *1*: number a line, and are not the answer (the blocks of a reordering task keep their numbers)
+    labels = {i for m in re.finditer(r"(?m)^\s*(?:\(?\d+[.)]|\*\d+\*:)(?=\s)", g) for i in range(*m.span())}
     digits = [i for i, ch in enumerate(g) if ch.isdigit() and i not in labels]
     if not digits:
         return []
