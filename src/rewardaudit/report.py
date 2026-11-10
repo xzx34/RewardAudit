@@ -16,7 +16,7 @@ from rich.text import Text
 
 from rewardaudit.contract import REASONING, Contract, wrapper_fn
 from rewardaudit.errors import short_error
-from rewardaudit.metrics import FORMAT_ONLY, OUTRANKS, REJECTED_GOLD_ID, wilson
+from rewardaudit.metrics import FORMAT_ONLY, OUTRANKS, REJECTED_GOLD_ID, TOO_FEW, wilson
 from rewardaudit.pipeline import AuditResult
 
 SCHEMA_VERSION = "1"
@@ -162,6 +162,9 @@ def _verdict(result: AuditResult) -> str:
     found = f"problems found ({high} high, {medium} medium)" if high + medium else ""
     if result.contract.no_discrimination:
         return f"{found}; the rates could not be measured" if found else "the rates could not be measured"
+    if any(d["severity"] == "low" and any(TOO_FEW in e["note"] for e in d["evidence"]) for d in result.defects):
+        unrated = "the audit could not rate some findings: too few calls; use more rows"
+        return f"{found}; {unrated}" if found else unrated
     if found:
         return found
     return "no serious problems found" if result.defects or not _reliability(result)[0] else "no problems found"
@@ -179,6 +182,9 @@ def _top_lines(result: AuditResult) -> list[str]:
     pin = meta.get("verifiers_pin")  # findings hold on the verifiers they were measured on
     lines = [f"Measured on {pin}, not on the verifiers a fresh install of this package gets."] if pin else []
     lines += [line] if (line := direct_scoring_line(meta)) else []
+    source = result.spec.get("dataset", "")
+    if source.startswith("hf:") and len(source.split(":")) < 4:
+        lines.append(f"Hugging Face dataset: using split {result.spec.get('split') or 'train'!r} (no split in the dataset name).")
     if not_run := meta.get("probes_not_run"):
         lines.append(f"Budget of {_duration(result.config.budget_s)} reached before {', '.join(not_run)} "
                      f"({_plural(len(not_run), 'probe')} not run); the rows below are measured on fewer probes.")
@@ -352,7 +358,7 @@ def render_terminal(result: AuditResult, console: Console | None = None, *, full
         _say(console, "No defects.", "green")
     if withheld:
         _say(console, f"Not counted, for the reason above: {_plural(len(withheld), 'more finding')} (see report.json).", "dim")
-    console.print()
+    _say(console, "rewardaudit probes <id> explains a probe, defect or evidence id.", "dim")
     if full and findings:
         _say(console, f"Findings ({len(findings)})", "bold")
         _print_findings(findings, console)

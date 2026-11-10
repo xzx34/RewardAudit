@@ -5,6 +5,12 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
 ## Unreleased
 
+- A checker that returns a value that is not a score is told which score types it can return.
+- The result says when too few calls prevented findings from being rated, and suggests using more rows.
+- `rewardaudit probes <id>` explains defects, findings and evidence ids; reports point to it, and every probe has an example.
+- Command help describes positional arguments in the command description.
+- A Hugging Face dataset name without a split reports which split was used.
+
 ### Added
 
 - Each high defect is confirmed in a line under it, in the terminal and in `report.md`: its example is sent 5 more times, and

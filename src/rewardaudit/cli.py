@@ -90,7 +90,7 @@ def _execute(call: Any, quiet: bool) -> AuditResult:
 
 @app.command()
 def audit(
-    target: str = typer.Argument(..., help="reward.py[:function], a verifiers environment installed here, or owner/name from the Hub"),
+    target: str = typer.Argument(...),
     dataset: str | None = typer.Option(None, "--dataset", "-d", help="for a scoring function: jsonl, json, csv or parquet file, or hf:org/name[:config[:split]]"),
     n: str = typer.Option(str(DEFAULT_N), "--n", "-n", help="rows to draw at random from the whole dataset, or 'all'"),
     seed: int = typer.Option(0, help="seed of the random draw"),
@@ -110,7 +110,10 @@ def audit(
     full: bool = typer.Option(False, "--full", help="also print the finding behind each defect, one per probe"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="print only the result"),
 ) -> None:
-    """Audit one checker. Exit code: 0 no high defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured."""
+    """Audit one checker. TARGET is reward.py[:function], a verifiers environment installed here, or owner/name from the Hub.
+
+    Exit code: 0 no high defect, 1 such a defect, 2 the audit could not be done or the rates could not be measured.
+    """
     try:
         size, gates, budget_s = _sample_size(n), _fail_on(fail_on), _budget(budget)
     except AuditError as e:
@@ -142,10 +145,13 @@ def demo(
 
 @app.command("compare")
 def compare_calls(
-    a: str = typer.Argument(..., help="the calls of one audit, as audit --calls writes them"),
-    b: str = typer.Argument(..., help="the calls of another audit on the same dataset, --n and --seed"),
+    a: str = typer.Argument(...),
+    b: str = typer.Argument(...),
 ) -> None:
-    """Show where two checkers, or two versions of one, decide differently on the same rows."""
+    """Show where two checkers, or two versions of one, decide differently on the same rows.
+
+    A and B are calls files written by audit --calls, on the same dataset, --n and --seed.
+    """
     from rewardaudit.comparison import compare, render_compare
 
     try:
@@ -157,9 +163,9 @@ def compare_calls(
 
 @app.command()
 def probes(
-    key: str | None = typer.Argument(None, help="a probe (Q6) or a family (Q): show what it sends and what a sound checker does"),
+    key: str | None = typer.Argument(None),
 ) -> None:
-    """List every probe, or explain one."""
+    """List every probe, or explain KEY: a probe (Q6), family (Q), defect (D7), finding (S1) or evidence id (format_only)."""
     from rewardaudit.explain import render_explain, render_probe_list
 
     if key is None:

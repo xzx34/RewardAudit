@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from rewardaudit import audit, cli
 from rewardaudit.contract import Contract
+from rewardaudit.defects import DEFECTS
 from rewardaudit.metrics import Robustness, exception_type
 from rewardaudit.pipeline import exit_code
 from rewardaudit.probes.base import Probe
@@ -154,6 +155,22 @@ def test_no_problems_found_and_a_row_nothing_was_sent_for():
     assert "Result: no problems found" in text and "No defects." in text
     assert row_line(text, "Accepts wrong answers").split() == ["Accepts", "wrong", "answers", "not", "measured"]
     assert exit_code(r) == 0
+
+
+def test_one_row_says_the_findings_could_not_be_rated():
+    r = audit(last_number, ROWS_OF_NUMBERS[:1], workers=1)
+    text = flat(screen(r))
+    assert r.defects and all(d["severity"] == "low" for d in r.defects)
+    assert "the audit could not rate some findings: too few calls; use more rows" in text
+    assert "no serious problems found" not in text and exit_code(r) == 0
+
+
+def test_a_hugging_face_name_without_a_split_reports_the_split_used(substring):
+    r = dataclasses.replace(substring, spec={**substring.spec, "dataset": "hf:org/name:main"})
+    line = "Hugging Face dataset: using split 'train' (no split in the dataset name)."
+    assert line in flat(screen(r)) and line in render_markdown(r)
+    r = dataclasses.replace(r, spec={**r.spec, "split": "test"})
+    assert "using split 'test'" in flat(screen(r))
 
 
 def test_full_prints_every_finding_its_interval_and_the_accepted_formats(substring):
@@ -494,6 +511,25 @@ def test_probes_explains_the_finding_no_probe_sends(console_80):
     res = runner.invoke(cli.app, ["probes", "g1"])
     assert res.exit_code == 0 and "reference answer rejected in every format tried" in res.output
     assert "partial credit" in flat(res.output)
+
+
+def test_report_ids_can_be_looked_up(console_80, substring):
+    assert flat(screen(substring)).count("rewardaudit probes <id>") == 1
+    for defect in DEFECTS:
+        res = runner.invoke(cli.app, ["probes", defect.id])
+        assert res.exit_code == 0, res.output
+        assert flat(defect.explanation) in flat(res.output)
+    for key in ("S1", "S2", "format_only", "wrong_above", "wrong_partial"):
+        res = runner.invoke(cli.app, ["probes", key])
+        assert res.exit_code == 0 and res.output.startswith(key), res.output
+        assert "sound checker" in flat(res.output)
+
+
+def test_probes_missing_sample_replies_have_examples(console_80):
+    for key in ("M26", "M27", "L3", "L4", "Q27", "Q10", "P15", "E10"):
+        res = runner.invoke(cli.app, ["probes", key])
+        assert res.exit_code == 0, res.output
+        assert "reference answer" in res.output and "No example" not in res.output
 
 
 def test_an_unknown_probe_fails(console_80):

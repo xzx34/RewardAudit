@@ -195,6 +195,10 @@ def classify_contract(contract: Any, tasks: list[Task], min_passing: int = MIN_P
     if k == 0:
         errors = [v for v in gold if v.kind == Kind.ERROR]
         if errors and len(errors) >= 0.5 * len(gold):
+            if ", in _coerce\n" in (errors[0].error or ""):
+                return "gold_never_passes", (f"The checker returned a value that is not a score: {short_error(errors[0].error or '')}"), (
+                    "Return a number or bool, a dict with numeric fields, a tuple with a numeric element, an object with a "
+                    "numeric score, reward or overall attribute, or a one-element list or tensor holding a score")
             return "gold_never_passes", (f"The checker raised an error on {len(errors)} of {len(gold)} calls with the reference "
                                          f"answer: {short_error(errors[0].error or '')}"), NOT_PASSING
         return "gold_never_passes", f"No reference answer earned full score in any of the {len(contract.wrappers_run)} formats tried", NOT_PASSING

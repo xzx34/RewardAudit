@@ -238,6 +238,28 @@ def test_a_checker_that_raises_on_every_reference_answer():
     assert stop.cls == "gold_never_passes" and "raised an error on" in stop.reason and "KeyError" in stop.reason
 
 
+def test_a_checker_returning_a_string_is_told_to_return_a_score(tmp_path):
+    checker = tmp_path / "reward.py"
+    checker.write_text('def score(completion, answer):\n    return "1.0"\n')
+    data = tmp_path / "data.jsonl"
+    data.write_text(json.dumps(ROWS[0]) + "\n")
+    res = _run(str(checker), "--dataset", str(data), "--workers", "1", "-q")
+    assert res.exit_code == 2, res.output
+    assert "returned a value that is not a score" in res.output and "unsupported score type: str" in res.output
+    assert "number or bool" in res.output and "dict" in res.output and "tuple" in res.output and "tensor" in res.output
+    assert "raised an error" not in res.output and "answer column" not in res.output
+
+
+def test_command_help_describes_positional_arguments_and_options():
+    res = _run("--help")
+    text = " ".join(res.output.split())
+    assert res.exit_code == 0, res.output
+    assert "TARGET is reward.py[:function]" in text and "owner/name from the Hub" in text
+    assert "column holding the reference answer" in text and "seconds allowed per checker call" in text
+    assert "A and B are calls files" in " ".join(CliRunner().invoke(cli.app, ["compare", "--help"]).output.split())
+    assert "explain KEY: a probe" in " ".join(CliRunner().invoke(cli.app, ["probes", "--help"]).output.split())
+
+
 def test_too_few_passing_reference_answers():
     stop = _stops(lambda completion, answer: float(answer == "1000" and answer in completion), ROWS)
     assert stop.cls == "gold_never_passes" and "Only 1 of 12" in stop.reason
