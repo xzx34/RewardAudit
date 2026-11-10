@@ -46,6 +46,7 @@ TASKS = [
     Task("date", "When did the library open?", "2020-03-05"),
     Task("inequality", "Solve 2x + 1 > 7 for x.", "x > 3"),
     Task("near_zero", "What is 4 divided by 5000?", "0.0008"),
+    Task("choice", "Who has more Grammys, Adele or Taylor Swift?", "Adele"),
 ]
 # Their replies are right by construction, in spellings the tool's own comparison does not read.
 SPELLINGS = ("Q23", "Q24", "Q25", "Q26", "Q27", "Q30")
@@ -161,7 +162,7 @@ def test_every_probe_is_described_in_neutral_words():
 def test_the_probes():
     assert {fam: [p.id for p in probes] for fam, (_, probes) in FAMILIES.items()} == {
         "N": ["N1", "N2", "N3", "N5", "N9", "N10"],
-        "E": ["E1", "E5", "E2", "E3", "E6", "E9", "E8"],
+        "E": ["E1", "E5", "E2", "E3", "E6", "E9", "E8", "E10"],
         "L": ["L1", "L2", "L3", "L4", "L5", "L6"],
         "O": ["O3", "O4", "O5", "O6", "O7", "O11", "O10", "O12", "O13", "O14", "O15", "O16"],
         "M": ["M1", "M2", "M3", "M5", "M6", "M7", "M16", "M18", "M19", "M20", "M21", "M22", "M23", "M24", "M25", "M26", "M27",

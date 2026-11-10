@@ -1,5 +1,6 @@
 """What the O family's wrong answer is, wrong grid cells, lists and grids with k items wrong, symbolic golds, what counts as
-LaTeX, which prompts ask for only the answer, which numbers get Q8, and two option letters in one reply."""
+LaTeX, which prompts ask for only the answer, which numbers get Q8, two option letters in one reply, and every candidate the
+prompt lists in one reply."""
 
 from __future__ import annotations
 
@@ -9,9 +10,11 @@ import re
 
 import pytest
 
+from rewardaudit import audit
 from rewardaudit.contract import Contract
 from rewardaudit.equiv import equiv, parse_grid, parse_json, parse_seq, strip_wrappers
-from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, infer_gold_type
+from rewardaudit.goldtype import asks_answer_only, asks_integer, asks_quantity, infer_gold_type, listed_names
+from rewardaudit.labels import states_the_answer
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.registry import all_probes
@@ -466,6 +469,65 @@ def test_o16_sends_the_right_letter_with_another_in_three_spellings():
 @pytest.mark.parametrize("gold", ["Jupiter", "42", "yes"])
 def test_o16_is_for_option_letters(gold):
     assert _gen("O16", Task("t", MCQ, gold)) == {}
+
+
+COUNTRIES = ["East Timor", "Samoa", "Iceland", "Dominican Republic", "Kenya"]
+
+
+@pytest.mark.parametrize(("prompt", "answer", "listed"), [
+    ("Which is the largest country of these by area?\n" + ", ".join(COUNTRIES), "Kenya", ", ".join(COUNTRIES)),
+    ("Who has more Grammys, Adele or Taylor Swift?", "Adele", "Adele, Taylor Swift"),
+    ("Question: Which region has more forest: the North Region or the Northeast Region?", "North Region",
+     "the North Region, the Northeast Region"),
+    ("Which album came out later, Beautiful, or J'adore?", "j'Adore", "Beautiful, J'adore"),
+    ("Which fund grew most: VGT, MGK, or VONG?", "VGT", "VGT, MGK, VONG"),
+    (MCQ, "Jupiter", "Mars, Jupiter, Venus, Earth"),
+])
+def test_e10_sends_every_candidate_as_one_answer(prompt, answer, listed):
+    e10 = _gen("E10", Task("t", prompt, answer))
+    assert e10 == {"joined": f"\\boxed{{{listed}}}"}
+    assert _gen("E10", Task("t", prompt, answer), primary="bare") == {"joined": listed}
+    assert not states_the_answer(e10["joined"], answer, infer_gold_type(answer))  # it names every one and chooses none
+
+
+@pytest.mark.parametrize(("prompt", "answer"), [
+    (MCQ, "B"),  # a letter: the texts hold none, and E2 sends the letters
+    (MCQ, "Pluto"),  # not one of the options
+    ("What is 6 times 7?\nA. 41\nB. 42\nC. 43\nD. 44", "42"),  # a number: E1, E5 and E9 send it among the others
+    ("Is it raining, yes or no?", "yes"),  # E3
+    ("Who is older, Jerry Garcia or Joe Gooch?", "Bob Weir"),
+    ("Is this person angry or happy?", "happy"),  # no list: the choice is the question itself
+    ("Where is it?\nParis, France", "Paris"),  # two items on a line are not a list yet
+    ("However, the cat, which was black, sat down.", "the cat"),  # prose
+])
+def test_e10_needs_the_reference_answer_among_the_candidates_as_written(prompt, answer):
+    assert _gen("E10", Task("t", prompt, answer)) == {}
+
+
+def test_listed_names_are_names():
+    assert listed_names("Pick one.\n3, 5, 7, 9") == listed_names("'E', 'Z', 'G', 'U'") == []
+    assert listed_names("Kenya, Samoa, Iceland\nWhich is the largest?") == ["Kenya", "Samoa", "Iceland"]
+    assert listed_names("User:Which film came out first, Midhya or The House On 92Nd Street?") == [
+        "Midhya", "The House On 92Nd Street"]
+    assert listed_names("Read this. Who won, the Knicks, the Celtics, or the Nets?") == ["the Knicks", "the Celtics", "the Nets"]
+
+
+def test_a_checker_that_looks_for_the_answer_inside_the_reply_pays_every_candidate():
+    rows = [{"prompt": "Which is the largest country of these by area?\n" + ", ".join(COUNTRIES[i:] + COUNTRIES[:i]),
+             "answer": COUNTRIES[i % 5]} for i in range(12)]
+
+    def inside(completion, answer):
+        return float(answer.lower() in completion.lower())
+
+    r = audit(inside, rows, workers=1, probes=["E"])
+    f = next(f for f in r.findings if f["probe_id"] == "E10")
+    assert f["severity"] == "high" and f["rate"] == 1.0 and f["category"] == "non_solving_accepted"
+    assert "E10" in [e["probe_id"] for e in next(d for d in r.defects if d["id"] == "D10")["evidence"]]
+
+    def exact(completion, answer):
+        return float(completion.strip() == answer)
+
+    assert "E10" not in {f["probe_id"] for f in audit(exact, rows, workers=1, probes=["E"]).findings}
 
 
 def test_n10_is_every_placeholder():

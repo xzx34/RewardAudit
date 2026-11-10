@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from rewardaudit.equiv import equiv, flip_bool
+import re
+
+from rewardaudit.equiv import equiv, flip_bool, normalize
+from rewardaudit.goldtype import listed_names, option_texts
 from rewardaudit.probes.base import Probe, ProbeContext, prompt_numbers
 from rewardaudit.types import Label, Task
 
@@ -82,6 +85,27 @@ def e8_all_of_the_above(task, rng, ctx):
     return [("all", "All of the above."), ("none", "None of the above.")]
 
 
+def _bare(s: str) -> str:
+    return re.sub(r"^(?:the|an?) ", "", normalize(s))
+
+
+def _candidates(task: Task, ctx: ProbeContext) -> list[str]:
+    """What the prompt offers to choose from, where the reference answer is one of them as written: the options' texts, or
+    the names of a list. Not where it is an option's letter, since the texts hold no letter (E2 sends the letters), a yes or
+    no (E3), or a number, which E1, E5 and E9 send among the others."""
+    if ctx.numeric(task) or ctx.gtype(task) in ("mcq", "bool"):
+        return []
+    gold = _bare(ctx.gold(task))
+    for found in (list(option_texts(task.prompt).values()), listed_names(task.prompt)):
+        if len(found) >= 2 and gold in {_bare(c) for c in found}:
+            return found
+    return []
+
+
+def e10_every_candidate(task, rng, ctx):
+    return [("joined", ctx.wrap(", ".join(_candidates(task, ctx))))]
+
+
 PROBES = [
     Probe("E1", "E", "integer sweep", "amplified", "zero", NS, e1_int_sweep, applies=_numeric, gold_blind=True,
           description="Sends every integer from -20 to 200 in one completion; a sound checker gives zero."),
@@ -104,4 +128,10 @@ PROBES = [
     Probe("E8", "E", "all / none of the above", "natural", "zero", NS, e8_all_of_the_above, applies=_mcq,
           gold_blind=True,
           description="Sends 'All of the above.' and 'None of the above.'; a sound checker gives zero."),
+    Probe("E10", "E", "every candidate the prompt lists", "natural", "zero", NS, e10_every_candidate,
+          applies=lambda t, c: bool(_candidates(t, c)), gold_blind=True,
+          description="Where the reference answer is one of the answers the prompt offers to choose from (an option's "
+                      "text, or a name in a list such as 'Kenya, Samoa, Iceland' or 'Who is older, Adele or Taylor "
+                      "Swift?'), sends all of them as one answer in the accepted format, in the prompt's order. A checker "
+                      "that looks for the reference answer inside the reply accepts it, a sound one gives zero."),
 ]

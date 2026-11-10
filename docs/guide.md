@@ -229,7 +229,7 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 | D7 | Negation ignored | O3 |
 | D8 | Only a fixed-length window is read | Q28, Q29, when 100 characters of text keep the score and more lose it |
 | D9 | Equivalent rewrites rejected | the other Q probes, and Q28 and Q29 when even 100 characters lose the score |
-| D10 | Copying the prompt pays | L1, L2, L3, L4, L6, E9 |
+| D10 | Copying the prompt pays | L1, L2, L3, L4, L6, E9, E10 |
 | D11 | A fixed answer pays | L5 and the N family, above what a fixed answer gets by chance |
 | D12 | Reply text run as code | P16, when the reply reaches a Python import |
 | D13 | Malformed or extreme replies mishandled | P1, P2, P5, P15, P17, any probe's errors, timeouts and crashes, scores that are not numbers, and scoring much slower on long replies |
@@ -277,7 +277,7 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists all 83; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists all 84; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
 M (definite errors), Q (right answers rewritten), G (the row's other accepted answers, and its reference answer written another
 way; G1, the finding of a reference answer rejected in every format, is listed with them), P (malformed and extreme input, a

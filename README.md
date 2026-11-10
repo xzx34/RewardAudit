@@ -88,7 +88,7 @@ that only the last number counts.
 | Pays wrong answers in part | Does a definite error earn more than nothing? | off by one, one word changed |
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
-`rewardaudit probes` lists all 83 probes and `rewardaudit probes O11` explains one.
+`rewardaudit probes` lists all 84 probes and `rewardaudit probes O11` explains one.
 `rewardaudit compare v1.jsonl v2.jsonl` shows where two checkers, or two versions of one, decide differently, probe by
 probe, from two audits of the same rows run with `--calls`.
 

@@ -195,6 +195,35 @@ def numbered_choices(prompt: str) -> list[str]:
     return [str(n) for n in run] if len(run) >= 2 else []
 
 
+# A question that ends in a choice between names, after its first comma or colon ('Who is older, Adele or Taylor Swift?'),
+# behind a label such as 'Question:'
+_CHOICE_QUESTION = re.compile(r"(?:\w+:\s*)?[^,:]+[,:]\s*(.+?),?\s+or\s+([^,:?]+?)\s*\?\s*")
+
+
+def _names(items: list[str]) -> list[str]:
+    """The items, if each is a name: two letters in a row, at most eight words, no question mark, exclamation mark, colon or
+    semicolon (a period may end an abbreviation: St. Lucia)."""
+    items = [re.sub(r"^(?:or|and)\s+", "", x.strip()) for x in items]
+    return items if all(re.search(r"[^\W\d_]{2}", x) and len(x.split()) <= 8 and not re.search(r"[?!;:]", x)
+                        for x in items) else []
+
+
+def listed_names(prompt: str) -> list[str]:
+    """The names a prompt offers to choose from, from its last line that offers any: a line that is a list of three or more
+    capitalised names ('East Timor, Samoa, Kenya'), or a question that ends in a choice ('Which is older, the Nile or the
+    Amazon?'). A list of numbers or of single letters is not one of names; a line of prose is not a list."""
+    for line in reversed(prompt.splitlines()):
+        question = re.split(r"(?<=[.!?])\s+", line.strip())[-1]
+        if m := _CHOICE_QUESTION.fullmatch(question):
+            if len(names := _names([*m.group(1).split(","), m.group(2)])) >= 2:
+                return names
+        elif not line.strip().endswith("?"):
+            names = _names(line.strip().rstrip(".").rsplit(":", 1)[-1].split(","))
+            if len(names) >= 3 and all(x[0].isupper() for x in names):
+                return names
+    return []
+
+
 _QUANTITY_RE = re.compile(
     r"\bhow (?:many|much|long|far|old|tall|high|fast|often)\b|\b(?:the|total) number of\b(?!\s+the\b)|"
     r"\banswer with (?:a|one|a single) number\b", re.I)

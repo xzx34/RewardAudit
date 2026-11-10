@@ -41,7 +41,7 @@ DEFECTS = (
     Defect("D9", "Equivalent rewrites rejected", "A right answer loses the score when written another way.",
            tuple(f"Q{i}" for i in range(1, 32) if i not in (28, 29))),
     Defect("D10", "Copying the prompt pays", "A reply taken from the prompt earns credit without solving the task.",
-           ("L1", "L2", "L3", "L4", "L6", "E9")),
+           ("L1", "L2", "L3", "L4", "L6", "E9", "E10")),
     Defect("D11", "A fixed answer pays", "One reply, whatever the task, earns credit more often than a fixed answer would by chance.",
            ("L5", "N1", "N2", "N3", "N5", "N9", "N10")),
     Defect("D12", "Reply text run as code", "The reply's text reached a Python import, so the checker runs what it reads."),

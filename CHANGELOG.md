@@ -86,6 +86,9 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
   environment, and not on a reference answer that is JSON. In `report.json` the example of a G3 finding has a new key,
   `reference`, the writing the checker got; `report.md` shows it next to the row's own, and `repro.py` scores the reply
   against it. The calls file has no such key. 83 probes in all.
+- E10, under D10: where the reference answer is one of the answers the prompt offers to choose from, an option's text or a
+  name in a list (`Kenya, Samoa, Iceland`, or a question such as `Who is older, Adele or Taylor Swift?`), all of them as one
+  answer in the accepted format. A checker that looks for the reference answer inside the reply accepts it. 84 probes in all.
 
 ### Fixed
 
