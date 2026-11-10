@@ -143,10 +143,10 @@ def main() -> None:
 
         adapter = build_adapter(spec)
     except AuditError as e:
-        send({"ok": False, "fatal": True, "user_error": str(e)})
+        send({"ok": False, "user_error": str(e)})
         return
     except Exception:
-        send({"ok": False, "fatal": True, "error": traceback.format_exc()})
+        send({"ok": False, "error": traceback.format_exc()})
         return
     send({"ok": True, "ready": True, "name": adapter.name, "meta": adapter.meta, "max_score": adapter.max_score()})
 
@@ -188,8 +188,6 @@ def main() -> None:
                         "reached_import": marker.take(),
                     }
                 )
-            elif op == "ping":
-                send({"ok": True})
             elif op == "exit":
                 send({"ok": True, **_environment(not_checker)})
                 break

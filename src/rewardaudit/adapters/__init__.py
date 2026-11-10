@@ -25,4 +25,4 @@ def build_adapter(spec: dict[str, Any]) -> Adapter:
     raise ValueError(f"unknown adapter kind: {kind!r}")
 
 
-__all__ = ["Adapter", "build_adapter"]
+__all__ = ["build_adapter"]

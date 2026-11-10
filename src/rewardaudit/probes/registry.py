@@ -24,7 +24,3 @@ def all_probes(families: list[str] | None = None) -> list[Probe]:
         if families is None or fam in families:
             out.extend(probes)
     return out
-
-
-def probes_by_family() -> dict[str, list[Probe]]:
-    return {fam: probes for fam, (_, probes) in FAMILIES.items()}

@@ -146,8 +146,8 @@ class RunnerPool:
     def _live(self) -> Runner:
         return next((r for r in self._runners if not r.retired), self._runners[0])
 
-    def score(self, task: Task, completion: str, timeout_s: float | None = None) -> Verdict:
-        return self._live().score(task, completion, timeout_s)
+    def score(self, task: Task, completion: str) -> Verdict:
+        return self._live().score(task, completion)
 
     def score_many(self, items: list[tuple[Task, str]], progress: Any = None) -> list[Verdict]:
         """`progress` is called with the number of calls just finished."""
@@ -372,8 +372,8 @@ class Runner:
     def dataset_issues(self) -> list[dict[str, Any]]:
         return self._loaded({"op": "dataset_issues"}, "checking the dataset")["issues"]
 
-    def score(self, task: Task, completion: str, timeout_s: float | None = None) -> Verdict:
-        timeout = timeout_s or self.timeout_s
+    def score(self, task: Task, completion: str) -> Verdict:
+        timeout = self.timeout_s
         self.calls += 1
         if self.retired:
             return Verdict(Kind.CRASH, error=self._memory_error)

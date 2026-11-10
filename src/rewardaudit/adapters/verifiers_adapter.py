@@ -202,9 +202,6 @@ class VerifiersV1Adapter(VerifiersAdapter):
             return None
         return None if out is None else str(out)
 
-    def max_score(self) -> float | None:
-        return None
-
 
 PARSED_KEYS = ("parsed", "parsed_answer", "extracted_answer", "extracted", "prediction", "pred")
 BOXED_HELPERS = ("verify_boxed_math_answer", "extract_boxed_answer")
