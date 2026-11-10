@@ -141,6 +141,8 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - M6 leaves alone the numbers of lines written `*1*: ...`, as it already did `1. ...` and `(1) ...`. In a task that asks
   for numbered blocks to be put in order, the numbers stay in place and are not the answer, so a checker that ignores them
   was reported as accepting a close answer.
+- `owner/name@1.2.0` installs that version into a venv of its own. Before, once `owner/name` or another version was
+  installed, its venv was reused and the audit measured the version it held, while the report named the one asked for.
 
 ## 0.2.0 - 2026-11-07
 

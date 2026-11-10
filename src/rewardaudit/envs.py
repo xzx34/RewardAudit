@@ -54,8 +54,11 @@ print(json.dumps(out))
 
 
 def env_dir(env: str) -> Path:
-    owner, _, name = env.partition("/")
-    return CACHE / "envs" / f"{owner}__{name.split('@')[0]}"
+    """A venv is reused once installed, so a version asked for gets one of its own: `owner/name@1.2.0` installed into the
+    venv of `owner/name` would audit whatever that one holds."""
+    owner, _, rest = env.partition("/")
+    name, _, version = rest.partition("@")
+    return CACHE / "envs" / (f"{owner}__{name}" + (f"@{version}" if version and version != "latest" else ""))
 
 
 def detect_api(py: Path, name: str, timeout_s: float = 300.0) -> dict:

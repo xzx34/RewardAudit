@@ -848,6 +848,27 @@ def test_verifiers_given_by_the_user_decides(installed, asked, pin):
     assert installed({"api": "v0", "verifiers": "0.4.1", "verifiers_req": ["verifiers>=0.3"]}, verifiers=asked) == ([pin], pin)
 
 
+def test_a_version_asked_for_gets_a_venv_of_its_own(tmp_path, monkeypatch):
+    """A venv is reused once installed: `o/n@0.1.4` put into the venv of `o/n` would audit the version that one holds."""
+    monkeypatch.setattr(envs, "CACHE", tmp_path)
+    assert envs.env_dir("o/n@0.1.4") not in (envs.env_dir("o/n"), envs.env_dir("o/n@0.1.5"))
+    assert envs.env_dir("o/n@latest") == envs.env_dir("o/n")
+    cmds = []
+
+    def run(cmd, what, timeout_s):
+        cmds.append(cmd)
+        if cmd[1] == "venv":
+            (Path(cmd[-1]) / "bin").mkdir(parents=True)
+            (Path(cmd[-1]) / "bin" / "python").write_text("")
+
+    monkeypatch.setattr(envs, "_uv", lambda: "uv")
+    monkeypatch.setattr(envs, "_run", run)
+    monkeypatch.setattr(envs, "detect_api", lambda *a, **k: {"api": "v1", "verifiers": "0.4.1"})
+    run(["uv", "venv", "--python", "3.12", str(envs.env_dir("o/n"))], "", None)  # o/n is installed already
+    python, _ = envs.install_env("o/n@0.1.4")
+    assert python == envs.env_dir("o/n@0.1.4") / "bin" / "python" and "n==0.1.4" in cmds[-1]
+
+
 def test_versions_are_ordered_well_enough_to_compare_bounds():
     order = ["0.1.7", "0.1.10", "0.1.20", "0.2.0.dev1", "0.2.0a1", "0.2.0", "0.2.0.post1", "1.0"]
     assert sorted(reversed(order), key=envs._version_key) == order
