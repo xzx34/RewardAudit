@@ -229,7 +229,7 @@ def test_the_standard_library_is_no_package_and_a_dead_worker_says_nothing(tmp_p
 
 @pytest.mark.parametrize("modules", [
     ["rewardaudit"],
-    ["rewardaudit.worker", "rewardaudit.checks.dataset", "rewardaudit.adapters.function_adapter", "rewardaudit.adapters.verifiers_adapter",
+    ["rewardaudit.worker", "rewardaudit.dataset_checks", "rewardaudit.adapters.function_adapter", "rewardaudit.adapters.verifiers_adapter",
      "rewardaudit.demo"],
 ], ids=["package", "worker"])
 def test_a_worker_needs_none_of_the_tools_own_dependencies(modules):

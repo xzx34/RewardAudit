@@ -2,7 +2,7 @@
 
 import pytest
 
-from rewardaudit.checks.dataset import run_dataset_checks
+from rewardaudit.dataset_checks import run_dataset_checks
 from rewardaudit.types import Task
 
 

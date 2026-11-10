@@ -161,7 +161,7 @@ def main() -> None:
                 tasks = reading_rows(adapter.tasks, req["n"], int(req.get("seed", 0)))
                 send({"ok": True, "tasks": [t.to_dict() for t in tasks], "meta": adapter.meta})
             elif op == "dataset_issues":
-                from rewardaudit.checks.dataset import run_dataset_checks
+                from rewardaudit.dataset_checks import run_dataset_checks
 
                 rows = reading_rows(adapter.all_tasks)  # loading tells how many rows were left out
                 send({"ok": True, "issues": run_dataset_checks(rows, left_out=adapter.meta.get("empty_rows_left_out", 0))})
