@@ -6,7 +6,7 @@ import re
 from decimal import Decimal
 
 from rewardaudit.equiv import equiv, flip_bool, to_letter, to_number
-from rewardaudit.goldtype import asks_percent
+from rewardaudit.goldtype import asks_percent, numbered_choices
 from rewardaudit.probes.base import MIN_WORD, NOT_LATEX, UNIT_RE, Probe, ProbeContext, fmt_num, plain_number
 from rewardaudit.types import Label, Task
 
@@ -133,6 +133,23 @@ def _plain(task: Task, ctx: ProbeContext) -> bool:
     return ctx.numeric(task) and plain_number(ctx.gold(task))
 
 
+def _choice_number(task: Task, ctx: ProbeContext) -> bool:
+    """The reference answer is the number of one of the choices the prompt lists ('2 - producer's desk'): a minus sign
+    before it names no other choice."""
+    return ctx.gold(task) in numbered_choices(task.prompt)
+
+
+def _attachable(task: Task, ctx: ProbeContext) -> bool:
+    """A reference answer to which an attached letter or word makes another answer: one in Latin letters. Not a set of
+    option letters (ACx still names A and C), a whole line of the prompt (an option line, which a word after it leaves the
+    same option), or one with no Latin letter (an amount such as $174, a group of numbers, a word in another script), where
+    what is attached is no part of the answer."""
+    g = ctx.gold(task).strip()
+    if not re.search(r"[A-Za-z]", g) or (re.fullmatch(r"[A-J]{2,}", g) and set(g) <= set(ctx.options(task))):
+        return False
+    return g not in {line.strip() for line in task.prompt.splitlines()}
+
+
 def m21_attached(task, rng, ctx):
     """The reference answer inside a longer one: a checker that looks for it as a substring still finds it."""
     g = ctx.gold(task)
@@ -222,8 +239,10 @@ def m27_near_zero(task, rng, ctx):
 PROBES = [
     Probe("M1", "M", "off by one", "natural", "zero", NS, m1_off_by_one, applies=_is_int,
           description="Sends the integer reference answer plus or minus one; a sound checker gives zero."),
-    Probe("M2", "M", "sign flipped", "natural", "zero", NS, m2_sign, applies=lambda t, c: c.numeric(t),
-          description="Sends the numeric reference answer with its sign flipped; a sound checker gives zero."),
+    Probe("M2", "M", "sign flipped", "natural", "zero", NS, m2_sign,
+          applies=lambda t, c: c.numeric(t) and not _choice_number(t, c),
+          description="Sends the numeric reference answer with its sign flipped, unless it is the number of one of the "
+                      "choices the prompt lists; a sound checker gives zero."),
     Probe("M3", "M", "wrong by a factor of ten", "natural", "zero", NS, m3_magnitude,
           applies=lambda t, c: c.numeric(t),
           description="Sends the numeric reference answer multiplied or divided by ten; a sound checker gives zero."),
@@ -254,14 +273,18 @@ PROBES = [
           description="Sends another task's reference answer (one that differs from this task's); a checker that "
                       "does not compare against this task's own accepts it, a sound one gives zero."),
     Probe("M21", "M", "the reference answer with characters attached", "natural", "zero", NS, m21_attached,
-          applies=lambda t, c: _plain(t, c) or c.gtype(t) in ("short_str", "long_text"), by_variant=True,
+          applies=lambda t, c: _plain(t, c) or (c.gtype(t) in ("short_str", "long_text") and _attachable(t, c)),
+          by_variant=True,
           description="Sends the reference answer inside a longer answer: 42 as 420 and 142, a word with a letter "
                       "added, or followed by a word from another row's answer. A checker that looks for the reference "
-                      "answer as a substring accepts these, a sound one gives zero."),
+                      "answer as a substring accepts these, a sound one gives zero. Letters and words are attached only "
+                      "to an answer in Latin letters, and not to a set of option letters or a whole line of the prompt, "
+                      "where they leave the answer the same."),
     Probe("M22", "M", "opposite number with a Unicode minus", "natural", "zero", NS, m22_unicode_minus,
-          applies=lambda t, c: _plain(t, c) and to_number(c.gold(t)) > 0,
-          description="Sends a positive reference answer with the minus sign U+2212 before it. A checker that drops "
-                      "characters outside ASCII reads the reference answer, a sound one gives zero."),
+          applies=lambda t, c: _plain(t, c) and to_number(c.gold(t)) > 0 and not _choice_number(t, c),
+          description="Sends a positive reference answer with the minus sign U+2212 before it, unless it is the number of "
+                      "one of the choices the prompt lists. A checker that drops characters outside ASCII reads the "
+                      "reference answer, a sound one gives zero."),
     Probe("M23", "M", "a different unit", "natural", "zero", NS, m23_other_unit,
           applies=lambda t, c: bool(UNIT_RE.fullmatch(c.gold(t))),
           description="Sends a reference answer that ends in a unit with another unit, 5 m for 5 km; a sound checker "

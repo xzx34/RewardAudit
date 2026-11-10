@@ -56,6 +56,22 @@ def test_m21_leaves_other_kinds_of_answer_alone(answer):
     assert _gen("M21", answer) == {}
 
 
+@pytest.mark.parametrize(("answer", "prompt"), [
+    ("$174", "How much tax does Alice have to pay in 2018?"),  # 174 with a stray letter is still 174 dollars
+    ("((2,9),(64,625))", "Compute the operation."),
+    ("盗窃", "被告人的罪名是？"),  # a Latin letter after a word in another script is a stray mark
+    ("ACD", "Which are correct?\nA. one\nB. two\nC. three\nD. four"),  # ACDx still names A, C and D
+    ("d) Stafne's bone cavity", "The most likely diagnosis is:\n\na) Radicular cyst\nd) Stafne's bone cavity"),
+])
+def test_m21_attaches_nothing_where_it_leaves_the_answer_the_same(answer, prompt):
+    assert _gen("M21", answer, prompt, others=["London Bridge"]) == {}
+
+
+def test_m21_still_attaches_to_words_and_letters_that_are_no_option_set():
+    assert _gen("M21", "Rome", "What is the capital of Italy?") == {"suffix_x": "Romex"}
+    assert _gen("M21", "XYZ", "Which are correct?\nA. one\nB. two") == {"suffix_x": "XYZx"}
+
+
 def test_one_digit_changed_in_a_long_answer_is_another_answer():
     gold = "E_1 = \\\\frac{\\\\sqrt{3}}{8}Mc^2 + \\\\frac{\\\\sqrt{5}}{7}"
     assert equiv(gold.replace("{8}", "{9}"), gold, "latex") is False
@@ -80,6 +96,18 @@ def test_m6_leaves_the_number_of_a_line_alone():
 def test_m22_writes_a_positive_number_with_a_unicode_minus():
     assert _gen("M22", "42") == {"unicode_minus": "−42"}
     assert _gen("M22", "-42") == _gen("M22", "0") == _gen("M22", "Paris") == {}
+
+
+MUSR = ("Where would Ricky look for the earphones given the story?\n\nPick one of the following choices:\n1 - piano\n"
+        "2 - producer's desk\n3 - recording booth\n\nYou must pick one option.")
+
+
+def test_a_minus_before_the_number_of_a_listed_choice_is_not_sent():
+    assert _gen("M2", "2", MUSR) == _gen("M22", "2", MUSR) == {}
+    assert _gen("M2", "5", MUSR) == {"neg": "-5"} and _gen("M22", "5", MUSR) == {"unicode_minus": "−5"}  # no such choice
+    rules = "1. a#b = a + b\n2. a#b = a - b if a > b\n3. otherwise 7\nCompute 1#2."  # numbered rules are no choices
+    assert _gen("M2", "2", rules) == {"neg": "-2"}
+    assert _gen("M3", "2", MUSR) == {"x10": "20", "div10": "0.2"}  # 20 is no choice either, and the sign is not involved
 
 
 @pytest.mark.parametrize(("answer", "expected"), [
@@ -299,9 +327,24 @@ def test_q27_changes_the_spelling_of_words(answer, expected):
 
 @pytest.mark.parametrize(("answer", "prompt"), [
     ("BE", "Name the line."), ("42", "How many?"), ("New York", "Rewrite it with a hyphen."), ("Paris", "Copy it character by character."),
+    ("calculate_triangle_area(base=10, height=5)", "Call the function for a triangle of base 10 and height 5."),
+    ("THOSE FROM MARS", "Decrypt this Caesar cipher text: MAHLX YKHF FTKL. Provide only the decrypted text."),
 ])
 def test_q27_leaves_symbols_and_prompts_on_characters_alone(answer, prompt):
     assert _gen("Q27", answer, prompt) == {}
+
+
+@pytest.mark.parametrize("prompt", ["Decrypt this Caesar cipher text: MAHLX YKHF.", "Encrypt the plaintext with the rule below.",
+                                    "Below are the rules for a specific cipher."])
+def test_q2_leaves_the_case_of_a_cipher_answer_alone(prompt):
+    assert _gen("Q2", "LXOVE", prompt) == {}
+    assert _gen("Q2", "Paris", "What is the capital of France?") == {"lower": "paris", "upper": "PARIS"}
+
+
+def test_q3_adds_no_period_to_a_function_call():
+    assert _gen("Q3", "triangle_properties.get(side1=5, side2=4, side3=3)") == {
+        "newline": "triangle_properties.get(side1=5, side2=4, side3=3)\n"}
+    assert set(_gen("Q3", "sin(x)")) == {"period", "newline"}  # an expression, not a call with keyword arguments
 
 
 def test_l5_sends_the_most_common_answer_on_every_row_with_a_common_answer():

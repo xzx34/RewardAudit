@@ -44,6 +44,11 @@ def _written(answer, prompt="Compute it.", primary="boxed", reaches=True):
     return {name: (reply, reference) for name, reply, reference in G3.generate(task, random.Random(0), ctx)}
 
 
+def test_an_option_letter_gets_no_period():
+    assert _written("E", "Which is it?\nA) one\nE) five") == {}  # answer keys store the letter bare
+    assert _written("E.", "Which is it?") == {}
+
+
 @pytest.mark.parametrize("answer, prompt, variant, written", [
     ("x+1", "", "spaces", "x + 1"), ("x + 1", "", "spaces", "x+1"), ("(1,2)", "", "spaces", "(1, 2)"),
     ("2, 3, 5", "", "spaces", "2,3,5"), ("y=2x-3", "", "spaces", "y = 2x - 3"), ("x=-1", "", "spaces", "x = -1"),

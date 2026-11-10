@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import re
 
-from rewardaudit.equiv import parse_json
+from rewardaudit.equiv import parse_json, to_letter
+from rewardaudit.goldtype import asks_letter
 from rewardaudit.probes.base import NOT_LATEX, Probe
 from rewardaudit.probes.rewrite import _quantity, frac_swap, percent_form, text_markup, unit_form
 from rewardaudit.types import Label
@@ -14,14 +15,21 @@ from rewardaudit.types import Label
 MAX_ALIASES = 8  # per row; TriviaQA lists about 15 and up to 66
 
 
+def _aliases(task, ctx) -> list[str]:
+    """The row's other accepted answers. Where the prompt asks for an option's letter and the reference answer is one, only
+    those that are letters: an option's text is not the answer such a prompt asks for (as for Q30)."""
+    aliases = ctx.aliases.get(task.id, [])
+    return [a for a in aliases if to_letter(a)] if ctx.gtype(task) == "mcq" and asks_letter(task.prompt) else aliases
+
+
 def _has_aliases(task, ctx) -> bool:
     """Other accepted answers beside a reference answer that is one answer. Next to a list, a JSON object or a grid, a
     list may hold its parts, and a part alone is not the answer."""
-    return bool(ctx.aliases.get(task.id)) and ctx.gtype(task) not in ("list", "json", "grid")
+    return bool(_aliases(task, ctx)) and ctx.gtype(task) not in ("list", "json", "grid")
 
 
 def g2_other_answers(task, rng, ctx):
-    return [(f"alias{i}", ctx.wrap(a)) for i, a in enumerate(ctx.aliases[task.id][:MAX_ALIASES], 1)]
+    return [(f"alias{i}", ctx.wrap(a)) for i, a in enumerate(_aliases(task, ctx)[:MAX_ALIASES], 1)]
 
 
 def _reference_reaches_checker(task, ctx) -> bool:
@@ -62,7 +70,7 @@ def g3_reference_written_another_way(task, rng, ctx):
     a = task.answer
     percent, unit = percent_form(task, a), unit_form(task, a)
     written = {"spaces": _respaced(a) if _symbols(a) else None, "dfrac": frac_swap(a),
-               "period": a + "." if re.search(r"[^\s.!?]\Z", a) else None,
+               "period": a + "." if re.search(r"[^\s.!?]\Z", a) and ctx.gtype(task) != "mcq" else None,
                "text": text_markup(a, ctx) if ctx.gtype(task) == "short_str" else None,
                "percent": percent and percent[1], "unit": unit and unit[1],
                "commas": _commas(a) if _quantity(task, ctx) else None}
@@ -75,13 +83,15 @@ PROBES = [
           applies=_has_aliases, headline=False,
           description="Where the checker receives a list of accepted answers, sends each one other than the reference answer "
                       "in the accepted format, one per reply and up to 8 per row; a sound checker gives each full credit. "
+                      "Where the prompt asks for an option's letter, only the accepted answers that are letters are sent. "
                       "Its finding names some that lost the score."),
     Probe("G3", "G", "the reference answer written another way", "natural", "full", Label.SOLVING,
           g3_reference_written_another_way, applies=_reference_reaches_checker, headline=False,
           description="Sends the reference answer in the accepted format while the checker gets it written another way, one "
                       "way per call: spaces at its operators and commas taken out or put in, \\frac and \\dfrac swapped, a "
-                      "period added, words in \\text{} under a \\boxed{} format, a percentage as a decimal and back, the unit "
-                      "taken off or added, thousands separators added to a quantity or taken out; each only where it applies. "
+                      "period added (not to a single letter, as answer keys store an option letter bare), words in "
+                      "\\text{} under a \\boxed{} format, a percentage as a decimal and back, the unit taken off or added, "
+                      "thousands separators added to a quantity or taken out; each only where it applies. "
                       "A sound checker gives full credit. Not sent where the checker gets a column of its own or JSON parsed "
                       "from the reference answer. Its finding's rate is over all these calls, and its note gives the rate at "
                       "which each writing lost the score."),

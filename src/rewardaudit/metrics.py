@@ -584,10 +584,11 @@ def _timing_finding(s: ProbeStats) -> dict[str, Any] | None:
     a, b = statistics.median(short), statistics.median(long)
     if b <= SLOW_MS or b < 10 * a:
         return None
-    return {"probe_id": s.probe.id, "name": "scoring time grows with reply length", "family": s.probe.family, "tier": s.probe.tier,
-            "category": "robustness", "severity": "medium", "rate": 1.0, "ci": list(wilson(len(long), len(long))), "n": len(long),
-            "task_rate": 0.0, "n_tasks": s.n_tasks, "example": None, "note": f"median {a:,.0f} ms at 1k characters, {b:,.0f} ms at 64k",
-            "meaning": "The checker takes much longer on a long reply."}
+    return _require_evidence(
+        {"probe_id": s.probe.id, "name": "scoring time grows with reply length", "family": s.probe.family, "tier": s.probe.tier,
+         "category": "robustness", "severity": "medium", "rate": 1.0, "ci": list(wilson(len(long), len(long))), "n": len(long),
+         "task_rate": 0.0, "n_tasks": s.n_tasks, "example": None, "note": f"median {a:,.0f} ms at 1k characters, {b:,.0f} ms at 64k",
+         "meaning": "The checker takes much longer on a long reply."}, len(long) >= MIN_TASKS)
 
 
 def _partial_head(tally: Tally, n: int) -> dict[str, Any]:

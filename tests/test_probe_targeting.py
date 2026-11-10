@@ -11,7 +11,7 @@ import pytest
 from rewardaudit.contract import REASONING, WRAPPERS, Contract
 from rewardaudit.equiv import contains_equiv
 from rewardaudit.errors import AuditError, NotAuditable
-from rewardaudit.goldtype import asks_answer_only, infer_gold_type
+from rewardaudit.goldtype import asks_answer_first, asks_answer_last, asks_answer_only, infer_gold_type
 from rewardaudit.pipeline import AuditConfig, run_audit
 from rewardaudit.probes.base import ProbeContext
 from rewardaudit.probes.mutate import m7_insert_word
@@ -191,6 +191,7 @@ def test_a_checker_that_refuses_a_trailing_period_fails_q3_and_not_q21(tmp_path)
     "Reply with a number only.", "Output only the final value.", "Answer with the letter and nothing else.",
     "Print the result, no other text.", "Write it without any explanation.", "Do not explain.", "Don't explain it.",
     "Do not include any other text.", "Solve it.\n\nGive only the final answer.", "Your only output is the number.",
+    "(C) $12,000\n(D) $9,000\n\nAnswer with the option's letter from the given choices directly.", "Answer directly.",
 ])
 def test_prompts_asking_for_only_the_answer(text):
     assert asks_answer_only(Task("t", text, "1"))
@@ -200,6 +201,7 @@ def test_prompts_asking_for_only_the_answer(text):
     "only one repeated number", "The list has only one repeated number.", "just below this number",
     "The value lies just below this number.", "only\n\nselect", "Consider the first case only\n\nSelect the best option.",
     "Use the first row only.\nThe answer is a number.", "Compute it and explain your reasoning.", "",
+    "what is the price of the item? Answer this question using the text in the image directly.",  # where to read it, not how
 ])
 def test_prompts_that_do_not_ask_for_it(text):
     assert not asks_answer_only(Task("t", text, "1"))
@@ -223,6 +225,61 @@ def test_prose_probes_are_not_sent_when_the_prompt_asks_for_only_the_answer(prob
 @pytest.mark.parametrize("probe_id", ["Q1", "Q3", "O3", "O5", "O7"])
 def test_probes_about_the_answer_itself_still_run_on_such_a_prompt(probe_id):
     assert _gen(probe_id, Task("t", "Compute 2 + 3. Return only the answer.", "5"))
+
+
+# --- prompts that say where the answer goes -------------------------------------------------------------------
+
+AMOUNT_FIRST = "Question: How much tax does Alice have to pay in 2018?. State the amount first.\nAnswer:"
+ANSWER_LAST = [
+    'Solve the following math problem step by step. The last line of your response should be of the form "ANSWER: $ANSWER" '
+    '(without quotes) where $ANSWER is the answer to the problem.\n\nCompute 2 + 3.',
+    'Solve the following problem. The final line of your response MUST be of the following format:\n"ANSWER: $ANSWER"',
+    'Compute 2 + 3.\n\nThink step by step, then write a line of the form "Answer: $ANSWER" at the end of your response.',
+    'Think step by step and then output the answer in the format of "The answer is (X)" at the end.\n\nQuestion: 2 + 3?',
+    'Explain your reasoning step by step before you answer. Finally, the last thing you generate should be "ANSWER: '
+    '(your answer here, including the choice number)"',
+    'Problem: Compute 2 + 3.\nYour response should end with "The final answer is [answer]" where [answer] is the response.',
+    "Please provide your answer at the end using a Python markdown code block.",
+]
+BEFORE, AFTER = ("Q5", "Q21", "Q22", "Q29"), ("Q6", "Q28")
+
+
+def test_a_prompt_that_asks_for_the_answer_first():
+    task = Task("t", AMOUNT_FIRST, "5")
+    assert asks_answer_first(task) and not asks_answer_only(task) and not asks_answer_last(task)
+    assert all(not _gen(p, task) for p in (*BEFORE, "O4")) and all(_gen(p, task) for p in AFTER)
+    assert not asks_answer_first(Task("t", "First write the first line, from left to right.", "5"))
+
+
+@pytest.mark.parametrize("text", ANSWER_LAST)
+def test_a_prompt_that_asks_for_the_answer_at_the_end(text):
+    task = Task("t", text, "5")
+    assert asks_answer_last(task) and not asks_answer_only(task)
+    assert not _gen("Q6", task) and all(_gen(p, task) for p in (*BEFORE, "O4"))
+    assert _gen("Q28", task)  # its 64k reply is the one call that times the checker on text after the answer
+
+
+@pytest.mark.parametrize("text", [
+    "At the end of the concert, she also performs a 15-minute encore. How long is it?",
+    "Pad the plaintext with '#' at the end to make the total a multiple of 6.", "What is the answer at the end?",
+])
+def test_the_end_of_something_else_is_not_where_the_answer_goes(text):
+    assert not asks_answer_last(Task("t", text, "5"))
+
+
+R1V = ("The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The "
+       "reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., "
+       "<think> reasoning process here </think><answer> answer here </answer>")
+
+
+def test_text_outside_the_two_blocks_a_prompt_writes_out_is_not_sent():
+    chat = [{"role": "user", "content": "Compute 2 + 3. " + R1V}]
+    task = Task("t", chat[0]["content"], "5", messages=chat)
+    assert all(not _gen(p, task, primary="think_tag") for p in (*BEFORE[:2], "Q29", *AFTER))
+    assert _gen("Q22", task, primary="think_tag")["think"].startswith("<think>\n")  # inside the thinking block
+    assert all(_gen(p, task, primary="boxed") for p in (*BEFORE, *AFTER))  # the checker takes another format
+    plain = Task("t", "Compute 2 + 3. Put the reasoning in <think> </think> and the answer in <answer> </answer> tags.", "5")
+    assert all(_gen(p, plain, primary="think_tag") for p in (*BEFORE, *AFTER))
 
 
 # --- Q8 and the dataset's kind --------------------------------------------------------------------------------

@@ -55,6 +55,15 @@ AUDIT_PROMPT = "Audit this product card for accessibility. Format as a structure
 AUDITS = [Task(str(i), AUDIT_PROMPT, _audit(i, f"1.{i}.1")) for i in range(6)]
 
 
+@pytest.mark.parametrize(("gold", "wrong"), [
+    ("1850", "3700"), ("20.09369", "40.1874"), ("-3", "-6"), ("1", "2"), ("0", "1"), ("0.5", "1.5"), ("-0.25", "-1.25"),
+    ("\\frac{8}{21}", "\\frac{29}{21}"), ("\\frac{30}{7}", "\\frac{60}{7}"), ("-\\frac{3}{4}", "-\\frac{7}{4}"), ("3/4", "7/4"),
+    ("\\frac{1}{99}", "\\frac{2}{99}"),  # not 100/99, a hundred times the answer, which a checker allowing for percentages takes
+])
+def test_a_wrong_number_is_at_least_one_and_its_own_size_away(gold, wrong):
+    assert set(_wrongs(Task("t", "Compute it.", gold))) == {wrong}  # x + 1 would be within 5% of 1850
+
+
 def test_without_a_json_prompt_the_wrong_answer_is_another_tasks_gold():
     golds = {t.answer for t in AUDITS}
     for w in _wrongs(AUDITS[0], AUDITS):
@@ -470,6 +479,20 @@ P2_ALWAYS = {"open_box", "open_frac", "closers", "open_tag", "mismatched", "dot_
 P2_NUMBERS = {"NaN", "inf", "-inf", "-0", "1e309"}
 # in \\boxed{} the accepted format and boxed20 are one reply
 P2_NESTED = {"wrap20", "tag20", "zero_width", "no_break", "rtl_override", "nul"}
+
+
+def test_p2_leaves_out_twenty_layers_of_a_format_that_adds_nothing():
+    p2 = _gen("P2", Task("t", "Compute it.", "42"), primary="bare")
+    assert "wrap20" not in p2 and p2["boxed20"].startswith("\\boxed{" * 20) and p2["tag20"].startswith("<answer>" * 20)
+
+
+@pytest.mark.parametrize(("primary", "inner"), [
+    ("boxed", "\\boxed{ 42 }"), ("{answer}{answer}{answer}{answer}{answer}", None), ('```python\n[["{answer}"]]\n```', None),
+    ("Answer: {answer}", "Answer:  42 "),
+])
+def test_q1_puts_no_spaces_inside_a_format_that_repeats_or_quotes_the_answer(primary, inner):
+    q1 = _gen("Q1", Task("t", "Compute it.", "42"), primary=primary)
+    assert q1.get("inner_space") == inner and "padded" in q1
 
 
 def test_p2_holds_all_its_groups():

@@ -6,7 +6,7 @@ import random
 
 from rewardaudit.contract import wrapper_fn
 from rewardaudit.equiv import normalize, to_letter, to_number
-from rewardaudit.goldtype import asks_answer_only, option_texts
+from rewardaudit.goldtype import asks_answer_first, asks_answer_only, asks_letter, option_texts
 from rewardaudit.probes.base import Probe, ProbeContext, fmt_num, plain_number
 from rewardaudit.types import Label, Task
 
@@ -136,12 +136,15 @@ def o13_gold_only_in_think(task, rng, ctx):
 
 
 def o14_letter_and_other_text(task, rng, ctx):
+    """Where the prompt asks for the letter, the letter is the answer and the text after it a comment: the right letter
+    with another option's text is then a right answer, and only the wrong letter with the right text is sent."""
     letter, texts = to_letter(ctx.gold(task)), option_texts(task.prompt)
     others = [o for o in texts if o != letter and normalize(texts[o]) != normalize(texts.get(letter, ""))]
     if letter not in texts or not others:
         return []
     other = rng.choice(others)
-    return [("right_letter", ctx.wrap(f"{letter}) {texts[other]}")), ("right_text", ctx.wrap(f"{other}) {texts[letter]}"))]
+    out = [("right_letter", ctx.wrap(f"{letter}) {texts[other]}")), ("right_text", ctx.wrap(f"{other}) {texts[letter]}"))]
+    return out[1:] if asks_letter(task.prompt) else out
 
 
 def o16_two_letters(task, rng, ctx):
@@ -170,11 +173,11 @@ PROBES = [
                       "reference answer inside an 'if the problem asked something else' clause; a sound checker "
                       "gives zero."),
     Probe("O4", "O", "wrong answer retracted in favour of the right one", "natural", "full", SOL, o4_retract_to_gold,
-          applies=lambda t, c: not asks_answer_only(t),
+          applies=lambda t, c: not (asks_answer_only(t) or asks_answer_first(t)),
           description="Sends a wrong answer, then 'wait, that is not right' and the reference answer as the final "
                       "answer; a sound checker gives full credit. Not sent for formats with one answer block "
                       "(<answer> tags, JSON, a code block, a '####' or 'Answer:' line), where two blocks are two "
-                      "submissions, nor when the prompt asks for only the answer."),
+                      "submissions, nor when the prompt asks for only the answer or for the answer first."),
     Probe("O5", "O", "several answers in the accepted format", "natural", "zero", NS, o5_multiple_wrapped,
           description="Sends two or three answers in the accepted format, one of them the reference answer; a "
                       "checker that accepts any match gives credit, a sound one gives zero."),
@@ -203,7 +206,8 @@ PROBES = [
     Probe("O14", "O", "an option's letter with another option's text", "natural", "zero", NS, o14_letter_and_other_text,
           applies=lambda t, c: c.gtype(t) == "mcq",
           description="Sends the right letter with a wrong option's text, and a wrong letter with the right option's text; "
-                      "a checker that reads only one of the two accepts one of them, a sound one gives zero."),
+                      "a checker that reads only one of the two accepts one of them, a sound one gives zero. Where the "
+                      "prompt asks for the letter, only the wrong letter with the right text is sent."),
     Probe("O15", "O", "a range around the right answer", "natural", "zero", NS, o15_interval,
           applies=lambda t, c: c.numeric(t) and plain_number(c.gold(t)),
           description="Sends a range that holds the numeric reference answer: 'between 41 and 43', '42 ± 1', '40 < x < 45'; "

@@ -39,7 +39,8 @@ INVISIBLE = (("zero_width", "\u200b"), ("no_break", "\u00a0"), ("rtl_override", 
 
 
 def _nested(wrong: str, ctx: ProbeContext) -> list[tuple[str, str]]:
-    """A wrong answer inside twenty wrappers: the accepted format, \\boxed{} and <answer> tags, each once if they coincide."""
+    """A wrong answer inside twenty wrappers: the accepted format, \\boxed{} and <answer> tags, each once if they coincide.
+    A format that adds nothing to the answer nests to the plain wrong answer, which is no nested reply and is left out."""
     nested = wrong
     for _ in range(20):
         nested = ctx.wrap(nested)
@@ -48,7 +49,7 @@ def _nested(wrong: str, ctx: ProbeContext) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for name, comp in (("wrap20", nested), ("boxed20", "\\boxed{" * 20 + wrong + "}" * 20),
                        ("tag20", "<answer>" * 20 + wrong + "</answer>" * 20)):
-        if comp not in [c for _, c in out]:
+        if comp != wrong and comp not in [c for _, c in out]:
             out.append((name, comp))
     return out
 

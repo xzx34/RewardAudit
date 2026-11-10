@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 import re
 from collections import Counter
@@ -118,6 +119,12 @@ def malformed_latex(variant: str, reference: str, known: frozenset[str] | set[st
     Command names in the reference count as known."""
     known = set(known) | latex_commands(reference)
     return bool(latex_defects(variant, known) - latex_defects(reference, known))
+
+
+def away(x: float, step: float = 1) -> float:
+    """`x` moved away from zero by at least `step` and at least its own size: x + 1 below 1, 2x from 1 on. No relative
+    tolerance short of 100% takes it for `x`, where x + 1 is within 5% of x from 20 on."""
+    return x + math.copysign(max(step, abs(x)), x) if x else step
 
 
 def fmt_num(x: float) -> str:
@@ -256,7 +263,9 @@ class ProbeContext:
 
     def wrong_answer(self, task: Task, rng: random.Random) -> str | None:
         """A plausible answer that is definitely not equivalent to the gold, and not a part of it: next to a list gold,
-        a subset adds nothing, so a hedge between the two reads as the gold."""
+        a subset adds nothing, so a hedge between the two reads as the gold. A number moves away from zero first (see
+        `away`) and is never a hundred times or a hundredth of the gold, so that neither a checker's tolerance nor its
+        allowance for percentages makes it a second right answer."""
         g = self.gold(task)
         gt = self.gtype(task)
         cands: list[str] = []
@@ -267,11 +276,12 @@ class ProbeContext:
             if m:  # keep the fraction's spelling, change the numerator
                 sign, num, den = m.group(1), int(m.group(2)), m.group(3)
                 spelled = (lambda a: f"{sign}\\frac{{{a}}}{{{den}}}") if "frac" in g else (lambda a: f"{sign}{a}/{den}")
-                cands = [spelled(num + 1), spelled(num + 2), spelled(num * 2 if num else 1)]
+                cands = [spelled(int(away(num, int(den)))), spelled(num + 1), spelled(num + 2), spelled(num * 2 if num else 1)]
             elif float(x).is_integer() and "." not in g:
-                cands = [str(int(x) + 1), str(int(x) - 1), str(int(x) * 2 if x != 0 else 7)]
+                cands = [str(int(away(int(x)))), str(int(x) + 1), str(int(x) - 1), str(int(x) * 2 if x != 0 else 7)]
             else:
-                cands = [fmt_num(x + 1), fmt_num(x * 2 if x != 0 else 0.5), fmt_num(-x if x != 0 else 1)]
+                cands = [fmt_num(away(x)), fmt_num(x + 1), fmt_num(x * 2 if x != 0 else 0.5), fmt_num(-x if x != 0 else 1)]
+            cands = [c for c in cands if x == 0 or not any(math.isclose(to_number(c), x * k) for k in (100, 0.01))]  # 100/99 for 1/99
         elif gt == "mcq":
             letter = to_letter(g) or "A"
             cands = [o for o in self.options(task) if o != letter] or ["Z"]

@@ -70,6 +70,15 @@ def test_g2_sends_each_other_answer_in_the_accepted_format():
     assert list(_replies(city, many).values()) == [f"\\boxed{{name {i}}}" for i in range(MAX_ALIASES)]
 
 
+def test_g2_sends_only_letters_where_the_prompt_asks_for_a_letter():
+    asks = Task("q", "Only one of the following options is correct, tell me the answer using one single letter (A, B, C, or D).",
+                "A")
+    assert _replies(asks, ["Walking Georgie", "A"]) == {"alias1": "\\boxed{A}"}  # the option's text is not what it asks for
+    assert _replies(asks, ["Walking Georgie"]) == {}
+    free = Task("q", "Which option is correct?\nA. Walking Georgie\nB. Methodist", "A")
+    assert _replies(free, ["Walking Georgie"]) == {"alias1": "\\boxed{Walking Georgie}"}
+
+
 def test_g2_sends_nothing_without_other_answers_or_next_to_an_answer_made_of_parts():
     assert _replies(Task("city", "Which city?", "Paris"), []) == {}
     assert _replies(Task("primes", "List the prime factors of 30.", "2, 3, 5"), ["2", "3", "5"]) == {}

@@ -9,14 +9,17 @@ from decimal import Decimal
 
 from rewardaudit.equiv import NUMBER_WORDS, to_letter, to_number
 from rewardaudit.goldtype import (
+    asks_answer_first,
+    asks_answer_last,
     asks_answer_only,
     asks_integer,
     asks_percent,
     asks_quantity,
     option_texts,
     question_part,
+    writes_two_blocks,
 )
-from rewardaudit.probes.base import MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
+from rewardaudit.probes.base import _SENTINEL, MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
 
 SOL = Label.SOLVING
@@ -25,6 +28,32 @@ SOL = Label.SOLVING
 def _prose_allowed(task, ctx) -> bool:
     """A right answer with prose around it is not a rejection when the prompt asks for only the answer."""
     return not asks_answer_only(task)
+
+
+def _thinking_before_allowed(task, ctx) -> bool:
+    """Nor is one with a thinking block before it when the prompt asks for the answer first."""
+    return _prose_allowed(task, ctx) and not asks_answer_first(task)
+
+
+def _two_blocks(task, ctx) -> bool:
+    """The accepted format is a thinking block and then an answer block, and the prompt writes the reply out that way, the
+    blocks back to back: text outside the two blocks is outside the reply asked for. Inside the thinking block it is not."""
+    pre, mark = ctx.split_wrap()
+    return "</think>" in pre and mark("x").startswith("<") and writes_two_blocks(task)
+
+
+def _text_before_allowed(task, ctx) -> bool:
+    """Nor is one with text before it (outside a thinking block) when the prompt asks for the answer first."""
+    return _thinking_before_allowed(task, ctx) and not _two_blocks(task, ctx)
+
+
+def _text_after_allowed(task, ctx) -> bool:
+    """Nor is one with text after it when the prompt asks for the answer at the end."""
+    return _prose_allowed(task, ctx) and not asks_answer_last(task) and not _two_blocks(task, ctx)
+
+
+# A function call with keyword arguments, or none, is code: 'the' before it or a period after it makes other code.
+_CALL = re.compile(r"[A-Za-z_][\w.]*\((?:\s*[A-Za-z_]\w*\s*=[^\n]*)?\)")
 
 
 def _quantity(task, ctx) -> bool:
@@ -37,16 +66,23 @@ def _quantity(task, ctx) -> bool:
 
 
 def q1_whitespace(task, rng, ctx):
+    """Spaces inside a format that writes the answer more than once, or between quotes, change the answer itself."""
     g = ctx.gold(task)
     w = ctx.wrap(g)
-    out = [("padded", "  " + w + "  \n\n"), ("inner_space", ctx.wrap(f" {g} "))]
+    out = [("padded", "  " + w + "  \n\n")]
+    marked = ctx.wrap(_SENTINEL)
+    if marked.count(_SENTINEL) == 1 and not re.search(f"[\"'`]{_SENTINEL}|{_SENTINEL}[\"'`]", marked):
+        out.append(("inner_space", ctx.wrap(f" {g} ")))
     if "\\boxed{" in w:  # TeX ignores a space after a command name
         out.append(("boxed_space", w.replace("\\boxed{", "\\boxed {", 1)))
     return out
 
 
 def q3_trailing_period(task, rng, ctx):
-    return [("period", ctx.wrap(ctx.gold(task)) + "."), ("newline", ctx.wrap(ctx.gold(task)) + "\n")]
+    """No period after a function call, where it makes other code."""
+    w = ctx.wrap(ctx.gold(task))
+    period = [] if _CALL.fullmatch(ctx.gold(task)) else [("period", w + ".")]
+    return [*period, ("newline", w + "\n")]
 
 
 def q5_explanation_before(task, rng, ctx):
@@ -170,12 +206,13 @@ def q9_latex_forms(task, rng, ctx):
 
 
 _WORDY = re.compile(r"[A-Za-z]{2,}(?:[ ,'][A-Za-z]{2,})*")
-_CASE_MATTERS = re.compile(r"\bcharacter[- ]by[- ]character\b|\bcase[- ]sensitive\b", re.I)
+_CASE_MATTERS = re.compile(r"\bcharacter[- ]by[- ]character\b|\bcase[- ]sensitive\b|\b(?:en|de)crypt|\b(?:de)?cipher", re.I)
 
 
 def _wordy(task, ctx) -> bool:
     """Plain words only (e.g. 'Paris', 'yes'); never symbolic answers where case carries meaning (P - Q, x, BE), nor a
-    prompt that works on characters or says that case counts, where another case is another answer."""
+    prompt that works on characters (a cipher, character by character) or says that case counts, where another case is
+    another answer."""
     g, gt = ctx.gold(task), ctx.gtype(task)
     if gt not in ("bool", "short_str") or not _WORDY.fullmatch(g):
         return False
@@ -280,9 +317,10 @@ def q26_date(task, rng, ctx):
 
 
 def _words(task, ctx) -> bool:
-    """A short answer in words, on a prompt that does not work on characters or ask about hyphens."""
+    """A short answer in words, not a function call, on a prompt that does not work on characters or ask about hyphens."""
     prompt = " ".join(str(m.get("content")) for m in task.chat())
     return (ctx.gtype(task) == "short_str" and bool(re.search(rf"[^\W\d_]{{{MIN_WORD},}}", ctx.gold(task)))
+            and not _CALL.fullmatch(ctx.gold(task))
             and not _CASE_MATTERS.search(prompt) and not re.search(r"\b(?:hyphens?|dash(?:es)?)\b", prompt, re.I))
 
 
@@ -322,8 +360,14 @@ def q29_long_text_before(task, rng, ctx):
     return [(name, f"{pre}{text}\n\n{mark(ctx.gold(task))}") for name, text in _long_text(task, rng, ctx)]
 
 
-def _few_with_prose(task, ctx) -> bool:
-    return task.id in ctx.first_passing() and _prose_allowed(task, ctx)
+def _few_with_text_after(task, ctx) -> bool:
+    """Still sent where the prompt asks for the answer at the end: its longest reply is the one probe that measures the
+    scoring time with text after the answer."""
+    return task.id in ctx.first_passing() and _prose_allowed(task, ctx) and not _two_blocks(task, ctx)
+
+
+def _few_with_text_before(task, ctx) -> bool:
+    return task.id in ctx.first_passing() and _text_before_allowed(task, ctx)
 
 
 def q30_option_text(task, rng, ctx):
@@ -352,30 +396,36 @@ def q31_latex_markup(task, rng, ctx):
 
 PROBES = [
     Probe("Q1", "Q", "extra whitespace", "natural", "full", SOL, q1_whitespace,
-          description="Sends the reference answer with extra spaces and newlines around it and inside the format, "
-                      "and '\\boxed {x}' with a space before the brace (same TeX); a sound checker gives full credit."),
+          description="Sends the reference answer with extra spaces and newlines around it and inside the format (not "
+                      "where the format writes the answer twice or between quotes), and '\\boxed {x}' with a space "
+                      "before the brace (same TeX); a sound checker gives full credit."),
     Probe("Q3", "Q", "trailing period or newline", "natural", "full", SOL, q3_trailing_period,
-          description="Sends the reference answer followed by a period or a newline; a sound checker gives full "
-                      "credit."),
+          description="Sends the reference answer followed by a period (not after a function call, where it makes other "
+                      "code) or a newline; a sound checker gives full credit."),
     Probe("Q5", "Q", "explanation before the answer", "natural", "full", SOL, q5_explanation_before,
-          applies=_prose_allowed,
+          applies=_text_before_allowed,
           description="Sends a short explanation with other numbers, then the reference answer in the accepted "
                       "format; a sound checker gives full credit (models reason before answering, so rejecting this "
-                      "discards most correct replies). Not sent when the prompt asks for only the answer."),
+                      "discards most correct replies). Not sent when the prompt asks for only the answer or for the "
+                      "answer first, nor where it writes out the reply as a thinking block directly followed by the "
+                      "answer block."),
     Probe("Q6", "Q", "verification after the answer", "natural", "full", SOL,
-          q6_explanation_after, applies=_prose_allowed,
+          q6_explanation_after, applies=_text_after_allowed,
           description="Sends the reference answer in the accepted format, then a verification sentence (with other "
                       "numbers, with the words 'the answer is', or saying the answer is boxed); a sound checker gives "
-                      "full credit. Not sent when the prompt asks for only the answer."),
+                      "full credit. Not sent when the prompt asks for only the answer or for the answer at the end, "
+                      "nor where it writes out the reply as a thinking block directly followed by the answer block."),
     Probe("Q22", "Q", "thinking block with other numbers, then the answer", "natural", "full", SOL,
-          q22_think_then_answer, applies=_prose_allowed,
+          q22_think_then_answer, applies=_thinking_before_allowed,
           description="Sends a <think>...</think> block that tries other numbers (the accepted format's own block "
                       "when it has one), then the reference answer; a sound checker gives full credit. Not sent when "
-                      "the prompt asks for only the answer."),
-    Probe("Q21", "Q", "answer inside a sentence", "natural", "full", SOL, q21_sentence, applies=_prose_allowed,
+                      "the prompt asks for only the answer or for the answer first."),
+    Probe("Q21", "Q", "answer inside a sentence", "natural", "full", SOL, q21_sentence, applies=_text_before_allowed,
           description="Sends 'The final answer is <reference answer>' and 'Thus, the answer is <reference answer>', "
                       "with no period added at the end; a sound checker gives full credit. Not sent when the prompt "
-                      "asks for only the answer, nor when the accepted format is already such a sentence."),
+                      "asks for only the answer or for the answer first, nor when the accepted format is already such "
+                      "a sentence, nor where the prompt writes out the reply as a thinking block directly followed by "
+                      "the answer block."),
     Probe("Q8", "Q", "equivalent numeral (sign, trailing zeros)", "natural", "full", SOL, q8_numeric_forms,
           applies=_quantity,
           description="Sends the numeric reference answer as +n, n.0, n.00, with thousands separators, or with "
@@ -406,18 +456,21 @@ PROBES = [
           description="Sends a date reference answer as 2020-03-05, March 5, 2020 and Mar 5, 2020; a sound checker gives "
                       "full credit."),
     Probe("Q27", "Q", "other spellings of a word", "natural", "full", SOL, q27_spelling, applies=_words,
-          description="Sends a short answer in words without accents, with or without a leading article, with a hyphen "
-                      "and a space swapped, and with & and 'and' swapped; a sound checker gives full credit."),
-    Probe("Q28", "Q", "long text after the answer", "natural", "full", SOL, q28_long_text_after, applies=_few_with_prose,
+          description="Sends a short answer in words (not a function call) without accents, with or without a leading "
+                      "article, with a hyphen and a space swapped, and with & and 'and' swapped; a sound checker gives "
+                      "full credit."),
+    Probe("Q28", "Q", "long text after the answer", "natural", "full", SOL, q28_long_text_after, applies=_few_with_text_after,
           headline=False, sweep=True,
           description="Sends the reference answer followed by 100, 1k, 4k, 16k and 64k characters of neutral text. Its finding "
                       "gives the acceptance rate of each and the shortest that loses the score; a sound checker gives "
-                      "full credit. Sent on five rows, not when the prompt asks for only the answer."),
-    Probe("Q29", "Q", "long text before the answer", "natural", "full", SOL, q29_long_text_before, applies=_few_with_prose,
+                      "full credit. Sent on five rows, not when the prompt asks for only the answer, nor where the prompt "
+                      "writes out the reply as a thinking block directly followed by the answer block."),
+    Probe("Q29", "Q", "long text before the answer", "natural", "full", SOL, q29_long_text_before, applies=_few_with_text_before,
           headline=False, sweep=True,
           description="Sends 100, 1k, 4k, 16k and 64k characters of neutral text and then the reference answer. Its finding gives "
                       "the acceptance rate of each and the shortest that loses the score; a sound checker gives full "
-                      "credit. Sent on five rows, not when the prompt asks for only the answer."),
+                      "credit. Sent on five rows, not when the prompt asks for only the answer or for the answer first, "
+                      "nor where it writes out the reply as a thinking block directly followed by the answer block."),
     Probe("Q30", "Q", "an option's text with or without its letter", "natural", "full", SOL, q30_option_text,
           applies=lambda t, c: c.gtype(t) == "mcq",
           description="Sends the right option's letter with its text, and its text alone unless the prompt asks for a "

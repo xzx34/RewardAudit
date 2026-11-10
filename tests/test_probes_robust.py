@@ -100,7 +100,7 @@ def test_a_million_characters_that_hang_the_checker_are_found():
 @pytest.mark.parametrize(("name", "char"), [("zero_width", "​"), ("no_break", " "), ("rtl_override", "‮"), ("nul", "\x00")])
 def test_p2_hides_a_character_inside_a_wrong_answer(name, char):
     reply = _gen("P2")[name]
-    assert char in reply and "42" not in reply and reply.replace(char, "") == "\\boxed{43}"
+    assert char in reply and "42" not in reply and reply.replace(char, "") == "\\boxed{84}"
 
 
 def test_a_nul_byte_reaches_the_checker_through_the_worker(tmp_path):

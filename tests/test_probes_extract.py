@@ -30,9 +30,9 @@ def _gen(probe_id, answer, prompt="What is the answer?", primary="boxed", accept
 
 
 def test_o12_writes_a_right_and_a_wrong_answer_in_two_accepted_formats_both_ways():
-    assert _gen("O12", "42") == {"right_in_accepted": "\\boxed{42}\n<answer>43</answer>", "right_in_other": "\\boxed{43}\n<answer>42</answer>"}
-    assert _gen("O12", "42", primary="answer_tag", accepted=("boxed",))["right_in_other"] == "<answer>43</answer>\n\\boxed{42}"
-    assert _gen("O12", "42", primary="hash", accepted=("final_answer",))["right_in_accepted"] == "#### 42\nFinal Answer: 43"
+    assert _gen("O12", "42") == {"right_in_accepted": "\\boxed{42}\n<answer>84</answer>", "right_in_other": "\\boxed{84}\n<answer>42</answer>"}
+    assert _gen("O12", "42", primary="answer_tag", accepted=("boxed",))["right_in_other"] == "<answer>84</answer>\n\\boxed{42}"
+    assert _gen("O12", "42", primary="hash", accepted=("final_answer",))["right_in_accepted"] == "#### 42\nFinal Answer: 84"
 
 
 @pytest.mark.parametrize(("primary", "accepted"), [("boxed", ()), ("boxed", ("reasoning_boxed", "boxed_dollar")), ("final_answer", ("answer_colon",)),
@@ -40,6 +40,18 @@ def test_o12_writes_a_right_and_a_wrong_answer_in_two_accepted_formats_both_ways
 def test_o12_needs_a_second_accepted_format_with_a_mark_of_its_own(primary, accepted):
     variants = _gen("O12", "42", primary=primary, accepted=accepted)
     assert bool(variants) == (primary == "bare")  # any mark is its own next to a bare answer
+
+
+def test_a_tolerance_does_not_make_the_wrong_half_of_a_hedge_a_right_answer():
+    import math
+
+    def last_number_within_5_percent(completion, answer):
+        numbers = re.findall(r"-?\d+(?:\.\d+)?", completion)
+        return float(bool(numbers) and math.isclose(float(numbers[-1]), float(answer), rel_tol=0.05))
+
+    rows = [{"prompt": f"Add {i} and 100.", "answer": str(i + 100)} for i in range(12)]  # 101 is within 5% of 100
+    found = {f["probe_id"] for f in audit(last_number_within_5_percent, rows, workers=1, probes=["O"]).findings}
+    assert "O11" in found and not found & {"O3", "O5", "O6", "O7", "O10"}  # it reads the last answer, and nothing else
 
 
 def test_o13_leaves_the_answer_only_in_the_thinking_block():
@@ -66,6 +78,19 @@ def test_o14_pairs_a_letter_with_another_options_text():
     variants = _gen("O14", "B", MCQ)
     assert re.fullmatch(r"\\boxed\{B\) 4[134]\}", variants["right_letter"])
     assert re.fullmatch(r"\\boxed\{[ACD]\) 42\}", variants["right_text"])
+
+
+@pytest.mark.parametrize("ask", ["The last line of your response should be of the form 'Answer: $LETTER'.",
+                                 "Answer with the option's letter from the given choices directly.",
+                                 'Output the answer in the format of "The answer is (X)" at the end.'])
+def test_o14_sends_only_the_wrong_letter_where_the_prompt_asks_for_the_letter(ask):
+    variants = _gen("O14", "B", f"{MCQ}\n\n{ask}")
+    assert set(variants) == {"right_text"} and re.fullmatch(r"\\boxed\{[ACD]\) 42\}", variants["right_text"])
+
+
+@pytest.mark.parametrize("text", ["Let f(x) = 6x. What is f(7)?", "She receives a letter from her mother. What is 6 times 7?"])
+def test_o14_sends_both_where_the_prompt_does_not_ask_for_the_letter(text):
+    assert set(_gen("O14", "B", text + MCQ[len("What is 6 times 7?"):])) == {"right_letter", "right_text"}
 
 
 @pytest.mark.parametrize(("answer", "prompt"), [("B", "Pick B or C."), ("42", MCQ), ("B", "A. same\nB. same")])
@@ -162,6 +187,17 @@ def test_a_checker_that_loses_the_answer_next_to_any_text_has_no_window():
     f = next(f for f in r.findings if f["probe_id"] == "Q28")
     assert f["example"]["variant"] == "0.1k" and f["severity"] == "low"  # it takes a reply to be its answer field
     assert "D8" not in {d["id"] for d in r.defects} and "Q28" in {e["probe_id"] for d in r.defects if d["id"] == "D9" for e in d["evidence"]}
+
+
+def test_scoring_time_measured_on_one_long_reply_is_not_rated():
+    from rewardaudit.metrics import ProbeStats, _timing_finding
+
+    s = ProbeStats(PROBES["Q29"])
+    s.variant_ms["1k"], s.variant_ms["64k"] = [10.0], [900.0]
+    f = _timing_finding(s)
+    assert f["severity"] == "low" and f["rated"] == "medium" and f["note"].endswith("too few calls to rate")
+    s.variant_ms["1k"], s.variant_ms["64k"] = [10.0, 12.0], [900.0, 950.0]
+    assert _timing_finding(s)["severity"] == "medium"
 
 
 def test_scoring_time_that_grows_with_the_reply_is_a_finding():

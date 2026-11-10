@@ -102,6 +102,37 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - A row whose list of answers is empty is left out under a column name that reaches below an item of the list, such as
   `answers.0.0` for answers kept as `[answer, conditions]` pairs, as it already was under `answers.text.0`. Before, the
   audit stopped, saying the row had no such column.
+- Probes that put text before or after a right answer are no longer sent where the prompt says where the answer goes, since
+  a checker that refuses such a reply follows the prompt. Where it asks for the answer first ("State the amount first"),
+  Q5, Q21, Q22, Q29 and O4 are left out; where it asks for the answer at the end ("The last line of your response should
+  be of the form ...", "... at the end of your response", "Your response should end with ..."), Q6 (Q28 is still sent,
+  since its longest reply is the one call that times the checker on text after the answer); and where it writes out the
+  reply as a thinking block directly followed by an answer block (`<think> ... </think><answer> ... </answer>`) and the
+  checker takes that format, Q5, Q6, Q21, Q28 and Q29, whose text would fall outside both blocks.
+  "Answer with the option's letter from the given choices directly" now counts as asking for only the answer.
+- Where the prompt asks for an option's letter, O14 sends only a wrong letter with the right option's text, and G2 only the
+  accepted answers that are letters. Before, a checker that read the right letter followed by another option's text was
+  counted as accepting a hedge, and one that refused an option's text where the prompt asked for the letter as rejecting a
+  right answer.
+- M21 attaches letters and words only to an answer in Latin letters, and not to a set of option letters (`ACD`) or to an
+  answer that is a whole line of the prompt, such as an option line. Before, `ACDx`, `$174x`, a group of numbers or a word
+  in another script with a word or letter attached, which still name the same answer, were counted as wrong answers.
+- M2 and M22 are not sent where the reference answer is the number of one of the choices the prompt lists on numbered lines
+  (`2 - producer's desk`): a minus sign before it names no other choice.
+- G3 no longer writes a reference answer that is a single letter with a period (`A.`): multiple-choice answer keys store
+  an option letter bare, so a checker that compares the letter with the stored string never meets `A.` outside the audit.
+- Q1 puts no spaces inside a format that writes the answer more than once or between quotes, where they change the answer
+  itself; Q2 and Q27 leave prompts about a cipher (to encrypt or decrypt) alone, where the case of each letter is part of
+  the answer; Q3's period and Q27 leave a function call with keyword arguments alone, where they make other code.
+- The wrong number the O probes pair with a numeric reference answer, and that P2 hides characters in, is moved away from
+  zero by at least 1 and by at least its own size, 2x for 30 and x + 1 for 0.5, and is never a hundred times or a
+  hundredth of the answer. Before, it was x + 1, which a relative tolerance takes for the reference answer when x is
+  large (101 is within 5% of 100), so a hedge between two answers the checker counts as right was reported as a hedge
+  accepted. A loose tolerance is still measured where it belongs, by M1, M24 and M27, and an allowance for percentages by
+  M25.
+- P2 no longer sends twenty layers of a format that adds nothing to the answer, which are the plain wrong answer.
+- A finding that scoring time grows with the length of the reply, measured on one long reply, is low with "too few calls to
+  rate", as other findings resting on one row are. Before, it was medium.
 
 ## 0.2.0 - 2026-11-07
 
