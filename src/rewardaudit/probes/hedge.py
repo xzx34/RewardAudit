@@ -6,8 +6,8 @@ import random
 
 from rewardaudit.contract import wrapper_fn
 from rewardaudit.equiv import normalize, to_letter, to_number
-from rewardaudit.goldtype import asks_answer_first, asks_answer_only, asks_letter, option_texts
 from rewardaudit.probes.base import Probe, ProbeContext, fmt_num, plain_number
+from rewardaudit.prompt import asks_answer_first, asks_answer_only, asks_letter, option_texts
 from rewardaudit.types import Label, Task
 
 NS, SOL = Label.NOT_SOLVING, Label.SOLVING

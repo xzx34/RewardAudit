@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 
 from rewardaudit.equiv import contains_equiv, equiv, extract_boxed, normalize, to_letter
-from rewardaudit.goldtype import mcq_options
 from rewardaudit.probes.base import Probe, ProbeContext, prompt_numbers, safe_not_solving
+from rewardaudit.prompt import mcq_options
 from rewardaudit.types import Label, Task
 
 NS = Label.NOT_SOLVING

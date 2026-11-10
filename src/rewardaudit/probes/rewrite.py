@@ -8,7 +8,8 @@ from datetime import date
 from decimal import Decimal
 
 from rewardaudit.equiv import NUMBER_WORDS, to_letter, to_number
-from rewardaudit.goldtype import (
+from rewardaudit.probes.base import _SENTINEL, MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
+from rewardaudit.prompt import (
     asks_answer_first,
     asks_answer_last,
     asks_answer_only,
@@ -19,7 +20,6 @@ from rewardaudit.goldtype import (
     question_part,
     writes_two_blocks,
 )
-from rewardaudit.probes.base import _SENTINEL, MIN_WORD, UNIT_RE, Probe, fmt_num, plain_number
 from rewardaudit.types import Label
 
 SOL = Label.SOLVING

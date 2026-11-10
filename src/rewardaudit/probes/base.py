@@ -20,7 +20,8 @@ from rewardaudit.equiv import (
     to_number,
     within_list,
 )
-from rewardaudit.goldtype import is_numeric, mcq_options
+from rewardaudit.goldtype import is_numeric
+from rewardaudit.prompt import mcq_options
 from rewardaudit.types import Label, Task
 
 # (variant name, completion), or with a third item, the reference answer written another way for that call only (G3)

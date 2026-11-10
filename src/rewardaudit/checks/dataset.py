@@ -7,7 +7,8 @@ from collections import Counter
 from typing import Any
 
 from rewardaudit.equiv import contains_equiv, normalize, to_letter
-from rewardaudit.goldtype import infer_dataset_type, infer_gold_type, mcq_options
+from rewardaudit.goldtype import infer_dataset_type, infer_gold_type
+from rewardaudit.prompt import mcq_options
 from rewardaudit.types import Task
 
 _SPACE = re.compile(r"\s+")

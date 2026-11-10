@@ -7,9 +7,9 @@ from __future__ import annotations
 import re
 
 from rewardaudit.equiv import parse_json, to_letter
-from rewardaudit.goldtype import asks_letter
 from rewardaudit.probes.base import NOT_LATEX, Probe
 from rewardaudit.probes.rewrite import _quantity, frac_swap, percent_form, text_markup, unit_form
+from rewardaudit.prompt import asks_letter
 from rewardaudit.types import Label
 
 MAX_ALIASES = 8  # per row; TriviaQA lists about 15 and up to 66

@@ -3,8 +3,9 @@
 import pytest
 
 from rewardaudit.equiv import contains_equiv, equiv, parse_grid, parse_seq, states_the_answer
-from rewardaudit.goldtype import infer_gold_type, order_semantics
+from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.probes.structured import dumps_like, parse_list_gold
+from rewardaudit.prompt import order_semantics
 
 
 @pytest.mark.parametrize("gold,kind", [

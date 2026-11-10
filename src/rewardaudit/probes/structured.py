@@ -23,8 +23,8 @@ from rewardaudit.equiv import (
     value_number,
     values_equal,
 )
-from rewardaudit.goldtype import order_semantics
 from rewardaudit.probes.base import Probe, ProbeContext, fmt_num
+from rewardaudit.prompt import order_semantics
 from rewardaudit.types import Label, Task
 
 NS, SOL = Label.NOT_SOLVING, Label.SOLVING

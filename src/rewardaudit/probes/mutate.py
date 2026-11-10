@@ -6,8 +6,8 @@ import re
 from decimal import Decimal
 
 from rewardaudit.equiv import equiv, flip_bool, to_letter, to_number
-from rewardaudit.goldtype import asks_percent, numbered_choices
 from rewardaudit.probes.base import MIN_WORD, NOT_LATEX, UNIT_RE, Probe, ProbeContext, fmt_num, plain_number
+from rewardaudit.prompt import asks_percent, numbered_choices
 from rewardaudit.types import Label, Task
 
 NS = Label.NOT_SOLVING
