@@ -3,7 +3,8 @@ or a crash. A reply the checker accepts is a finding; these calls stay out of th
 since they run on a few tasks only.
 
 Each call that times out costs the full timeout plus a worker restart, so these probes run on the first five
-passing tasks only, with few variants, and every completion stays well under 200 KB.
+passing tasks only, with few variants, and every completion stays under 200 KB except P17's, which is a million
+characters by design.
 """
 
 from __future__ import annotations

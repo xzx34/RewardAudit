@@ -198,7 +198,7 @@ class _Failures:
 
 
 class Robustness:
-    """S4 timeouts, S5 exceptions, crashes and S7 network attempts over the probe calls, added as they come."""
+    """Timeouts, exceptions, crashes and network attempts over the probe calls, added as they come."""
 
     def __init__(self) -> None:
         self.total = 0

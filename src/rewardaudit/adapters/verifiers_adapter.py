@@ -1,7 +1,9 @@
-"""Audit a Prime Intellect `verifiers` (v1) taskset: the environment's own reward hooks score a
-trace that carries exactly one assistant reply — the completion under test.
+"""Audit a Prime Intellect `verifiers` environment: its own scoring, given exactly one assistant reply, the completion
+under test. `VerifiersAdapter` picks one of two by what is installed: `VerifiersV1Adapter` for a v1 taskset, whose
+reward hooks score a trace, and `VerifiersV0Adapter` for an Environment from `load_environment()`, scored through its own
+rollout.
 
-Runs inside the worker, under the interpreter where the taskset package is installed.
+Runs inside the worker, under the interpreter where the environment's package is installed.
 """
 
 from __future__ import annotations

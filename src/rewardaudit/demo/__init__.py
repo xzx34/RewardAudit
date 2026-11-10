@@ -1,6 +1,6 @@
 """Three toy checkers with planted defects, used by `rewardaudit demo` and the test suite.
 
-  substring : score 1 if the gold appears anywhere in the completion       (accepts any shotgun)
+  substring : score 1 if the gold appears anywhere in the completion       (accepts a reply listing many candidates)
   mcq_regex : first capital letter A-D in the completion is the answer     (reads 'B' from 'Based on')
   grid_exact: exact match after whitespace normalisation                   (rejects any wrapper or prose)
 """

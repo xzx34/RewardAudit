@@ -1,4 +1,5 @@
-"""Every probe family, in the order they run (natural-first within a family is set by tier)."""
+"""Every probe family. The audit sends the probes tier by tier (natural, amplified, contrived), and within a tier in
+this order."""
 
 from __future__ import annotations
 

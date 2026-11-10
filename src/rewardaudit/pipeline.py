@@ -1,4 +1,5 @@
-"""The audit pipeline: tasks -> gold type -> contract -> determinism -> probes -> metrics -> dataset checks."""
+"""The audit pipeline: tasks -> gold type -> contract -> determinism -> probes -> metrics -> dataset checks -> defects
+-> confirmation."""
 
 from __future__ import annotations
 
