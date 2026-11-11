@@ -244,7 +244,7 @@ rewardaudit audit reward.py --dataset data.jsonl --full --out out
 One finding from that run:
 
 ```
-rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
+rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,776 calls · 1 s
 
   HIGH    O11  hedge between two answers, the right one last                                                        100%
                The answer is either 68 or 34.

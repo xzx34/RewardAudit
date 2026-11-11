@@ -47,7 +47,7 @@ rewardaudit audit reward.py --dataset data.jsonl --n 100
 Excerpt (elapsed time varies):
 
 ```
-rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
+rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,776 calls · 1 s
 
 Result: problems found (2 high, 4 medium)
 
@@ -106,7 +106,7 @@ rewardaudit audit reward.py --dataset data.jsonl --n all            # every row
 rewardaudit audit reward.py --dataset data.jsonl --n 500 --seed 1   # another draw
 ```
 
-The 40-row quickstart makes 4,779 checker calls, about 119 per row; the count depends on which probes apply.
+The 40-row quickstart makes 4,776 checker calls, about 119 per row; the count depends on which probes apply.
 Checks on the dataset itself, such as duplicate prompts and empty answers, always cover every row.
 
 ## From Python
