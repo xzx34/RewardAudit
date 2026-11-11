@@ -67,7 +67,6 @@ class VerifiersV1Adapter(VerifiersAdapter):
                 last_err = e
         if self.cfg_cls is None:
             raise ImportError(f"taskset {tid!r} is not importable: {last_err}")
-        self.taskset_id = tid
         cfg = self.cfg_cls(id=tid)
         self.taskset = vf.load_taskset(cfg)
         self.name = spec["env"]

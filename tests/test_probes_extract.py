@@ -119,7 +119,7 @@ def test_o15_sends_a_range_around_the_answer():
 
 
 @pytest.mark.parametrize("probe_id", ["Q28", "Q29"])
-def test_long_text_comes_in_four_lengths_around_the_answer_and_holds_no_answer(probe_id):
+def test_long_text_comes_in_lengths_around_the_answer_and_holds_no_answer(probe_id):
     variants = _gen(probe_id, "42")
     assert list(variants) == [name for name, _ in LENGTHS]
     for (name, size), reply in zip(LENGTHS, variants.values(), strict=True):

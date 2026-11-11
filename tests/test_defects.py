@@ -55,6 +55,11 @@ def test_every_probe_belongs_to_exactly_one_defect():
     assert not {p.id for p in all_probes()} - set(BY_PROBE)
 
 
+def test_every_probe_named_by_a_defect_is_registered():
+    # G1 and S1 are findings from reference and consistency checks, not generated probes.
+    assert set(BY_PROBE) - {"G1", "S1"} <= {p.id for p in all_probes()}
+
+
 def test_a_defect_takes_the_worst_of_its_evidence_and_the_worst_defect_comes_first():
     out = _defects([_finding("Q1", "low"), _finding("Q5", "high", "right_rejected", 0.3), _finding("M2", "medium")])
     assert [(d["id"], d["severity"]) for d in out] == [("D9", "high"), ("D1", "medium")]
@@ -225,7 +230,7 @@ def test_the_terminal_lists_defects_first_and_keeps_findings_for_full(tmp_path):
     assert exit_code(r) == 1
 
 
-def test_fail_on_knows_the_new_rate():
+def test_fail_on_knows_the_wrong_partial_rate():
     assert cli._fail_on("wrong_partial>0.1") == {"wrong_partial": 0.1}
 
 

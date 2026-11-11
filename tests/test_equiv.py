@@ -58,7 +58,7 @@ def test_labels():
     assert not states_the_answer("forty-two", "42")
 
 
-@pytest.mark.parametrize("gold,other", [("yes", "no"), ("no", "yes"), ("NO", "YES"), ("Yes", "No"), ("true", "false"), ("False", "True"),
+@pytest.mark.parametrize("gold,other", [("yes", "no"), ("NO", "YES"), ("Yes", "No"), ("true", "false"), ("False", "True"),
                                         ("Y", "N"), ("correct", "incorrect"), ("right", "wrong")])
 def test_a_boolean_is_flipped_in_its_own_words(gold, other):
     assert flip_bool(gold) == other and flip_bool(other) == gold and not equiv(gold, other)

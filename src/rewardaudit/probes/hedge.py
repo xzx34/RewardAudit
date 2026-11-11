@@ -108,7 +108,7 @@ def o10_gold_in_think(task, rng, ctx):
 OTHER_MARKS = ("boxed", "answer_tag", "hash", "final_answer", "answer_colon", "the_final_answer_is")
 
 
-def _other_mark(task: Task, ctx: ProbeContext) -> str | None:
+def _other_mark(ctx: ProbeContext) -> str | None:
     """Another format this checker accepts, with a mark of its own. In a format it does not accept, a second answer is only
     text to it, and rightly ignored."""
     written = ctx.split_wrap()[1]("x")
@@ -121,7 +121,7 @@ def _other_mark(task: Task, ctx: ProbeContext) -> str | None:
 
 def o12_two_formats(task, rng, ctx):
     g, w = _pair(task, rng, ctx)
-    other = _other_mark(task, ctx)
+    other = _other_mark(ctx)
     if w is None or other is None:
         return []
     pre, mark = ctx.split_wrap()

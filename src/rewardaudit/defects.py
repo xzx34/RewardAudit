@@ -39,7 +39,7 @@ DEFECTS = (
     Defect("D8", "Only a fixed-length window is read", "A right answer loses the score once enough text comes before or after it.",
            ("Q28", "Q29")),
     Defect("D9", "Equivalent rewrites rejected", "A right answer loses the score when written another way.",
-           tuple(f"Q{i}" for i in range(1, 31) if i not in (28, 29))),
+           ("Q1", "Q2", "Q3", "Q5", "Q6", "Q8", "Q9", "Q10", "Q21", "Q22", "Q23", "Q24", "Q25", "Q26", "Q27", "Q30")),
     Defect("D10", "Copying the prompt pays", "A reply taken from the prompt earns credit without solving the task.",
            ("L1", "L2", "L3", "L4", "L6", "E9", "E10")),
     Defect("D11", "A fixed answer pays", "One reply, whatever the task, earns credit more often than a fixed answer would by chance.",

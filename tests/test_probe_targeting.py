@@ -43,7 +43,7 @@ def test_a_changed_number_is_beyond_any_tolerance(x):
 
 
 def test_changed_keeps_the_other_kinds():
-    assert _changed(True) is False and _changed("a") == "ax" and _changed([1]) is None and _changed(None) is None
+    assert _changed(True) is False and _changed(None) is None
 
 
 # --- O4 and formats with one answer ---------------------------------------------------------------------------

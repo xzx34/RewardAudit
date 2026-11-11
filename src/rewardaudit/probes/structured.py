@@ -202,8 +202,6 @@ def _changed(x: object) -> object:
         return not x
     if isinstance(x, (int, float)):
         return abs(x) * 2 + 10
-    if isinstance(x, str):
-        return x + "x"
     return None
 
 

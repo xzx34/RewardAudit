@@ -590,7 +590,7 @@ Catalogue probes and findings: `Q28`, `Q29`.
 
 A right answer loses the score when written another way.
 
-Catalogue probes and findings: `Q1`, `Q2`, `Q3`, `Q4`, `Q5`, `Q6`, `Q7`, `Q8`, `Q9`, `Q10`, `Q11`, `Q12`, `Q13`, `Q14`, `Q15`, `Q16`, `Q17`, `Q18`, `Q19`, `Q20`, `Q21`, `Q22`, `Q23`, `Q24`, `Q25`, `Q26`, `Q27`, `Q30`.
+Catalogue probes and findings: `Q1`, `Q2`, `Q3`, `Q5`, `Q6`, `Q8`, `Q9`, `Q10`, `Q21`, `Q22`, `Q23`, `Q24`, `Q25`, `Q26`, `Q27`, `Q30`.
 
 ### D10: Copying the prompt pays
 
