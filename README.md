@@ -22,14 +22,15 @@
   <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md">Reference</a>
 </p>
 
-In reinforcement learning with verifiable rewards, what the model learns depends on the **checker**: the code that
-compares the model's output with the reference answer and assigns a score. When the checker is wrong, training
-optimizes in the wrong direction. If a hedge such as `either 68 or 34` earns full score, the model learns to hedge; if
-a correct answer written as `34.0` is marked wrong, the model learns to avoid a correct way of writing it.
+Many benchmarks, and most reinforcement learning with verifiable rewards, rely on a **checker**: a function that
+scores a model's output against the ground truth. When the checker is wrong, training optimizes in the wrong direction.
+Take a question whose ground truth is 34. If a hedge such as `either 68 or 34` earns full score, the model learns to
+hedge; if `34.0`, the same answer with a decimal point, is marked wrong, the model learns to avoid a correct way of
+writing it.
 
-RewardAudit tests a checker the way you would test any other function: it sends outputs whose correct score is known
-in advance and reports the ones the checker scores wrongly. All it needs is the checker and a dataset with reference
-answers. It needs no model and no GPU, and a small audit finishes in seconds.
+RewardAudit tests a checker the way you would test a function: it builds outputs whose correct score is known in
+advance, has the checker score them, and finds the ones it scores wrongly. All it needs is the checker and a dataset
+with ground truth. It needs no API and no GPU, and an audit takes only seconds.
 
 ## Quick start
 
@@ -39,9 +40,7 @@ Install:
 pip install rewardaudit
 ```
 
-Audit your own checker. Here a checker is a Python function that takes the model's output and the reference answer and
-returns a score. The checker below takes the last number in the output, compares it with the reference answer and
-scores it:
+Audit your own checker:
 
 ```python
 # reward.py
@@ -52,7 +51,7 @@ def score(completion, answer):
     return 1.0 if numbers and numbers[-1] == answer.strip() else 0.0
 ```
 
-Each line of the dataset holds a task and its reference answer:
+Each line of the dataset holds a task and its ground truth:
 
 ```json
 {"question": "Gus has 23 apples and gets 11 more. How many apples does Gus have now?", "answer": "34"}
@@ -91,11 +90,11 @@ The example output of every high-severity defect is sent five more times to conf
 
 ## What it tests
 
-RewardAudit builds its outputs from each task's reference answer. Some leave the task unsolved, so a correct checker
+RewardAudit builds its outputs from each task's ground truth. Some leave the task unsolved, so a correct checker
 gives them zero; others are correct but written differently, so they deserve full score. They come from 79 probes in
 eight families:
 
-| Family | The output contains | Example (reference answer `34`) | Expected score |
+| Family | The output contains | Example (ground truth `34`) | Expected score |
 |---|---|---|---|
 | **N** | no answer | an empty output, `\boxed{}` | 0 |
 | **E** | many candidate answers at once | `Possible answers: -20, -19, …, 200` | 0 |
@@ -108,7 +107,7 @@ eight families:
 
 An audit runs in four steps:
 
-1. **Find the format.** Send each reference answer in common formats, from `\boxed{}` to answer tags, and keep the
+1. **Find the format.** Send each task's ground truth in common formats, from `\boxed{}` to answer tags, and keep the
    ones the checker accepts.
 2. **Send the probes.** Send the probe outputs in those formats. The checker runs in separate processes with time and
    memory limits, so a crash or a hang is recorded as a finding and does not stop the audit.
@@ -142,7 +141,7 @@ One of several answers is read  ██████▉                          9
 A few of them:
 
 - **lm-evaluation-harness** (MGSM): with punctuation removal turned on, `Die Antwort lautet -3.` is scored correct for
-  the reference answer `3`.
+  the ground truth `3`.
 - **OpenAI grade-school-math** (GSM8K): `#### 30 … Wait, that is not right. … The correct result is #### 60` is scored
   correct for `30`, because the first marked number is kept.
 - **Inspect AI** (`match_str`, numeric matching): `The answer is either 60 or 30.` is scored correct for `30`.
@@ -188,7 +187,7 @@ thresholds, and `rewardaudit compare` shows where two versions of a checker scor
 
 ## Limits
 
-RewardAudit is for checkers that score a single output against a reference answer. Multi-turn and tool-use
+RewardAudit is for checkers that score a single output against the ground truth. Multi-turn and tool-use
 environments and checkers that call a model are out of scope; in those cases it stops and explains why rather than
 print misleading numbers. If the same input receives different scores, it reports this and continues. Because it tests
 a fixed set of outputs, a clean result means only that these outputs were scored correctly, not that the checker is

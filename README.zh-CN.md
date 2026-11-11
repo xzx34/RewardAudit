@@ -22,9 +22,9 @@
   <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md">参考文档</a>
 </p>
 
-在基于可验证奖励的强化学习中，模型学到什么，很大程度上取决于 **checker**：一段把模型输出与参考答案进行比较并打分的代码。checker 一旦判错，训练就会朝错误的方向优化。比如，`either 68 or 34` 这样两头下注的输出如果能拿到满分，模型就会学会两头下注；正确答案写成 `34.0` 如果被判为错误，模型就会学会回避这种本来正确的写法。
+在大量 benchmark 以及基于可验证奖励的 RL 中都存在一类 **checker**：基于模型输出和 Ground Truth 来进行打分的函数。checker 一旦判错，训练就会朝错误的方向优化。比如，对于 Ground Truth 是 34 的问题，`either 68 or 34` 这样两头下注的输出如果能拿到满分，模型就会学会两头下注；加上小数点的答案 `34.0` 如果被判为错误，模型就会学会回避这种本来正确的写法。
 
-RewardAudit 用测试普通函数的方式来测试 checker：构造一批应得分数已知的输出交给 checker 打分，再找出其中判错的部分。使用时只需提供 checker 和带参考答案的数据集，不需要模型，也不需要 GPU，小规模的审计几秒钟即可完成。
+RewardAudit 用测试函数的方式来测试 checker：构造一批应得分数已知的输出交给 checker 打分，再找出其中判错的部分。使用时只需提供 checker 和带 Ground Truth 的数据集，无需 API 和 GPU，只需几秒钟就能完成审计。
 
 ## 快速上手
 
@@ -34,7 +34,7 @@ RewardAudit 用测试普通函数的方式来测试 checker：构造一批应得
 pip install rewardaudit
 ```
 
-审计你自己的 checker：在这里，checker 是一个封装好的 Python 函数，接收模型的输出和参考答案，并返回分数。下面这个 checker 会取出输出中的最后一个数，与参考答案比较并打分：
+审计你自己的 checker：
 
 ```python
 # reward.py
@@ -45,7 +45,7 @@ def score(completion, answer):
     return 1.0 if numbers and numbers[-1] == answer.strip() else 0.0
 ```
 
-数据集的每一行包含一道题目及其参考答案：
+数据集的每一行包含一道题目及其 Ground Truth：
 
 ```json
 {"question": "Gus has 23 apples and gets 11 more. How many apples does Gus have now?", "answer": "34"}
@@ -81,9 +81,9 @@ rewardaudit audit reward.py --dataset data.jsonl
 
 ## 检测内容
 
-RewardAudit 根据每道题的参考答案构造输出。其中一部分没有解出题目，正确的 checker 应当给零分；另一部分答案正确，只是写法不同，应当给满分。这些输出由 79 个探针生成，分为八族：
+RewardAudit 根据每道题的 Ground Truth 构造输出。其中一部分没有解出题目，正确的 checker 应当给零分；另一部分答案正确，只是写法不同，应当给满分。这些输出由 79 个探针生成，分为八族：
 
-| 族 | 输出内容 | 示例（参考答案为 `34`） | 应得分数 |
+| 族 | 输出内容 | 示例（Ground Truth 为 `34`） | 应得分数 |
 |---|---|---|---|
 | **N** | 不含答案 | 空输出、`\boxed{}` | 0 |
 | **E** | 同时列出大量候选答案 | `Possible answers: -20, -19, …, 200` | 0 |
@@ -96,7 +96,7 @@ RewardAudit 根据每道题的参考答案构造输出。其中一部分没有�
 
 一次审计分为四步：
 
-1. **确定格式。** 把每个参考答案以各种常见格式（从 `\boxed{}` 到答案标签）发送给 checker，保留它接受的格式。
+1. **确定格式。** 把每道题的 Ground Truth 以各种常见格式（从 `\boxed{}` 到答案标签）发送给 checker，保留它接受的格式。
 2. **发送探针。** 以这些格式发送探针生成的输出。checker 在独立进程中运行，并受时间和内存限制，崩溃或卡死会被记为一条发现，不会中断审计。
 3. **比对分数。** 将每个分数与应得分数比对，并把发现归入 22 类缺陷，例如“两头下注的答案被接受”“等价改写被拒绝”。
 4. **确认结果。** 将每个高严重度缺陷的示例输出再发送五次，并删减为 checker 仍然接受的最短形式。
@@ -122,9 +122,9 @@ RewardAudit 根据每道题的参考答案构造输出。其中一部分没有�
 
 其中几个例子：
 
-- **lm-evaluation-harness**（MGSM）：开启去除标点后，参考答案为 `3` 时，`Die Antwort lautet -3.` 被判为正确。
-- **OpenAI grade-school-math**（GSM8K）：参考答案为 `30` 时，`#### 30 … Wait, that is not right. … The correct result is #### 60` 被判为正确，因为它只保留第一个标记出的数字。
-- **Inspect AI**（`match_str`，数值匹配）：参考答案为 `30` 时，`The answer is either 60 or 30.` 被判为正确。
+- **lm-evaluation-harness**（MGSM）：开启去除标点后，Ground Truth 为 `3` 时，`Die Antwort lautet -3.` 被判为正确。
+- **OpenAI grade-school-math**（GSM8K）：Ground Truth 为 `30` 时，`#### 30 … Wait, that is not right. … The correct result is #### 60` 被判为正确，因为它只保留第一个标记出的数字。
+- **Inspect AI**（`match_str`，数值匹配）：Ground Truth 为 `30` 时，`The answer is either 60 or 30.` 被判为正确。
 - **TheoremQA**：数字解析失败时，会把输出文本当作 Python 代码执行。
 
 [已确认的缺陷](https://github.com/xzx34/RewardAudit/blob/main/docs/findings.md)列出了 30 个项目中的 35 个此类问题，每条都附有被审计版本的源码链接（英文）。
@@ -158,7 +158,7 @@ Hub 上的环境是第三方代码，审计时会在你的机器上安装并运�
 
 ## 局限
 
-RewardAudit 适用于针对单条输出、按参考答案打分的 checker。多轮对话、工具调用环境以及调用模型打分的 checker 不在适用范围内；遇到这类情况时，它会停止并说明原因，而不会给出误导性的数字。如果同一输入得到不同的分数，它会报告这一情况并继续审计。由于测试的是一组固定的输出，审计结果干净只说明这些输出都得到了正确的分数，并不代表 checker 没有问题。
+RewardAudit 适用于针对单条输出、按 Ground Truth 打分的 checker。多轮对话、工具调用环境以及调用模型打分的 checker 不在适用范围内；遇到这类情况时，它会停止并说明原因，而不会给出误导性的数字。如果同一输入得到不同的分数，它会报告这一情况并继续审计。由于测试的是一组固定的输出，审计结果干净只说明这些输出都得到了正确的分数，并不代表 checker 没有问题。
 
 ## 文档
 
