@@ -21,7 +21,7 @@
   <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md">参考</a>
 </p>
 
-用可验证奖励做强化学习，模型学到什么，取决于一小段代码：把模型的答案和参考答案做比较、给出分数的 **checker**。checker 判错了，训练就会跟着学错。`either 68 or 34` 这种两头下注的回答如果能拿满分，模型就会学会两头下注；`34.0` 如果被判错，模型就会避开这个本来正确的写法。
+用可验证奖励做强化学习时，模型学到什么，取决于一小段代码：**checker**。它把模型的答案和参考答案作比较，然后打分。checker 判错了，模型就跟着学错：`either 68 or 34` 这种两头下注的回答要是能拿满分，模型就学会两头下注；`34.0` 要是被判成错，模型就会回避这个本来正确的写法。
 
 RewardAudit 像测试普通函数一样测试 checker：发给它一批事先知道该得几分的回复，找出它判错的那些。你只需要提供 checker 和一份带参考答案的数据集。不需要模型，也不需要 GPU，小规模的审计几秒钟就能跑完。
 
@@ -150,7 +150,7 @@ rewardaudit audit primeintellect/gsm8k    # 从 Prime Intellect Hub 装进单独
 
 Hub 上的环境是别人写的代码，审计时会在你的机器上安装并运行它。只对你本来就愿意运行的包这样做。
 
-**在 CI 里用。** 没有高严重度缺陷时退出码是 0，有则是 1，无法完成审计时是 2。`--fail-on "right_rejected>0.1,wrong_accepted>0.01"` 可以设定你自己的阈值。`rewardaudit compare` 告诉你同一个 checker 的两个版本在哪些回复上判得不一样。
+**在 CI 里用。** 没有高严重度缺陷时退出码是 0，有则是 1，无法完成审计或无法计量比例时是 2。`--fail-on "right_rejected>0.1,wrong_accepted>0.01"` 可以设定你自己的阈值。`rewardaudit compare` 告诉你同一个 checker 的两个版本在哪些回复上判得不一样。
 
 ## 局限
 

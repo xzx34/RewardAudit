@@ -174,7 +174,8 @@ rewardaudit audit primeintellect/gsm8k    # from the Prime Intellect Hub, in its
 A Hub environment is someone else's code, and auditing it installs and runs that code on your machine. Only do this
 with packages you would run anyway.
 
-**In CI.** The exit code is 0 when there is no high defect, 1 when there is, and 2 when the audit could not be done.
+**In CI.** The exit code is 0 when there is no high defect, 1 when there is, and 2 when the audit could not be done or
+its rates could not be measured.
 `--fail-on "right_rejected>0.1,wrong_accepted>0.01"` sets your own thresholds. `rewardaudit compare` shows where two
 versions of a checker decide differently.
 
