@@ -1,5 +1,4 @@
-"""Probes for structured golds: lists (M8 M9 M10 Q10), JSON objects (M11 M12 M13), grids (M17), and lists or grids with
-k items wrong (M28).
+"""Probes for structured golds: lists (M8 M9 M10 Q10) and lists or grids with k items wrong (M28).
 
 Every variant is written in the gold's own spelling (separators, spacing, brackets), so the only thing
 that differs from the gold is the one change the probe makes. Whether element order matters is read from
@@ -222,13 +221,6 @@ def _get_path(v: object, path: tuple) -> object:
     return v
 
 
-def _fresh_key(obj: dict, base: str) -> str:
-    k = base
-    while k in obj:
-        k += "_x"
-    return k
-
-
 def _number(task, rng, ctx):
     obj = _obj(task, ctx)
     paths = _numeric_paths(obj) if obj else []
@@ -244,15 +236,6 @@ def _drop_field(task, rng, ctx):
         return []
     k = rng.choice(list(obj))
     return [("drop_field", dumps_like({a: b for a, b in obj.items() if a != k}, _raw(task)))]
-
-
-def _rename_key(task, rng, ctx):
-    obj = _obj(task, ctx)
-    if not obj:
-        return []
-    k = rng.choice(list(obj))
-    new = _fresh_key(obj, f"{k}_x")
-    return [("rename", dumps_like({new if a == k else a: b for a, b in obj.items()}, _raw(task)))]
 
 
 # --- grids ---------------------------------------------------------------------------------------------------
@@ -336,8 +319,7 @@ def _new_elements(seq: Seq, task: Task, ctx: ProbeContext, k: int) -> list[str]:
 
 def _partly_wrong(task, rng, ctx):
     """The same random order of items for every k, so each variant holds the wrong items of the one before. A list takes
-    new elements as M10 does, used in turn when there are fewer than the items replaced; a grid each cell's other value, as
-    M17 does."""
+    new elements as M10 does, used in turn when there are fewer than the items replaced; a grid each cell's other value."""
     seq = _seq(task, ctx)
     n = _items(task, ctx)
     steps = [(f"k{k}" if k < n else ALL, k) for k in _steps(n)]
@@ -405,27 +387,10 @@ PROBES_M = [
           applies=_seq_applies(lambda s: True),
           description="Sends the reference list with one extra element that is not already in it; a sound "
                       "checker gives zero."),
-    Probe("M11", "M", "one JSON number changed", "natural", "zero", NS, _not_gold(_number),
-          applies=lambda t, c: bool(_numeric_paths(_obj(t, c) or {})),
-          description="Sends the reference JSON object with one numeric value changed; a checker that only "
-                      "validates the keys or the schema accepts it, a sound one gives zero."),
-    Probe("M12", "M", "one JSON field dropped", "natural", "zero", NS, _not_gold(_drop_field),
-          applies=_obj_asked,
-          description="Sends the reference JSON object with one top-level field removed, only on tasks whose "
-                      "prompt asks for JSON; a sound checker gives zero."),
-    Probe("M13", "M", "one JSON key renamed", "natural", "zero", NS, _not_gold(_rename_key),
-          applies=_obj_asked,
-          description="Sends the reference JSON object with one key renamed (its value kept), only on tasks whose "
-                      "prompt asks for JSON; a checker that compares only values accepts it, a sound one gives "
-                      "zero."),
-    Probe("M17", "M", "one grid cell changed", "natural", "zero", NS, _not_gold(_cell),
-          applies=lambda t, c: c.gtype(t) == "grid",
-          description="Sends the reference grid with exactly one cell changed to another value the grid uses; a "
-                      "sound checker gives zero."),
     Probe("M28", "M", "k items of a list or grid wrong", "natural", "zero", NS, _not_gold(_partly_wrong),
           applies=lambda t, c: _items(t, c) >= 3, headline=False, sweep=True,
           description="Where the reference answer is a list or a grid of 3 items or more, sends it with k of them replaced "
-                      "by wrong ones, as M10 and M17 make them, from one item up to all (at most 8 steps, closer together "
+                      "by wrong ones, from one item up to all (at most 8 steps, closer together "
                       "at both ends). Its finding gives the acceptance rate of each k, and the mean share of the score "
                       "where scores fall between nothing and full; its severity is that of the reply with every item "
                       "wrong. A sound checker gives zero."),

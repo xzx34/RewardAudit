@@ -21,7 +21,6 @@ from rewardaudit.prompt import asks_answer_first, asks_answer_last, asks_answer_
 from rewardaudit.types import Task
 
 PROBES = {p.id: p for p in all_probes()}
-OBJECT = '{"name": "Ada", "age": 36}'
 PROSE_PROBES = ("Q5", "Q6", "Q21", "Q22", "O4")
 
 
@@ -37,19 +36,6 @@ def _tasks(*golds):
 
 # --- JSON probes ----------------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("probe_id", ["M12", "M13"])
-def test_field_probes_need_a_prompt_that_asks_for_json(probe_id):
-    assert _gen(probe_id, Task("t", "Return the record as a JSON object.", OBJECT))
-    assert not _gen(probe_id, Task("t", "Extract the person's name and age.", OBJECT))
-    chat = [{"role": "system", "content": "Reply in json."}, {"role": "user", "content": "Who is it?"}]
-    assert _gen(probe_id, Task("t", "Who is it?", OBJECT, messages=chat))
-
-
-def test_value_probes_on_json_do_not_read_the_prompt():
-    t = Task("t", "Extract the person's name and age.", OBJECT)
-    assert _gen("M11", t)
-
-
 @pytest.mark.parametrize("x", [0, 1, 36, -36, 0.5, -0.5, 99999, 1e6, -1e6])
 def test_a_changed_number_is_beyond_any_tolerance(x):
     y = _changed(x)
@@ -58,7 +44,6 @@ def test_a_changed_number_is_beyond_any_tolerance(x):
 
 def test_changed_keeps_the_other_kinds():
     assert _changed(True) is False and _changed("a") == "ax" and _changed([1]) is None and _changed(None) is None
-    assert '"age": 82' in _gen("M11", Task("t", "Return JSON.", OBJECT))["value"]
 
 
 # --- O4 and formats with one answer ---------------------------------------------------------------------------

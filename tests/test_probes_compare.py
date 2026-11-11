@@ -304,7 +304,6 @@ def test_q26_needs_a_date_that_says_which_number_is_the_month(answer):
 
 
 @pytest.mark.parametrize(("answer", "expected"), [
-    ("Beyoncé", {"no_accents": "Beyonce"}),
     ("the chair", {"no_article": "chair"}),
     ("a green apple", {"no_article": "green apple"}),
     ("apples", {"article": "the apples"}),
@@ -316,6 +315,13 @@ def test_q26_needs_a_date_that_says_which_number_is_the_month(answer):
 ])
 def test_q27_changes_the_spelling_of_words(answer, expected):
     assert _gen("Q27", answer) == expected
+
+
+def test_q27_adds_an_article_only_when_the_prompt_contains_the_word_the():
+    for prompt, added in [("Name the fruit.", True), ("THE fruit?", True), ("Name a fruit.", False),
+                          ("What does mother eat?", False), ("Wie heißt die Frucht?", False)]:
+        variants = _gen("Q27", "apples", prompt)
+        assert variants == ({"article": "the apples"} if added else {})
 
 
 @pytest.mark.parametrize(("answer", "prompt"), [

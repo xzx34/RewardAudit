@@ -47,7 +47,7 @@ rewardaudit audit reward.py --dataset data.jsonl --n 100
 Excerpt (elapsed time varies):
 
 ```
-rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
+rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
 
 Result: problems found (2 high, 4 medium)
 
@@ -87,7 +87,7 @@ accepted: `68 34.` shows that only the last number counts.
 | Pays wrong answers in part | Does a definite error earn more than nothing? | off by one, one word changed |
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
-`rewardaudit probes` lists all 84 probes; `rewardaudit probes O11` explains one.
+`rewardaudit probes` lists all 79 probes; `rewardaudit probes O11` explains one.
 The [reference](https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md) describes every probe and all 22 defects.
 `rewardaudit compare v1.jsonl v2.jsonl` shows where two checkers, or two versions of one, decide differently, probe by
 probe, from two audits of the same rows run with `--calls`.

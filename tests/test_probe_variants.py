@@ -94,11 +94,6 @@ def test_a_json_prompt_keeps_the_probes_on_fields_and_values():
     assert set(_wrongs(no_number)) <= {'{"name": "Ada"}', '{"city": "Rome"}'}
 
 
-def test_m11_still_runs_where_the_prompt_does_not_ask_for_json():
-    t = Task("t", "Extract the person's name and age.", '{"name": "Ada", "age": 36}')
-    assert strip_wrappers(_gen("M11", t)["value"]) == '{"name": "Ada", "age": 82}'
-
-
 # --- the O family's wrong answer: list golds -----------------------------------------------------------------
 
 def _ids(text: str) -> set[str]:
@@ -155,49 +150,10 @@ def _in_palette(grid) -> bool:
 ARC = "[[0, 8, 3], [8, 0, 3]]"
 
 
-@pytest.mark.parametrize("gold", [ARC, "[[9, 9], [9, 9]]", "[[0, 0], [0, 0]]", "[[1, 1], [1, 1]]", "[[5, 5], [5, 5]]",
-                                  "[[0, 9], [9, 0]]"])
-def test_m17_keeps_a_json_grid_inside_a_0_9_palette(gold):
-    t = Task("t", "Predict the output grid.", gold)
-    for seed in SEEDS:
-        (comp,) = _gen("M17", t, seed=seed).values()
-        grid = json.loads(strip_wrappers(comp))
-        assert _in_palette(grid) and grid != json.loads(gold), comp
-
-
-def test_a_wrong_cell_is_a_value_the_grid_already_uses():
-    t = Task("t", "Predict the output grid.", ARC)
-    for seed in SEEDS:
-        (comp,) = _gen("M17", t, seed=seed).values()
-        grid = json.loads(strip_wrappers(comp))
-        assert {c for row in grid for c in row} <= {0, 3, 8}
-        assert sum(a != b for ra, rb in zip(grid, json.loads(ARC), strict=True) for a, b in zip(ra, rb, strict=True)) == 1
-
-
 def test_the_o_family_wrong_grid_has_valid_cells():
     t = Task("t", "Predict the output grid.", ARC)
     for w in _wrongs(t):
         assert _in_palette(json.loads(w)) and not equiv(w, ARC, "grid")
-
-
-@pytest.mark.parametrize("gold,cells", [("0 8\n8 3", set("038")), ("1 0\n0 1", set("01")), ("999\n999", set("89")),
-                                        ("5 5\n5 5", set("56")), ("10 20\n30 40", {"10", "20", "30", "40"}),
-                                        ("#.#\n.#.", set("#."))])
-def test_a_text_grid_keeps_its_shape_and_its_symbols(gold, cells):
-    t = Task("t", "Predict the output grid.", gold)
-    pat = r"\S" if " " not in gold else r"\S+"
-    for seed in SEEDS:
-        (comp,) = _gen("M17", t, seed=seed).values()
-        text = strip_wrappers(comp, keep_punct=True)
-        assert set(re.findall(pat, text)) <= cells and text != gold
-        assert [len(re.findall(pat, ln)) for ln in text.splitlines()] == [len(re.findall(pat, ln)) for ln in gold.splitlines()]
-
-
-def test_other_kinds_of_cell():
-    assert _gen("M17", Task("t", "q", '[["a", "b"], ["b", "a"]]'))
-    assert _gen("M17", Task("t", "q", "[[0.5, 0.25], [0.25, 0.5]]"))
-    (comp,) = _gen("M17", Task("t", "q", "[[true, false], [false, true]]")).values()
-    assert {c for row in json.loads(strip_wrappers(comp)) for c in row} == {True, False}
 
 
 # --- lists and grids with k items wrong ----------------------------------------------------------------------
@@ -586,26 +542,6 @@ def _accepted(report, probe_id):
     scores = [o.verdict.score for o in report.observations if o.probe_id == probe_id]
     assert scores, probe_id
     return sum(s == 1.0 for s in scores) / len(scores)
-
-
-PALETTE_ONLY = """
-import json, re
-
-def score(prompt, completion, answer):
-    found = re.findall(r"\\[\\[.*\\]\\]", completion)
-    try:
-        grid = json.loads(found[-1])
-    except (IndexError, ValueError):
-        return 0.0
-    gold = json.loads(answer)
-    same_shape = [len(r) for r in grid] == [len(r) for r in gold]
-    return float(same_shape and all(c in range(10) for r in grid for c in r))
-"""
-
-
-def test_a_checker_that_only_validates_the_palette_is_found(tmp_path):
-    golds = [json.dumps([[i % 10, 8, 3], [8, 0, (i + 1) % 10]]) for i in range(12)]
-    assert _accepted(_run(tmp_path, PALETTE_ONLY, golds, ["M"]), "M17") == 1.0
 
 
 UNION = """

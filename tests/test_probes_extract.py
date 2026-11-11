@@ -4,18 +4,19 @@ import random
 import re
 
 import pytest
+from conftest import probe_context
 
 from rewardaudit import audit
 from rewardaudit.contract import Contract
 from rewardaudit.equiv import contains_equiv
 from rewardaudit.goldtype import infer_task_type
-from rewardaudit.metrics import _sweep_severity
+from rewardaudit.metrics import Tally, _sweep_severity
 from rewardaudit.probes.base import _FILLER, ProbeContext
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.probes.rewrite import LENGTHS
 from rewardaudit.prompt import option_texts
 from rewardaudit.report import render_markdown
-from rewardaudit.types import Label, Task
+from rewardaudit.types import Kind, Label, Observation, Task, Verdict
 
 PROBES = {p.id: p for p in all_probes()}
 MCQ = "What is 6 times 7?\nA. 41\nB. 42\nC. 43\nD. 44"
@@ -152,13 +153,36 @@ def test_q30_reads_a_template_that_asks_for_a_letter():
     assert "text" not in _gen("Q30", "B", MCQ + '\nEnd with "The answer is (X)".')
 
 
-def test_q31_writes_latex_markup_inside_a_box():
-    assert _gen("Q31", "Paris") == {"text": "\\boxed{\\text{Paris}}"}
-    assert _gen("Q31", "45", "What is the angle ABC?")["degrees"] == "\\boxed{45^\\circ}"
-    assert "degrees" not in _gen("Q31", "45", "How many apples are there?")
-    assert _gen("Q31", "\\frac{1}{2}") == _gen("Q31", "(3,4]") == _gen("Q31", "42") == _gen("Q31", "p - q") == {}  # not what goes in \\text{}
-    assert "text" not in _gen("Q31", "Paris", primary="answer_tag")
-    assert _gen("Q31", "Saint-Tropez") == {"text": "\\boxed{\\text{Saint-Tropez}}"}
+def test_q28_on_answer_last_prompts_counts_failures_and_time_but_not_rejections():
+    last = [Task(str(i), "Compute it. Put the answer at the end of your response.", str(10 + i)) for i in range(2)]
+    ordinary = [Task(str(i), "Compute it.", str(10 + i)) for i in range(2, 4)]
+    probe = PROBES["Q28"]
+    for tasks in (last, last + ordinary):
+        ctx = probe_context(tasks)
+        tally = Tally([probe], tasks, ctx.contract, "int")
+        observations = []
+        for task in tasks:
+            ctx.task = task
+            variants = probe.generate(task, random.Random(0), ctx)
+            assert len(variants) == len(LENGTHS)
+            for name, reply in variants:
+                verdict = Verdict(Kind.ERROR, error="failed") if name == "4k" else Verdict(
+                    Kind.SCORE, score=0.0, elapsed_ms=900.0 if name == "64k" else 10.0)
+                observations.append(Observation(probe.id, probe.family, name, task.id, reply, verdict,
+                                                probe.label, probe.expect, probe.tier))
+        tally.add(observations)
+        metrics = tally.finish()
+        rejected = [f for f in metrics["findings"] if f["category"] == "right_rejected"]
+        if tasks == last:
+            assert not rejected
+        else:
+            assert len(rejected) == 1 and rejected[0]["rate"] == 1.0 and rejected[0]["n"] == 2
+            assert rejected[0]["n_scored"] == 8 and rejected[0]["example"]["task_id"] in {"2", "3"}
+        failures = next(f for f in metrics["findings"] if "errors" in f["note"])
+        timing = next(f for f in metrics["findings"] if f["name"] == "scoring time grows with reply length")
+        assert failures["n"] == len(observations) and failures["rate"] == 1 / len(LENGTHS)
+        assert timing["category"] == "robustness" and timing["severity"] == "medium" and timing["n"] == len(tasks)
+        assert metrics["robustness"]["n_calls"] == len(observations)
 
 
 @pytest.mark.parametrize(("variant", "rate", "severity"), [("0.1k", 1.0, "medium"), ("1k", 1.0, "medium"), ("4k", 0.5, "medium"), ("16k", 1.0, "low"), ("64k", 1.0, "low"), ("1k", 0.2, "low")])

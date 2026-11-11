@@ -28,7 +28,6 @@ SAMPLE_TASKS = [
     Task("text", "Name the capital of France.", "Paris"),
     Task("latex", "Expand (n+1)^2.", "n^2+2n+1"),
     Task("list", "List the prime factors of 30 in increasing order, separated by commas.", "2, 3, 5"),
-    Task("json", "Return the point (3, 4) as a JSON object with keys x and y.", '{"x": 3, "y": 4}'),
     Task("grid", "Invert every cell of this binary grid (0 becomes 1, 1 becomes 0):\n0 1\n1 1", "1 0\n0 0"),
     Task("same", "What is 40 + 2?", "42"),
     Task("unit", "How far is the station?", "5 km"),

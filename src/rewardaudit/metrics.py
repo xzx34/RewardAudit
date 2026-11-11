@@ -31,7 +31,7 @@ from rewardaudit.equiv import normalize, states_the_answer
 from rewardaudit.goldtype import infer_gold_type
 from rewardaudit.probes.base import Probe
 from rewardaudit.probes.structured import ALL
-from rewardaudit.prompt import mcq_options
+from rewardaudit.prompt import asks_answer_last, mcq_options
 from rewardaudit.types import MARKER_MODULE, SCORE_NOT_A_NUMBER, Kind, Label, Observation, Task, Verdict
 
 
@@ -448,6 +448,14 @@ class Tally:
                     st.timeouts += 1
                 elif k == Kind.CRASH:
                     st.crashes += 1
+                if probe.sweep and o.verdict.ok:
+                    st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
+                    st.variant_score[o.variant] += contract.signal(o.verdict) / contract.gold_score.get(tid, contract.full_score)
+                if _reached_import(o.verdict):
+                    st.reached_import += 1
+                    st.import_example = st.import_example or o
+                if pid == "Q28" and asks_answer_last(next(t for t in self.tasks if t.id == tid)):
+                    continue
                 h, p = hit(o, contract, probe.gold_blind)
                 if p and probe.family == "M" and probe.headline:
                     self._add_paid(o)
@@ -483,12 +491,6 @@ class Tally:
                     example = o
                 if (probe.sweep or probe.by_variant) and h:
                     st.variant_examples.setdefault(o.variant, o)
-                if probe.sweep and o.verdict.ok:
-                    st.variant_ms[o.variant].append(o.verdict.elapsed_ms)
-                    st.variant_score[o.variant] += contract.signal(o.verdict) / contract.gold_score.get(tid, contract.full_score)
-                if _reached_import(o.verdict):
-                    st.reached_import += 1
-                    st.import_example = st.import_example or o
                 any_hit |= h
                 any_partial |= p
             if any_hit:

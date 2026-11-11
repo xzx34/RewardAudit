@@ -39,7 +39,7 @@ DEFECTS = (
     Defect("D8", "Only a fixed-length window is read", "A right answer loses the score once enough text comes before or after it.",
            ("Q28", "Q29")),
     Defect("D9", "Equivalent rewrites rejected", "A right answer loses the score when written another way.",
-           tuple(f"Q{i}" for i in range(1, 32) if i not in (28, 29))),
+           tuple(f"Q{i}" for i in range(1, 31) if i not in (28, 29))),
     Defect("D10", "Copying the prompt pays", "A reply taken from the prompt earns credit without solving the task.",
            ("L1", "L2", "L3", "L4", "L6", "E9", "E10")),
     Defect("D11", "A fixed answer pays", "One reply, whatever the task, earns credit more often than a fixed answer would by chance.",
@@ -57,7 +57,7 @@ DEFECTS = (
     Defect("D19", "Close answers accepted", "An answer a few characters away from the reference answer compares equal.", ("M5", "M6", "M7")),
     Defect("D20", "Parts of a structured answer ignored",
            "A list, JSON object or grid with a definite error compares equal to the reference answer.",
-           ("M8", "M9", "M10", "M11", "M12", "M13", "M17", "M28")),
+           ("M8", "M9", "M10", "M28")),
     Defect("D21", "A different answer accepted", "An answer that is plainly another one earns full score.", ("M16", "M19", "M20")),
     Defect("D22", "Reference formatting changes the verdict",
            "A right reply is rejected when the reference answer is written another way, so on a dataset whose reference "

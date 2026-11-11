@@ -3,7 +3,7 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). What stays the same across versions is listed in
 the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
-## Unreleased
+## 0.3.0 - 2026-11-11
 
 ### Added
 
@@ -14,7 +14,7 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - G2 tests other accepted answers supplied through `--reference-col`.
 - G3 and D22 report when rewriting the reference changes the score of the same right reply.
 - O16 tests paired option letters; M26 reverses relation signs; M27 tests small absolute tolerances; M28 changes parts of structured answers.
-- E10 tests all candidates named in the prompt as one answer; there are now 84 probes in eight families and 22 defects.
+- E10 tests all candidates named in the prompt as one answer; there are now 79 probes in eight families and 22 defects.
 - `--budget` and `audit(budget_s=...)` limit audit time and report probes left out.
 - `--calls` and `audit(calls=...)` save reference and probe calls as JSON Lines.
 - `rewardaudit compare A B` and Python `compare(a, b)` compare acceptance, replies and rates from two calls files.
@@ -25,6 +25,9 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
 ### Changed
 
+- Removed M11, M12, M13, M17 and Q31 because no real checker showed their defects; their ids are retired and are not reused.
+- Q27 no longer removes accents and adds an English article only when the prompt contains the word `the`; its other variants stay unchanged.
+- Q28 calls on prompts requiring the answer at the end count toward failed calls and scoring time, but no longer toward right-answer rejection findings.
 - `rewardaudit probes <id>` explains defects, findings and evidence ids as well as probes; reports point to lookup.
 - Command help describes positional arguments in the command description.
 - Reports name the default `train` split when a Hugging Face dataset name omits the split.

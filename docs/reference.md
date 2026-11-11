@@ -1,6 +1,6 @@
 # Probe and defect reference
 
-84 probes in 8 families; 22 defects.
+79 probes in 8 families; 22 defects.
 
 Generated from the descriptions used by `rewardaudit probes`. Look up any id with `rewardaudit probes <id>`.
 Acceptance and rejection rates pool a probe's scored calls across variants unless its entry says otherwise.
@@ -342,33 +342,9 @@ Sends the reference list with one extra element that is not already in it; a sou
 
 Counts toward: Accepts wrong answers.
 
-#### M11: one JSON number changed
-
-Sends the reference JSON object with one numeric value changed; a checker that only validates the keys or the schema accepts it, a sound one gives zero.
-
-Counts toward: Accepts wrong answers.
-
-#### M12: one JSON field dropped
-
-Sends the reference JSON object with one top-level field removed, only on tasks whose prompt asks for JSON; a sound checker gives zero.
-
-Counts toward: Accepts wrong answers.
-
-#### M13: one JSON key renamed
-
-Sends the reference JSON object with one key renamed (its value kept), only on tasks whose prompt asks for JSON; a checker that compares only values accepts it, a sound one gives zero.
-
-Counts toward: Accepts wrong answers.
-
-#### M17: one grid cell changed
-
-Sends the reference grid with exactly one cell changed to another value the grid uses; a sound checker gives zero.
-
-Counts toward: Accepts wrong answers.
-
 #### M28: k items of a list or grid wrong
 
-Where the reference answer is a list or a grid of 3 items or more, sends it with k of them replaced by wrong ones, as M10 and M17 make them, from one item up to all (at most 8 steps, closer together at both ends). Its finding gives the acceptance rate of each k, and the mean share of the score where scores fall between nothing and full; its severity is that of the reply with every item wrong. A sound checker gives zero.
+Where the reference answer is a list or a grid of 3 items or more, sends it with k of them replaced by wrong ones, from one item up to all (at most 8 steps, closer together at both ends). Its finding gives the acceptance rate of each k, and the mean share of the score where scores fall between nothing and full; its severity is that of the reply with every item wrong. A sound checker gives zero.
 
 Counts toward: Accepts wrong answers, as a finding but not in the rate.
 
@@ -464,13 +440,13 @@ Counts toward: Rejects right answers.
 
 #### Q27: other spellings of a word
 
-Sends a short answer in words (not a function call) without accents, with or without a leading article, with a hyphen and a space swapped, and with & and 'and' swapped; a sound checker gives full credit.
+Sends a short answer in words (not a function call) with or without a leading article (adding one only when the prompt contains the word 'the'), with a hyphen and a space swapped, and with & and 'and' swapped; a sound checker gives full credit.
 
 Counts toward: Rejects right answers.
 
 #### Q28: long text after the answer
 
-Sends the reference answer followed by 100, 1k, 4k, 16k and 64k characters of neutral text. Its finding gives the acceptance rate of each and the shortest that loses the score; a sound checker gives full credit. Sent on five rows, not when the prompt asks for only the answer, nor where the prompt writes out the reply as a thinking block directly followed by the answer block.
+Sends the reference answer followed by 100, 1k, 4k, 16k and 64k characters of neutral text. Its finding gives the acceptance rate of each and the shortest that loses the score; a sound checker gives full credit. Sent on five rows, not when the prompt asks for only the answer, nor where the prompt writes out the reply as a thinking block directly followed by the answer block. When the prompt asks for the answer at the end, calls count only toward failures and scoring time, not rejection.
 
 Counts toward: Rejects right answers, as a finding but not in the rate.
 
@@ -491,12 +467,6 @@ For a checker of extracted answer fields, this rejection finding stays low: surr
 #### Q30: an option's text with or without its letter
 
 Sends the right option's letter with its text, and its text alone unless the prompt asks for a letter; a sound checker gives full credit.
-
-Counts toward: Rejects right answers.
-
-#### Q31: an answer in LaTeX markup
-
-Inside \\boxed{} sends an answer in words in \\text{}, and with ^\\circ when the question is about an angle; a sound checker gives full credit.
 
 Counts toward: Rejects right answers.
 
@@ -620,7 +590,7 @@ Catalogue probes and findings: `Q28`, `Q29`.
 
 A right answer loses the score when written another way.
 
-Catalogue probes and findings: `Q1`, `Q2`, `Q3`, `Q4`, `Q5`, `Q6`, `Q7`, `Q8`, `Q9`, `Q10`, `Q11`, `Q12`, `Q13`, `Q14`, `Q15`, `Q16`, `Q17`, `Q18`, `Q19`, `Q20`, `Q21`, `Q22`, `Q23`, `Q24`, `Q25`, `Q26`, `Q27`, `Q30`, `Q31`.
+Catalogue probes and findings: `Q1`, `Q2`, `Q3`, `Q4`, `Q5`, `Q6`, `Q7`, `Q8`, `Q9`, `Q10`, `Q11`, `Q12`, `Q13`, `Q14`, `Q15`, `Q16`, `Q17`, `Q18`, `Q19`, `Q20`, `Q21`, `Q22`, `Q23`, `Q24`, `Q25`, `Q26`, `Q27`, `Q30`.
 
 ### D10: Copying the prompt pays
 
@@ -680,7 +650,7 @@ Catalogue probes and findings: `M5`, `M6`, `M7`.
 
 A list, JSON object or grid with a definite error compares equal to the reference answer.
 
-Catalogue probes and findings: `M8`, `M9`, `M10`, `M11`, `M12`, `M13`, `M17`, `M28`.
+Catalogue probes and findings: `M8`, `M9`, `M10`, `M28`.
 
 ### D21: A different answer accepted
 

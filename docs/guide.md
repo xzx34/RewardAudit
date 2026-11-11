@@ -126,6 +126,8 @@ rewardaudit audit examples/verl/reward.py --dataset examples/verl/data.jsonl --n
 Excerpt:
 
 ```
+rewardaudit 0.3.0 · reward:compute_score · 10 of 10 rows (seed 0) · 1,342 calls · 1 s
+
   HIGH  D1  Signs and punctuation ignored  M2 100%
             -17
             Sent 5 more times: 1.0 each.
@@ -143,6 +145,8 @@ rewardaudit audit examples/trl/reward.py --dataset examples/trl/data.jsonl --n a
 Excerpt:
 
 ```
+rewardaudit 0.3.0 · reward:reward · 10 of 10 rows (seed 0) · 1,275 calls · 1 s
+
   HIGH    D6  Hedged answers accepted  O7 100%, O16 60%, E2 30%
               The answer is either A or B.
               Sent 5 more times: 1.0 each. Shortest reply still accepted (1.0): A or
@@ -190,6 +194,8 @@ rewardaudit audit examples/qa/reward.py --dataset examples/qa/data.jsonl --n all
 Excerpt:
 
 ```
+rewardaudit 0.3.0 · reward:score · 10 of 10 rows (seed 0) · 1,092 calls · 1 s
+
   MEDIUM  D16  Reference answer rejected  G2 100%
                Victor-Marie Hugo
 ```
@@ -238,6 +244,8 @@ rewardaudit audit reward.py --dataset data.jsonl --full --out out
 One finding from that run:
 
 ```
+rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
+
   HIGH    O11  hedge between two answers, the right one last                                                        100%
                The answer is either 68 or 34.
                95% interval [97%, 100%], 120 calls
@@ -285,7 +293,8 @@ The [reference](reference.md) marks probes that instead report the highest probl
 is that variant's scored calls, and the example comes from it. Scale probes M24, M28, Q28 and Q29 report one selected size:
 the largest error accepted on at least half of scored calls, or the shortest text rejected on at least half. If no size
 meets that threshold, they use the highest problem rate. Their notes give the acceptance rate at every size.
-Errors and timeouts are separate findings over all of that probe's calls.
+Errors and timeouts are separate findings over all of that probe's calls. On prompts requiring the answer at the end,
+Q28 still measures failures and scoring time, but its calls stay out of right-answer rejection findings.
 Severity is a rule of thumb for what to look at first:
 
 | Severity | Meaning |
@@ -324,7 +333,7 @@ format credit does not count as accepted.
   `metrics.probes` for the rate of every probe.
 - `repro.py`: re-scores the reply behind each finding (not written for a function passed from Python).
 
-**Probes.** `rewardaudit probes` lists all 84; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
+**Probes.** `rewardaudit probes` lists all 79; `rewardaudit probes Q6` shows what one sends and which row it counts toward. They come in families: N (empty and
 placeholder replies), E (many candidates in one reply), L (copying the prompt, fixed answers), O (two answers, which one is read),
 M (definite errors), Q (right answers rewritten), G (the row's other accepted answers, and its reference answer written another
 way; G1, the finding of a reference answer rejected in every format, is listed with them), P (malformed and extreme input, a
@@ -561,8 +570,8 @@ Read findings against the rules of the evaluation you actually run:
   a flagged reply with a second answer would ever reach it before changing the checker.
 - A required format shown only by examples or non-English instructions may be missed. If replies must end with
   `Antwort: 42`, give `--format 'Antwort: {answer}'` and read each flagged reply against that instruction.
-- English rewrite probes can put `the` before a German answer or turn `überwiegend` into `uberwiegend`; check that the
-  rewritten answer is valid in the task's language before treating its refusal as a defect.
+- Q27 adds an English article only when the prompt contains the word `the`; this does not establish the answer's language.
+  Check that a rewritten answer is valid in the task's language before treating its refusal as a defect.
 - The tool cannot decide whether a scoring rule is intentional. If the benchmark allows a 5% numeric tolerance or uses
   F1 partial credit, compare a flagged reply with its documented scoring rules before changing the checker.
 - A clean result covers only the rows and probes tested. Empty references, such as a correct abstention, are omitted;

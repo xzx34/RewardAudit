@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from datetime import date
 from decimal import Decimal
 
@@ -326,11 +325,11 @@ def _words(task, ctx) -> bool:
 
 def q27_spelling(task, rng, ctx):
     g = ctx.gold(task)
-    out = {"no_accents": "".join(c for c in unicodedata.normalize("NFD", g) if not unicodedata.combining(c))}
+    out = {}
     article = re.match(r"(?:the|an?)\s+(.+)", g, re.I)
     if article:
         out["no_article"] = article[1]
-    elif g[0].islower():
+    elif g[0].islower() and re.search(r"\bthe\b", task.prompt, re.I):
         out["article"] = f"the {g}"
     if re.search(r"[^\W\d_]{3}-[^\W\d_]{3}", g):
         out["no_hyphen"] = g.replace("-", " ")
@@ -384,14 +383,6 @@ def text_markup(g: str, ctx) -> str | None:
     the accepted format has no box."""
     words = re.fullmatch(r"[^\W\d_ ,'-]+(?:[ ,'-]+[^\W\d_ ,'-]+)*", g) and re.search(rf"[^\W\d_]{{{MIN_WORD},}}", g)
     return f"\\text{{{g}}}" if "\\boxed{" in ctx.wrap("x") and words else None
-
-
-def q31_latex_markup(task, rng, ctx):
-    g = ctx.gold(task)
-    out = [("text", ctx.wrap(t))] if (t := text_markup(g, ctx)) else []
-    if plain_number(g) and re.search(r"\b(?:angle|degrees?)\b", question_part(task.prompt), re.I):
-        out.append(("degrees", ctx.wrap(f"{g}^\\circ")))
-    return out
 
 
 PROBES = [
@@ -456,15 +447,17 @@ PROBES = [
           description="Sends a date reference answer as 2020-03-05, March 5, 2020 and Mar 5, 2020; a sound checker gives "
                       "full credit."),
     Probe("Q27", "Q", "other spellings of a word", "natural", "full", SOL, q27_spelling, applies=_words,
-          description="Sends a short answer in words (not a function call) without accents, with or without a leading "
-                      "article, with a hyphen and a space swapped, and with & and 'and' swapped; a sound checker gives "
+          description="Sends a short answer in words (not a function call) with or without a leading article "
+                      "(adding one only when the prompt contains the word 'the'), with a hyphen and a space swapped, "
+                      "and with & and 'and' swapped; a sound checker gives "
                       "full credit."),
     Probe("Q28", "Q", "long text after the answer", "natural", "full", SOL, q28_long_text_after, applies=_few_with_text_after,
           headline=False, sweep=True,
           description="Sends the reference answer followed by 100, 1k, 4k, 16k and 64k characters of neutral text. Its finding "
                       "gives the acceptance rate of each and the shortest that loses the score; a sound checker gives "
                       "full credit. Sent on five rows, not when the prompt asks for only the answer, nor where the prompt "
-                      "writes out the reply as a thinking block directly followed by the answer block."),
+                      "writes out the reply as a thinking block directly followed by the answer block. When the prompt asks "
+                      "for the answer at the end, calls count only toward failures and scoring time, not rejection."),
     Probe("Q29", "Q", "long text before the answer", "natural", "full", SOL, q29_long_text_before, applies=_few_with_text_before,
           headline=False, sweep=True,
           description="Sends 100, 1k, 4k, 16k and 64k characters of neutral text and then the reference answer. Its finding gives "
@@ -475,7 +468,4 @@ PROBES = [
           applies=lambda t, c: c.gtype(t) == "mcq",
           description="Sends the right option's letter with its text, and its text alone unless the prompt asks for a "
                       "letter; a sound checker gives full credit."),
-    Probe("Q31", "Q", "an answer in LaTeX markup", "natural", "full", SOL, q31_latex_markup,
-          description="Inside \\boxed{} sends an answer in words in \\text{}, and with ^\\circ when the question is about "
-                      "an angle; a sound checker gives full credit."),
 ]
