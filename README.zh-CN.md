@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit：先测 checker，再用它训练" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit：对 LLM 评测和 RLVR 中基于规则的 verifier 进行自动化测试" width="100%">
 </p>
 
 <p align="center">
@@ -175,7 +175,7 @@ RewardAudit 审计的是基于规则、按 Ground Truth 打分的 checker。LLM 
 ```bibtex
 @software{rewardaudit,
   author = {Xu, Zixiang and Zhao, Yue},
-  title  = {RewardAudit: Auditing the Checkers Behind Benchmarks and Verifiable Rewards},
+  title  = {RewardAudit: Automated Testing of Rule-Based Verifiers for LLM Evaluation and RLVR},
   year   = {2026},
   url    = {https://github.com/xzx34/RewardAudit}
 }

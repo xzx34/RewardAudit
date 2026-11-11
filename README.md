@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit: test the checker before you train on it" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit: automated testing of rule-based verifiers for LLM evaluation and RLVR" width="100%">
 </p>
 
 <p align="center">
@@ -203,7 +203,7 @@ for the score, such as LLM judges and reward models, are out of its scope.
 ```bibtex
 @software{rewardaudit,
   author = {Xu, Zixiang and Zhao, Yue},
-  title  = {RewardAudit: Auditing the Checkers Behind Benchmarks and Verifiable Rewards},
+  title  = {RewardAudit: Automated Testing of Rule-Based Verifiers for LLM Evaluation and RLVR},
   year   = {2026},
   url    = {https://github.com/xzx34/RewardAudit}
 }
