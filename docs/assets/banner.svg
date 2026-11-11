@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" role="img" aria-labelledby="t d">
-<title id="t">rewardaudit</title>
+<title id="t">RewardAudit</title>
 <desc id="d">Test the checker before you train on it. Five replies to a task whose reference answer is 34, with the score a checker gave each: a hedged answer, a wrong sign and a rewritten right answer are scored wrong.</desc>
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0f1e"/><stop offset="1" stop-color="#111a2f"/></linearGradient>
@@ -32,7 +32,7 @@
   <path d="M21 27.6l4.3 4.3 7.8-8.4" fill="none" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M37.4 37.4l8.6 8.6" stroke="url(#mark)" stroke-width="4.6" stroke-linecap="round"/>
 </g>
-<text x="124" y="156" class="sans" font-size="52" letter-spacing="-1.2"><tspan fill="#e2e8f0" font-weight="600">reward</tspan><tspan fill="url(#word)" font-weight="800">audit</tspan></text>
+<text x="124" y="156" class="sans" font-size="52" letter-spacing="-1.2"><tspan fill="#e2e8f0" font-weight="600">Reward</tspan><tspan fill="url(#word)" font-weight="800">Audit</tspan></text>
 <text x="48" y="212" class="sans" font-size="20" font-weight="500" fill="#cbd5e1">Test the checker before you train on it.</text>
 <text x="48" y="241" class="sans" font-size="15" fill="#94a3b8">A black-box audit for reward functions and verifiers.</text>
 <g class="mono" font-size="12.5" text-anchor="middle">

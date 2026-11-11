@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="https://github.com/xzx34/rewardaudit/raw/main/docs/assets/banner.svg" alt="rewardaudit: test the checker before you train on it" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit: test the checker before you train on it" width="100%">
 </p>
 
 <p align="center">
-  <b>English</b> · <a href="https://github.com/xzx34/rewardaudit/blob/main/README.zh-CN.md">简体中文</a>
+  <b>English</b> · <a href="https://github.com/xzx34/RewardAudit/blob/main/README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/rewardaudit/"><img src="https://img.shields.io/pypi/v/rewardaudit?style=flat-square&color=14b8a6&label=pypi" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-334155?style=flat-square" alt="Python 3.11 to 3.13">
-  <a href="https://github.com/xzx34/rewardaudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/rewardaudit/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
+  <a href="https://github.com/xzx34/RewardAudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/RewardAudit/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
   <img src="https://img.shields.io/badge/needs-no%20model%20%C2%B7%20no%20GPU-6366f1?style=flat-square" alt="No model, no GPU">
 </p>
 
@@ -19,15 +19,15 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#tested-on-real-checkers">Real checkers</a> ·
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md">Guide</a> ·
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md">Reference</a>
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md">Guide</a> ·
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md">Reference</a>
 </p>
 
 A checker is the function that turns a model's reply into a reward. If it pays a reply that does not solve the task,
 the model learns to write that reply. If it refuses a right answer written another way, the model is punished for
 being right.
 
-**rewardaudit** finds these problems before training does. Give it a checker and a dataset with reference answers.
+**RewardAudit** finds these problems before training does. Give it a checker and a dataset with reference answers.
 It writes replies whose correctness is known in advance, sends them to the checker, and reports every place where the
 score and the truth disagree, with the reply that shows it. No model and no GPU: a 40-row audit takes seconds.
 
@@ -89,14 +89,14 @@ rewardaudit audit reward.py --dataset data.jsonl
 ```
 
 <p align="center">
-  <img src="https://github.com/xzx34/rewardaudit/raw/main/docs/assets/demo.svg" alt="The audit's output: two high defects, D1 Signs and punctuation ignored and D6 Hedged answers accepted, each with the reply that shows it" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/demo.svg" alt="The audit's output: two high defects, D1 Signs and punctuation ignored and D6 Hedged answers accepted, each with the reply that shows it" width="100%">
 </p>
 
 Two high defects in a four-line checker. `\boxed{−34}` earns full score because the pattern does not know the Unicode
 minus, and `either 68 or 34` does because only the last number counts. Each high defect's reply is sent five more times
 and cut down to the shortest reply still accepted: `68 34.` shows that the words never mattered.
 
-The example and its 40 rows are in [`examples/quickstart`](https://github.com/xzx34/rewardaudit/tree/main/examples/quickstart), and
+The example and its 40 rows are in [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart), and
 `rewardaudit demo` runs three more without any files of yours. An audit draws up to 100 rows at random
 (`--n`, `--seed`); checks on the dataset itself, such as duplicate prompts and empty answers, cover every row.
 
@@ -135,7 +135,7 @@ the reply behind each finding again.
 
 ## Tested on real checkers
 
-We ran rewardaudit on **185 checkers** copied from open-source evaluation suites and RL training frameworks.
+We ran RewardAudit on **185 checkers** copied from open-source evaluation suites and RL training frameworks.
 92 had at least one high-severity finding. A model-assisted review of those 234 findings against each benchmark's own
 code kept 213, leaving **81 checkers with at least one real high-severity defect**. Checkers with each defect:
 
@@ -154,7 +154,7 @@ We do not publish which checker has which defect.
 
 ## Connect your checker
 
-rewardaudit needs a function that takes a reply and a reference answer and returns a score. Parameters are matched by
+RewardAudit needs a function that takes a reply and a reference answer and returns a score. Parameters are matched by
 name, so `score(completion, answer)`, verl's `compute_score(solution_str, ground_truth)` and TRL's
 `reward(prompts, completions, **columns)` work as they are. For any other benchmark, a few lines that call its checker
 are enough. `--format '<solution>{answer}</solution>'` names a reply format the tool does not try by itself, and
@@ -192,26 +192,26 @@ run with `--calls`.
 
 ## What it does not do
 
-rewardaudit audits checkers that score one reply on a dataset with reference answers. If identical inputs give
+RewardAudit audits checkers that score one reply on a dataset with reference answers. If identical inputs give
 different scores, it reports S1 and continues. Multi-turn and tool environments and checkers that call a model are out
 of scope, and it stops and says so instead of giving misleading numbers. It tests a fixed set of replies, so a clean
 result means none of these replies got through, not that the checker is sound.
 
 ## Documentation
 
-- [Usage guide](https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md): every option, how to read a report, the Python API and the limits.
-- [Reference](https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md): all 79 probes and 22 defects, with examples.
-- [Examples](https://github.com/xzx34/rewardaudit/tree/main/examples): verl, TRL and question answering rewards, each with ten rows.
-- [Contributing](https://github.com/xzx34/rewardaudit/blob/main/CONTRIBUTING.md) and the [changelog](https://github.com/xzx34/rewardaudit/blob/main/CHANGELOG.md).
+- [Usage guide](https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md): every option, how to read a report, the Python API and the limits.
+- [Reference](https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md): all 79 probes and 22 defects, with examples.
+- [Examples](https://github.com/xzx34/RewardAudit/tree/main/examples): verl, TRL and question answering rewards, each with ten rows.
+- [Contributing](https://github.com/xzx34/RewardAudit/blob/main/CONTRIBUTING.md) and the [changelog](https://github.com/xzx34/RewardAudit/blob/main/CHANGELOG.md).
 
 ## Citation
 
 ```bibtex
 @software{rewardaudit,
   author = {Xu, Zixiang},
-  title  = {rewardaudit: test the checker before you train on it},
+  title  = {RewardAudit: test the checker before you train on it},
   year   = {2026},
-  url    = {https://github.com/xzx34/rewardaudit}
+  url    = {https://github.com/xzx34/RewardAudit}
 }
 ```
 

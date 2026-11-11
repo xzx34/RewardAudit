@@ -1,5 +1,5 @@
 [project]
-name = "rewardaudit"
+name = "RewardAudit"
 dynamic = ["version"]
 description = "Black-box audit of checkers (reward functions, verifiers) in RL environments with verifiable rewards."
 readme = "README.md"
@@ -33,10 +33,10 @@ dev = ["pytest>=8", "ruff>=0.5", "math-verify>=0.8", "datasets>=2.19", "pyarrow>
 rewardaudit = "rewardaudit.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/xzx34/rewardaudit"
-Documentation = "https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md"
-Changelog = "https://github.com/xzx34/rewardaudit/blob/main/CHANGELOG.md"
-Issues = "https://github.com/xzx34/rewardaudit/issues"
+Homepage = "https://github.com/xzx34/RewardAudit"
+Documentation = "https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md"
+Changelog = "https://github.com/xzx34/RewardAudit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/xzx34/RewardAudit/issues"
 
 [build-system]
 requires = ["hatchling"]

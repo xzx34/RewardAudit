@@ -26,7 +26,7 @@ Commands starting with `examples/` run from the repository root.
 
 Try `rewardaudit demo` to audit three built-in checkers without any files of yours.
 
-**Math equivalence.** `pip install 'rewardaudit[math]'` installs math-verify. When it is importable, rewardaudit uses it to
+**Math equivalence.** `pip install 'rewardaudit[math]'` installs math-verify. When it is importable, RewardAudit uses it to
 judge whether two answers are equivalent, which can change the probes sent and the findings. This affects the tool's own
 judgement even if your checker does not use it. Keep the tool's extras and dependency versions the same when comparing runs;
 the report's `environment` records the checker's imports, not all packages used by the tool.
@@ -58,7 +58,7 @@ answer that is a dict or list is passed on as it is. An `id` column names the ro
 
 ## Connect your checker
 
-rewardaudit calls your checker through one function: it takes a reply and the reference answer and returns the score.
+RewardAudit calls your checker through one function: it takes a reply and the reference answer and returns the score.
 Put that function in a file, name it `score`, and pass the file (`audit_me.py:my_function` names a function with another
 name):
 
@@ -79,7 +79,7 @@ def score(completion, answer):
     return grader.grade(response=completion, expected=answer)["points"]
 ```
 
-rewardaudit passes each reply it writes as `completion` and the row's reference answer as `answer`, and takes the number
+RewardAudit passes each reply it writes as `completion` and the row's reference answer as `answer`, and takes the number
 the function returns as the score.
 
 A wrapper like this may import the checker, build the object it needs as your evaluation builds it, call it for one
@@ -88,7 +88,7 @@ the reply that your real evaluation does not do, and no arguments other than tho
 Otherwise the audit describes the wrapper and not the checker.
 
 **Functions that work as they are.** A checker that already takes the reply and the reference needs no wrapper: pass the
-file it is in. The shapes below are shortcuts for the same interface. Given a file without a function name, rewardaudit
+file it is in. The shapes below are shortcuts for the same interface. Given a file without a function name, RewardAudit
 tries `score`, `compute_score`, `reward`, `reward_fn`, `reward_func`, `accuracy_reward` and `verify`, in that order.
 If none exists, it takes the first public function defined in the file whose name contains `score` or `reward`, in definition
 order, then the only public function if there is just one. `file.py:function` selects explicitly; `pkg.module:function`
@@ -159,7 +159,7 @@ rewardaudit 0.3.0 · reward:reward · 10 of 10 rows (seed 0) · 1,275 calls · 1
 
 ### The reply format
 
-rewardaudit first finds out how the checker wants a reply written: it sends each reference answer as it is, in `\boxed{}`, in
+RewardAudit first finds out how the checker wants a reply written: it sends each reference answer as it is, in `\boxed{}`, in
 `<answer>` tags, after `Final Answer:`, after `####`, and in other common forms, along with any tag or answer line the prompts
 ask for. Probes then build their replies on a form the checker accepts; some surround it with text or put it inside a sentence,
 since that is what they test. If yours is none of these, name it:
@@ -174,12 +174,12 @@ A format that is a mark and then the answer, such as `RESULT>> {answer}`, is mos
 itself: the official scripts of DROP, SQuAD, TAT-QA and WikiTableQuestions score a file of predictions, one answer each. Add
 `--answer-field` for such a checker (`answer_field=True` from Python): replies then write the answer bare wherever the
 checker accepts that as well as any other format, and a right answer with text around it stays out of Rejects right
-answers, its findings low. Without it, rewardaudit infers this from Q5 and Q6, when the bare answer passes and text before
+answers, its findings low. Without it, RewardAudit infers this from Q5 and Q6, when the bare answer passes and text before
 or after it mostly loses the score; where it infers right, the result is the same.
 
 ### Several accepted answers
 
-Many QA benchmarks accept any of several answers and keep them in a list. rewardaudit writes each reply from one answer and
+Many QA benchmarks accept any of several answers and keep them in a list. RewardAudit writes each reply from one answer and
 compares scores, so name one for the replies and hand the whole list to the checker:
 
 ```bash
@@ -209,7 +209,7 @@ rewardaudit 0.3.0 · reward:score · 10 of 10 rows (seed 0) · 1,092 calls · 1 
 
 Some checkers want the reference in a particular form. Wrap them as above and pass the reference in the form your
 evaluation passes it, for example in `\boxed{}` or parsed from JSON.
-If your dataset holds a worked solution, extract the final answer into a column first: rewardaudit rewrites the reference
+If your dataset holds a worked solution, extract the final answer into a column first: RewardAudit rewrites the reference
 answer to build its replies, so it has to be the answer itself.
 
 G3 also checks whether changing the reference's writing changes the score of the same right reply (D22).
@@ -219,7 +219,7 @@ See the [reference](reference.md#g3-the-reference-answer-written-another-way) fo
 
 ## Choose how many rows
 
-`--n` is yours to choose. rewardaudit always reads the whole dataset and draws that many rows at random, without replacement,
+`--n` is yours to choose. RewardAudit always reads the whole dataset and draws that many rows at random, without replacement,
 using `--seed` (0 by default). The default is 100; `--n all` uses every row. The report states how many rows were drawn from
 how many. A row whose reference answer is empty is left out first, since a reply to it could not be scored against anything.
 
@@ -260,7 +260,7 @@ rewardaudit 0.3.0 · reward:score · 40 of 40 rows (seed 0) · 4,776 calls · 1 
 Each row answers a question about the checker. On the first five rows, `yes` means a high or medium problem. **Runs reliably**
 reads the other way round: `yes` is good.
 
-The percentage is the share of calls that went that way, with a 95% interval. These are shares of the replies rewardaudit sends,
+The percentage is the share of calls that went that way, with a 95% interval. These are shares of the replies RewardAudit sends,
 not of what a model would write. They are for comparing runs and for `--fail-on`. A low rate can sit next to a high finding,
 since one kind of reply may be accepted every time and the others never, so read the defects to see what happens. The calls
 in the top line also count the wrong answers and repeats used before the probes, and the calls that confirm a high defect
@@ -326,10 +326,10 @@ The result says it could not rate some findings and suggests more rows; this alo
 Failed calls and rejected reference answers need two rows. A defect looks at its probes together: on a dataset with few numbers,
 each probe on numbers has only a few calls, and between them they may have enough.
 
-**A finding is about behaviour.** rewardaudit does not know what you intended. If your task demands an exact format, then
+**A finding is about behaviour.** RewardAudit does not know what you intended. If your task demands an exact format, then
 `34.0` being rejected may be right. Read the example, and run `repro.py` if you want to re-score it.
 
-**Composite scores.** If a checker returns sub-scores (correctness plus format, say), rewardaudit works out which of them
+**Composite scores.** If a checker returns sub-scores (correctness plus format, say), RewardAudit works out which of them
 separate right answers from wrong ones and judges acceptance on those. The report names them. A reply that earns only the
 format credit does not count as accepted.
 
@@ -358,7 +358,7 @@ that reproduce the result; `environment` in `report.json` lists them all, with t
 
 ## When the audit stops
 
-rewardaudit does not fit every checker. What it cannot measure it does not audit: it stops, says why in a line, and exits with 2.
+RewardAudit does not fit every checker. What it cannot measure it does not audit: it stops, says why in a line, and exits with 2.
 
 | Message contains | What to do |
 |---|---|
@@ -388,7 +388,7 @@ rewardaudit audit owner/name --n 200       # from the Prime Intellect Hub
 rewardaudit audit owner/name@1.2.0         # a specific version
 ```
 
-An environment brings its own dataset and rubric, so there is no `--dataset`. For `owner/name`, rewardaudit uses
+An environment brings its own dataset and rubric, so there is no `--dataset`. For `owner/name`, RewardAudit uses
 [uv](https://docs.astral.sh/uv/) to install the package into its own venv under `~/.cache/rewardaudit/envs` (set
 `REWARDAUDIT_HOME` to move it). It picks the verifiers version for the package's API.
 
@@ -567,7 +567,7 @@ These change only with a note in the [changelog](../CHANGELOG.md):
 
 A 0.x minor release may change the command line, Python API or report schema with a changelog entry. Findings and severities
 can change as probes and judgement improve. Pin the tool and dependencies when CI depends on results. Use a saved `repro.py`
-with the rewardaudit version recorded in its report; other package modules are not part of the Python API.
+with the RewardAudit version recorded in its report; other package modules are not part of the Python API.
 
 ## What the audit does not see
 
@@ -597,7 +597,7 @@ accepted; your training framework may treat it differently.
 **Crashes that mention the memory limit.** A worker that grows 4 GB beyond what it held when scoring started is stopped and the
 call counts as a crash. Probes with huge numbers cause this in some checkers, which is itself a finding.
 
-**`network attempts` in the summary.** Network access is blocked while scoring. If your checker needs a local service, rewardaudit
+**`network attempts` in the summary.** Network access is blocked while scoring. If your checker needs a local service, RewardAudit
 cannot audit it as it stands; put the logic in a function that does not need it.
 
 **Slow audits.** Use a smaller `--n`, more `--workers`, or `--probes N,M,O,Q`. A large dataset also takes time and memory to

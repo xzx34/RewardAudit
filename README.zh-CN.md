@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="https://github.com/xzx34/rewardaudit/raw/main/docs/assets/banner.svg" alt="rewardaudit：先测判分函数，再用它训练" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/banner.svg" alt="RewardAudit：先测判分函数，再用它训练" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/README.md">English</a> · <b>简体中文</b>
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/README.md">English</a> · <b>简体中文</b>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/rewardaudit/"><img src="https://img.shields.io/pypi/v/rewardaudit?style=flat-square&color=14b8a6&label=pypi" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-334155?style=flat-square" alt="Python 3.11 至 3.13">
-  <a href="https://github.com/xzx34/rewardaudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/rewardaudit/ci.yml?style=flat-square&label=tests" alt="测试"></a>
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
+  <a href="https://github.com/xzx34/RewardAudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/RewardAudit/ci.yml?style=flat-square&label=tests" alt="测试"></a>
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
   <img src="https://img.shields.io/badge/needs-no%20model%20%C2%B7%20no%20GPU-6366f1?style=flat-square" alt="不需要模型和 GPU">
 </p>
 
@@ -19,13 +19,13 @@
   <a href="#快速上手">快速上手</a> ·
   <a href="#工作原理">工作原理</a> ·
   <a href="#在真实-checker-上的结果">真实 checker</a> ·
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md">使用指南（英文）</a> ·
-  <a href="https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md">参考（英文）</a>
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md">使用指南（英文）</a> ·
+  <a href="https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md">参考（英文）</a>
 </p>
 
 checker（判分函数）把模型的回复变成奖励。它要是给没有解出题目的回复打了分，模型就会学着写这种回复；它要是因为写法不同而拒绝了正确答案，模型就会因为答对而受罚。
 
-**rewardaudit** 在训练之前把这些问题找出来。你给它一个 checker 和一份带参考答案的数据集，它构造一批事先知道对错的回复发给 checker，凡是分数和事实不一致的地方都报告出来，并附上能说明问题的那条回复。不需要模型，也不需要 GPU，40 行数据几秒钟就能审完。
+**RewardAudit** 在训练之前把这些问题找出来。你给它一个 checker 和一份带参考答案的数据集，它构造一批事先知道对错的回复发给 checker，凡是分数和事实不一致的地方都报告出来，并附上能说明问题的那条回复。不需要模型，也不需要 GPU，40 行数据几秒钟就能审完。
 
 ## 能发现什么
 
@@ -84,12 +84,12 @@ rewardaudit audit reward.py --dataset data.jsonl
 ```
 
 <p align="center">
-  <img src="https://github.com/xzx34/rewardaudit/raw/main/docs/assets/demo.svg" alt="审计的输出：两个高严重度缺陷，D1 符号和标点被忽略、D6 两头下注的回答被接受，各附一条能说明问题的回复" width="100%">
+  <img src="https://github.com/xzx34/RewardAudit/raw/main/docs/assets/demo.svg" alt="审计的输出：两个高严重度缺陷，D1 符号和标点被忽略、D6 两头下注的回答被接受，各附一条能说明问题的回复" width="100%">
 </p>
 
 四行代码的 checker，查出两个高严重度缺陷。`\boxed{−34}` 拿了满分，因为正则不认识 Unicode 减号；`either 68 or 34` 也拿了满分，因为它只看最后一个数字。每个高严重度缺陷的回复都会再发五次，并且缩短到仍然被接受的最短形式：`68 34.` 说明那些文字从来没起过作用。
 
-这个例子和它的 40 行数据在 [`examples/quickstart`](https://github.com/xzx34/rewardaudit/tree/main/examples/quickstart)，`rewardaudit demo` 不需要你提供任何文件就能再演示三个。每次审计最多随机抽 100 行（`--n`、`--seed`）；对数据集本身的检查，比如重复的题目和空答案，总是覆盖全部行。
+这个例子和它的 40 行数据在 [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart)，`rewardaudit demo` 不需要你提供任何文件就能再演示三个。每次审计最多随机抽 100 行（`--n`、`--seed`）；对数据集本身的检查，比如重复的题目和空答案，总是覆盖全部行。
 
 <details>
 <summary><b>怎么读汇总</b></summary>
@@ -123,7 +123,7 @@ checker 运行在独立的工作进程里，有时间和内存限制；报告会
 
 ## 在真实 checker 上的结果
 
-我们用 rewardaudit 审了 **185 个 checker**，它们取自开源的评测套件和强化学习训练框架。其中 92 个至少有一条高严重度发现。对这 234 条发现逐条对照各个 benchmark 自己的代码，用模型辅助复核，保留了 213 条，**81 个 checker 至少有一个经过复核的高严重度缺陷**。各缺陷涉及的 checker 数：
+我们用 RewardAudit 审了 **185 个 checker**，它们取自开源的评测套件和强化学习训练框架。其中 92 个至少有一条高严重度发现。对这 234 条发现逐条对照各个 benchmark 自己的代码，用模型辅助复核，保留了 213 条，**81 个 checker 至少有一个经过复核的高严重度缺陷**。各缺陷涉及的 checker 数：
 
 ```text
 ██████████████████████████████  39  否定被忽略
@@ -140,7 +140,7 @@ checker 运行在独立的工作进程里，有时间和内存限制；报告会
 
 ## 接入你的 checker
 
-rewardaudit 需要一个函数，接收回复和参考答案，返回分数。参数按名字匹配，所以 `score(completion, answer)`、verl 的 `compute_score(solution_str, ground_truth)` 和 TRL 的 `reward(prompts, completions, **columns)` 都能直接用。其他 benchmark 写几行调用它的 checker 即可。`--format '<solution>{answer}</solution>'` 指定工具不会自己尝试的回复格式，`--answer-col answers.text.0 --reference-col answers.text` 用来处理多个可接受答案。数据集可以是 jsonl、json、csv、parquet，或者 `hf:org/name[:config[:split]]`。
+RewardAudit 需要一个函数，接收回复和参考答案，返回分数。参数按名字匹配，所以 `score(completion, answer)`、verl 的 `compute_score(solution_str, ground_truth)` 和 TRL 的 `reward(prompts, completions, **columns)` 都能直接用。其他 benchmark 写几行调用它的 checker 即可。`--format '<solution>{answer}</solution>'` 指定工具不会自己尝试的回复格式，`--answer-col answers.text.0 --reference-col answers.text` 用来处理多个可接受答案。数据集可以是 jsonl、json、csv、parquet，或者 `hf:org/name[:config[:split]]`。
 
 **在 Python 里用**
 
@@ -168,23 +168,23 @@ Hub 上的环境是别人的代码，这样做会在你的机器上安装并运�
 
 ## 不做什么
 
-rewardaudit 审的是对单条回复、按参考答案打分的 checker。同样的输入给出不同分数时，它报告 S1 并继续。多轮对话、工具调用环境和调用模型打分的 checker 不在范围内，遇到时它会停下来说明原因，而不是给出误导的数字。它测试的是一组固定的回复，所以审计结果干净只说明这些回复都被判对了，不说明 checker 没有问题。
+RewardAudit 审的是对单条回复、按参考答案打分的 checker。同样的输入给出不同分数时，它报告 S1 并继续。多轮对话、工具调用环境和调用模型打分的 checker 不在范围内，遇到时它会停下来说明原因，而不是给出误导的数字。它测试的是一组固定的回复，所以审计结果干净只说明这些回复都被判对了，不说明 checker 没有问题。
 
 ## 文档
 
-- [使用指南](https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md)（英文）：所有选项、怎么读报告、Python 接口和局限。
-- [参考](https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md)（英文）：全部 79 个探针和 22 种缺陷，附例子。
-- [例子](https://github.com/xzx34/rewardaudit/tree/main/examples)：verl、TRL 和问答的奖励函数，每个 10 行数据。
-- [贡献指南](https://github.com/xzx34/rewardaudit/blob/main/CONTRIBUTING.md)和[更新日志](https://github.com/xzx34/rewardaudit/blob/main/CHANGELOG.md)。
+- [使用指南](https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md)（英文）：所有选项、怎么读报告、Python 接口和局限。
+- [参考](https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md)（英文）：全部 79 个探针和 22 种缺陷，附例子。
+- [例子](https://github.com/xzx34/RewardAudit/tree/main/examples)：verl、TRL 和问答的奖励函数，每个 10 行数据。
+- [贡献指南](https://github.com/xzx34/RewardAudit/blob/main/CONTRIBUTING.md)和[更新日志](https://github.com/xzx34/RewardAudit/blob/main/CHANGELOG.md)。
 
 ## 引用
 
 ```bibtex
 @software{rewardaudit,
   author = {Xu, Zixiang},
-  title  = {rewardaudit: test the checker before you train on it},
+  title  = {RewardAudit: test the checker before you train on it},
   year   = {2026},
-  url    = {https://github.com/xzx34/rewardaudit}
+  url    = {https://github.com/xzx34/RewardAudit}
 }
 ```
 
