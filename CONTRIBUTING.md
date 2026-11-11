@@ -92,7 +92,7 @@ Source paths below are relative to `src/rewardaudit/`; other paths are from the 
    behaviour test in the family's test file: check replies, inapplicable tasks, and
    that non-solving variants do not contain the reference as a correct answer.
    `tests/test_defects.py` checks that every probe belongs to exactly one defect.
-5. Update counts in `README.md` and `docs/guide.md`, and the changelog. Regenerate
+5. Update counts in `README.md`, `README.zh-CN.md` and `docs/guide.md`, and the changelog. Regenerate
    `docs/reference.md` using `explain.render_reference()`; the freshness test in
    `tests/test_report_cli.py` gives the command if the page differs.
 
