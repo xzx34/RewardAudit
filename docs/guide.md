@@ -19,8 +19,8 @@ Commands starting with `examples/` run from the repository root.
 
 ## What you need
 
-- **A checker:** a Python function that takes a model's reply and returns a score. It has to give the same score to the same
-  reply and must not call a model.
+- **A checker:** a Python function that takes a model's reply and returns a score. It must run locally and must not
+  call a model. Repeated inputs are checked for consistent scores; inconsistency is reported as S1 and the audit continues.
 - **A dataset:** rows with a prompt and a reference answer, the final answer a right reply should give. A worked solution is
   not one; see [below](#the-reference-answer-is-not-what-the-checker-expects).
 
@@ -111,6 +111,11 @@ with a numeric `score`, `reward` or `overall` attribute (tried in that order), o
 `score`, `overall`, `reward`, `rewards`, `total` or `accuracy`, and other numbers count as sub-scores. A dict with none of
 those keys counts all its numbers, bools included, as parts of a total, so return one number if that is not what they
 are.
+
+For a single-number score, the full score is the highest score earned by a reference reply across the rows and formats tried.
+For a composite score, it uses the sum of the parts that distinguish reference answers from wrong answers when it can
+identify them, and finds a full score for each row.
+Rows whose reference does not reach the full score get no probes.
 
 ### A verl-style reward
 
@@ -226,8 +231,9 @@ of 100 with a probability of 99.4%, and in a sample of 30 with 79%. Larger sampl
 many processes (4 by default, or your CPU count if lower). A progress bar shows the time left.
 `--probes N,O,M` runs only those families.
 
-**A slow checker.** `--budget 10m` (or `90s`, `1h`; `budget_s=600` from Python) limits the whole audit, counted from its
-start. Once that time has passed no further probe is sent: the probe whose calls are under way finishes, so the audit can
+**A slow checker.** `--budget 10m` (or `90s`, `1h`; `budget_s=600` from Python) limits sending probes, using elapsed time from the
+audit's start. Reference calls, the determinism check, confirmation and environment installation are not limited by it.
+Once that time has passed no further probe is sent: the probe whose calls are under way finishes, so the audit can
 run over by about as long as one probe takes, and every call made counts as usual. A line at the top of the report then
 names the probes that did not run, and `report.json` lists them under `meta.probes_not_run`. The summary rows are measured
 on the probes that ran, so a probe left out can hide a finding; to keep every probe, draw fewer rows instead. Under a budget
@@ -284,7 +290,8 @@ defect's `confirmation`, with `resends` and, when something could be taken out, 
 The [reference](reference.md) lists all 22 defects, their explanations and their probes, plus G1, S1, S2 and the evidence ids.
 `rewardaudit probes D6` looks up a defect; `rewardaudit probes O11` explains a probe and shows examples.
 
-**Findings.** Each finding is one probe, with an example reply and a rate; `--full` prints them, and `report.md` always has them.
+**Findings.** A probe can yield more than one finding: acceptance or rejection, and robustness. Each records a rate,
+with an example where available; `--full` prints them, and `report.md` always has them.
 Most acceptance or rejection finding rates pool the probe's variants, counting only calls that returned a score.
 For example, O11 reports 33% when one variant is accepted on 99 of 100 calls and the other two on 0 of 100 each:
 99 accepted calls out of 300.
@@ -570,13 +577,16 @@ Read findings against the rules of the evaluation you actually run:
   a flagged reply with a second answer would ever reach it before changing the checker.
 - A required format shown only by examples or non-English instructions may be missed. If replies must end with
   `Antwort: 42`, give `--format 'Antwort: {answer}'` and read each flagged reply against that instruction.
+- Probe prose is English; a letter parser may read its filler as option letters even on tasks in another language.
+- G2 expands only native lists of strings, not JSON text or structured annotation objects.
+- P16 tests specific import forms; execution reached only through other reply shapes or a fresh interpreter can be missed.
 - Q27 adds an English article only when the prompt contains the word `the`; this does not establish the answer's language.
   Check that a rewritten answer is valid in the task's language before treating its refusal as a defect.
 - The tool cannot decide whether a scoring rule is intentional. If the benchmark allows a 5% numeric tolerance or uses
   F1 partial credit, compare a flagged reply with its documented scoring rules before changing the checker.
 - A clean result covers only the rows and probes tested. Empty references, such as a correct abstention, are omitted;
   check the reported rows left out, reference acceptance and any budget notice before relying on the result.
-- This audit needs a deterministic local checker for one reply and a reference answer. For a checker that executes SQL,
+- This audit needs a local checker for one reply and a reference answer. For a checker that executes SQL,
   scores a conversation or asks a model, test its own evaluation pipeline instead.
 
 ## Troubleshooting

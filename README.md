@@ -117,7 +117,7 @@ from rewardaudit import audit
 result = audit(score, "data.jsonl", n=200)  # or a list of dicts, a DataFrame, a Hugging Face Dataset
 result.print()
 result.defects       # what the checker does wrong, most severe first
-result.findings      # every finding, one per probe
+result.findings      # every finding; a probe can give more than one
 result.rates         # the rate behind each row of the summary
 result.save("out/")  # report.md, report.json
 ```
@@ -149,10 +149,10 @@ be measured.
 
 ## What it does not do
 
-rewardaudit does not fit every checker. It audits those that score one reply and give the same score every time, on a dataset
-with reference answers. Multi-turn and tool environments and checkers that call a model are out of scope, and it stops and
-says so instead of giving misleading numbers. It tests a fixed set of replies, so a clean result means none of these replies
-got through, not that the checker is sound.
+rewardaudit does not fit every checker. It audits those that score one reply on a dataset with reference answers. If
+identical inputs give different scores, the audit reports S1 and continues. Multi-turn and tool environments and
+checkers that call a model are out of scope, and it stops and says so instead of giving misleading numbers. It tests a
+fixed set of replies, so a clean result means none of these replies got through, not that the checker is sound.
 
 The [usage guide](https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md) covers everything in more detail.
 
