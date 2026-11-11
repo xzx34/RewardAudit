@@ -1,0 +1,10 @@
+{"question": "What is 12 + 5?", "data_source": "arithmetic", "reward_model": {"ground_truth": "17"}}
+{"question": "What is 8 - 21?", "data_source": "arithmetic", "reward_model": {"ground_truth": "-13"}}
+{"question": "What is 7 times 4?", "data_source": "arithmetic", "reward_model": {"ground_truth": "28"}}
+{"question": "What is 15 - 34?", "data_source": "arithmetic", "reward_model": {"ground_truth": "-19"}}
+{"question": "What is 18 + 23?", "data_source": "arithmetic", "reward_model": {"ground_truth": "41"}}
+{"question": "What is 6 - 37?", "data_source": "arithmetic", "reward_model": {"ground_truth": "-31"}}
+{"question": "What is 9 times 6?", "data_source": "arithmetic", "reward_model": {"ground_truth": "54"}}
+{"question": "What is 24 - 41?", "data_source": "arithmetic", "reward_model": {"ground_truth": "-17"}}
+{"question": "What is 32 + 15?", "data_source": "arithmetic", "reward_model": {"ground_truth": "47"}}
+{"question": "What is 11 - 36?", "data_source": "arithmetic", "reward_model": {"ground_truth": "-25"}}

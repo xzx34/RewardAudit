@@ -17,11 +17,12 @@ pip install rewardaudit
 ```
 
 Python 3.11 or newer, on Linux or macOS. To read parquet files or Hugging Face datasets: `pip install 'rewardaudit[data]'`.
+The [math extra](https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md#what-you-need) changes how the tool judges equivalent answers.
 
 ## Quick start
 
 You need a scoring function and a dataset with reference answers. This example, with all its 40 rows, is in
-[`examples/quickstart`](examples/quickstart) in the repository.
+[`examples/quickstart`](https://github.com/xzx34/rewardaudit/tree/main/examples/quickstart). Run the command from that directory.
 
 ```python
 # reward.py
@@ -43,38 +44,36 @@ Two of the rows:
 rewardaudit audit reward.py --dataset data.jsonl --n 100
 ```
 
-```
-rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,739 calls · 1 s
+Excerpt (elapsed time varies):
 
-Result: problems found (2 high, 3 medium)
+```
+rewardaudit 0.2.0 · reward:score · 40 of 40 rows (seed 0) · 4,779 calls · 1 s
+
+Result: problems found (2 high, 4 medium)
 
   Accepts non-answers         no     0%  [0%, 14%]
   Accepts wrong answers       yes   14%  [11%, 17%]
   Accepts hedged answers      yes   26%  [23%, 30%]
   Rejects right answers       yes   19%  [16%, 22%]
   Pays wrong answers in part  no     0%  [0%, 1%]
-  Runs reliably               yes  no errors, timeouts or crashes in 4,622 calls
+  Runs reliably               yes  no errors, timeouts or crashes in 4,662 calls
 
 Rates are shares of calls, with 95% intervals. Yes on the first five rows: a high or medium problem.
 
 Reference answers accepted on 100% of rows. Replies were sent in the format \boxed{34}, one of 22 it accepts.
 
-Defects (6)
-  HIGH    D1  Signs and punctuation ignored  M22 100%, M3 4%
-              \boxed{−34}
-              Sent 5 more times: 1.0 each.
-  HIGH    D6  Hedged answers accepted  O11 100%
-              The answer is either 35 or 34.
-              Sent 5 more times: 1.0 each. Shortest reply still accepted (1.0):
-              35 34.
-  MEDIUM  D3  Numeric tolerance too wide  M24 75%, M25 38%
-              \boxed{34.34}
-  ...
+Defects (7)
+  HIGH    D1   Signs and punctuation ignored  M22 100%, M3 4%
+               \boxed{−34}
+               Sent 5 more times: 1.0 each.
+  HIGH    D6   Hedged answers accepted  O11 100%
+               The answer is either 68 or 34.
+               Sent 5 more times: 1.0 each. Shortest reply still accepted (1.0): 68 34.
 ```
 
-Here the checker takes the last run of digits in the reply, so `either 35 or 34` and `−34` earn full score and `34.0` earns nothing.
-Under each high defect, its reply is sent five more times and cut down to the shortest reply still accepted: `35 34.` shows
-that only the last number counts.
+Here the checker takes the last run of digits in the reply, so `either 68 or 34` and `−34` earn full score and `34.0` earns nothing.
+Under each high defect, its reply is sent five more times. When possible, it is cut down to the shortest reply still
+accepted: `68 34.` shows that only the last number counts.
 `rewardaudit demo` shows three more examples without any files of yours.
 
 ## What it checks
@@ -83,12 +82,13 @@ that only the last number counts.
 |---|---|---|
 | Accepts non-answers | Can a reply that ignores the task earn full score? | an empty reply, `\boxed{}`, the prompt copied back |
 | Accepts wrong answers | Does a definite error still earn full score? | off by one, sign flipped, another task's answer |
-| Accepts hedged answers | Does giving two answers, one of them right, earn full score? | `either 35 or 34`, the right answer retracted |
+| Accepts hedged answers | Does giving two answers, one of them right, earn full score? | `either 68 or 34`, the right answer retracted |
 | Rejects right answers | Does a correct answer lose the score when written differently? | `34.0`, `\dfrac{1}{2}`, an explanation before it |
 | Pays wrong answers in part | Does a definite error earn more than nothing? | off by one, one word changed |
 | Runs reliably | Does the checker run without errors, hangs, crashes or network use? | huge numbers, malformed input, repeated calls |
 
-`rewardaudit probes` lists all 84 probes and `rewardaudit probes O11` explains one.
+`rewardaudit probes` lists all 84 probes; `rewardaudit probes O11` explains one.
+The [reference](https://github.com/xzx34/rewardaudit/blob/main/docs/reference.md) describes every probe and all 22 defects.
 `rewardaudit compare v1.jsonl v2.jsonl` shows where two checkers, or two versions of one, decide differently, probe by
 probe, from two audits of the same rows run with `--calls`.
 
@@ -101,13 +101,13 @@ rewardaudit reads your whole dataset and draws `--n` rows from it at random, wit
 only on the dataset and `--seed`.
 
 ```bash
-rewardaudit audit reward.py --dataset data.jsonl --n 500            # 500 random rows (the default is 100)
+rewardaudit audit reward.py --dataset data.jsonl --n 500            # up to 500 random rows (default: 100)
 rewardaudit audit reward.py --dataset data.jsonl --n all            # every row
-rewardaudit audit reward.py --dataset data.jsonl --n 500 --seed 1   # another 500
+rewardaudit audit reward.py --dataset data.jsonl --n 500 --seed 1   # another draw
 ```
 
-Each row takes about 90 checker calls. Checks on the dataset itself, such as duplicate prompts and empty answers, always
-cover every row.
+The 40-row quickstart makes 4,779 checker calls, about 119 per row; the count depends on which probes apply.
+Checks on the dataset itself, such as duplicate prompts and empty answers, always cover every row.
 
 ## From Python
 
@@ -154,7 +154,7 @@ with reference answers. Multi-turn and tool environments and checkers that call 
 says so instead of giving misleading numbers. It tests a fixed set of replies, so a clean result means none of these replies
 got through, not that the checker is sound.
 
-The [usage guide](docs/guide.md) covers everything in more detail.
+The [usage guide](https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md) covers everything in more detail.
 
 ## License
 

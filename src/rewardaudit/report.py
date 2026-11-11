@@ -327,7 +327,7 @@ def _print_findings(findings: list[dict[str, Any]], console: Console) -> None:
                   Text(f"{f['rate']:.0%}"))
         details = [_reply(f["example"]["completion"])] if f.get("example") else []
         details += [f["note"]] if f.get("note") else []
-        details += [f"95% interval {_ci(f['ci'])}, {f['n']:,} {'rows' if f.get('unit') == 'tasks' else 'calls'}"]
+        details += [f"95% interval {_ci(f['ci'])}, {_plural(f['n'], 'row' if f.get('unit') == 'tasks' else 'call')}"]
         for line in details:
             t.add_row("", "", Text(line, style="dim"), "")
     console.print(Padding(t, (0, 0, 0, 2), expand=False))
@@ -391,6 +391,9 @@ def advice(result: AuditResult) -> list[tuple[str, list[str]]]:
         out.append(("**Reference answers rejected.** Some of the dataset's own reference answers got no full score in any "
                     "format tried. A sound checker accepts the reference answer, at least in the format the prompt asks for.", []))
     for key, (_, title, meaning, sound) in ROWS.items():
+        if key == "right_rejected" and result.metrics.get("compares_whole_reply"):
+            meaning = "The checker scores an extracted answer field; findings about surrounding text stay low."
+            sound = "Check equivalent answers within that field, or include the extraction step to audit full replies."
         fs = [f for f in result.findings if _row_of(f) == key]
         verb = "rejected" if key == "right_rejected" else "accepted"
         items = [f"{f['probe_id']} {f['name']}: {'scored above the reference answer' if f.get('above_gold') else verb} on "

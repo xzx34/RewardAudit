@@ -93,7 +93,7 @@ def _environment(not_checker: set[str]) -> dict[str, Any]:
     """What the checker ran under: this Python, this platform, and {distribution: version} for the third-party modules
     imported in this worker as the checker loaded and scored. That leaves out the standard library and `not_checker`:
     what was there before the checker loaded (this package, `__main__`, what .pth files import at startup), cloudpickle,
-    which carries a function over from Python, and what reading the rows imported. A module no installed distribution
+    which carries a function over from Python, and what loading or checking the rows imported. A module no installed distribution
     provides, such as the checker's own file, is not listed; one that several provide lists them all."""
     import importlib.metadata
     import platform
@@ -130,12 +130,12 @@ def main() -> None:
         out.flush()
 
     def reading_rows(call: Any, *args: Any) -> Any:
-        """What reading the dataset imports (pyarrow, datasets and theirs) is not the checker's."""
+        """What loading or checking the dataset imports is not the checker's."""
         before = set(sys.modules)
         try:
             return call(*args)
         finally:
-            not_checker.update(_top_level(set(sys.modules) - before))
+            not_checker.update(_top_level(set(sys.modules)) - _top_level(before))
 
     try:
         from rewardaudit.adapters import build_adapter
@@ -164,7 +164,7 @@ def main() -> None:
                 from rewardaudit.dataset_checks import run_dataset_checks
 
                 rows = reading_rows(adapter.all_tasks)  # loading tells how many rows were left out
-                send({"ok": True, "issues": run_dataset_checks(rows, left_out=adapter.meta.get("empty_rows_left_out", 0))})
+                send({"ok": True, "issues": reading_rows(run_dataset_checks, rows, adapter.meta.get("empty_rows_left_out", 0))})
             elif op == "score":
                 task = Task.from_dict(req["task"])
                 guard.tripped = False

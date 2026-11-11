@@ -12,7 +12,7 @@ from rich.text import Text
 from rewardaudit.contract import Contract
 from rewardaudit.defects import DEFECTS
 from rewardaudit.goldtype import infer_gold_type
-from rewardaudit.metrics import REJECTED_GOLD_ID, REJECTED_GOLD_NAME, probe_category
+from rewardaudit.metrics import PROSE_PROBES, REJECTED_GOLD_ID, REJECTED_GOLD_NAME, probe_category
 from rewardaudit.probes.base import Probe, ProbeContext
 from rewardaudit.probes.registry import FAMILIES
 from rewardaudit.report import RELIABLE_ROW, ROWS, _grid, _reply, _say
@@ -117,6 +117,43 @@ def render_probe_list(console: Console) -> None:
         _list_family(fam, console)
     _say(console, "\nAlso: D1–D22 (defects), S1, S2, format_only, wrong_above, wrong_partial.")
     _say(console, "\nrewardaudit probes <id> shows what a probe sends and what a sound checker does.", "dim")
+
+
+def render_reference() -> str:
+    """Generate the Markdown reference from the same catalogue and descriptions as the probes command."""
+    count = sum(len(probes) for _, probes in FAMILIES.values())
+    lines = ["# Probe and defect reference", "", f"{count} probes in {len(FAMILIES)} families; {len(DEFECTS)} defects.", "",
+             "Generated from the descriptions used by `rewardaudit probes`. Look up any id with `rewardaudit probes <id>`.",
+             "Acceptance and rejection rates pool a probe's scored calls across variants unless its entry says otherwise.",
+             "See the [severity rules](guide.md#read-the-result) for findings that stay low regardless of their rate.",
+             "", "## Probes", ""]
+    for family, (name, probes) in FAMILIES.items():
+        lines += [f"### {family}: {name}", ""]
+        for probe in probes:
+            description = probe.description.replace("\\", "\\\\").replace("<", "&lt;").replace(">", "&gt;")
+            lines += [f"#### {probe.id}: {probe.name}", "", description, "", f"Counts toward: {_row_label(probe)}.", ""]
+            if probe.sweep:
+                lines += ["Acceptance/rejection rate: one selected size; the note lists acceptance at every size. Selects the largest error "
+                          "accepted on at least half of scored calls, or the shortest text rejected on at least half; "
+                          "if no size meets that threshold, selects the highest problem rate.", ""]
+            elif probe.by_variant:
+                lines += ["Acceptance/rejection rate: the highest problem rate among variants, over that variant's scored calls.", ""]
+            if probe.id in PROSE_PROBES:
+                lines += ["For a checker of extracted answer fields, this rejection finding stays low: surrounding text "
+                          "is outside the checker's input.", ""]
+    lines += ["## Defects", ""]
+    for defect in DEFECTS:
+        lines += [f"### {defect.id}: {defect.name}", "", defect.explanation, ""]
+        if defect.probes:
+            lines += ["Catalogue probes and findings: " + ", ".join(f"`{pid}`" for pid in defect.probes) + ".", ""]
+    lines += ["## Other findings and evidence ids", ""]
+    for key in (REJECTED_GOLD_ID, "S1", "S2", "format_only", "wrong_above", "wrong_partial"):
+        console = Console(width=10000, force_terminal=False)
+        with console.capture() as capture:
+            render_explain(key, console)
+        title, description = capture.get().strip().split("\n", 1)
+        lines += [f"### {title.replace('  ', ': ', 1)}", "", description.strip(), ""]
+    return "\n".join(lines)
 
 
 def render_explain(key: str, console: Console | None = None) -> bool:

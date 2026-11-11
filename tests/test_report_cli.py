@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from rich.console import Console
@@ -359,6 +360,30 @@ def test_a_checker_on_the_standard_library_imports_none(tmp_path):
     assert json.loads((tmp_path / "out" / "report.json").read_text(encoding="utf-8"))["environment"] == r.environment
 
 
+def test_dataset_equivalence_imports_are_not_the_checkers(tmp_path):
+    (tmp_path / "checker.py").write_text("import re\n\ndef score(completion, answer):\n    return float(completion.strip() == answer)\n")
+    rows = [{"prompt": r"Expand \boxed{(x+1)^2}.", "answer": "x^2+2x+1"},
+            {"prompt": r"Simplify \boxed{\sqrt{8}/2}.", "answer": r"\sqrt{2}"}]
+    result = audit(str(tmp_path / "checker.py"), rows, workers=1, probes=["N"])
+    assert any(issue["id"] == "answer_in_prompt" for issue in result.dataset_issues)
+    assert result.environment["packages"] == {}
+    (tmp_path / "checker.py").write_text("import sympy\n\ndef score(completion, answer):\n    return float(completion.strip() == answer)\n")
+    result = audit(str(tmp_path / "checker.py"), rows, workers=1, probes=["N"])
+    assert "sympy" in result.environment["packages"]
+    assert "math-verify" not in result.environment["packages"]
+
+
+def test_answer_field_advice_does_not_require_surrounding_prose():
+    result = audit("demo:grid_exact", n=12, workers=1, answer_field=True)
+    assert result.metrics["compares_whole_reply"]
+    assert any(f["probe_id"] == "Q5" for f in result.findings)
+    md = render_markdown(result)
+    section = md[md.index("## What to fix"):md.index("## Answer formats")]
+    assert "whatever surrounds it" not in section
+    assert "Check equivalent answers within that field" in section
+    assert "include the extraction step to audit full replies" in section
+
+
 def test_what_reading_a_parquet_dataset_imports_is_not_the_checkers(tmp_path):
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -461,6 +486,17 @@ def test_a_reply_is_shown_on_one_line_with_both_ends():
 
 
 # --- the probes command -----------------------------------------------------------------------------------------------
+
+
+def test_reference_page_matches_the_catalogue():
+    from rewardaudit.explain import render_reference
+
+    page = Path(__file__).parents[1] / "docs" / "reference.md"
+    assert page.read_text(encoding="utf-8") == render_reference(), (
+        "Regenerate from release/: python -c 'from pathlib import Path; "
+        "from rewardaudit.explain import render_reference; "
+        'Path("docs/reference.md").write_text(render_reference(), encoding="utf-8")' + "'"
+    )
 
 
 @pytest.fixture
