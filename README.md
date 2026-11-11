@@ -139,7 +139,17 @@ Reads the thinking block        ████████▌                     
 One of several answers is read  ██████▉                          9
 ```
 
-We do not say which checker has which defect.
+A few of them:
+
+- **lm-evaluation-harness** (MGSM): with punctuation removal turned on, `Die Antwort lautet -3.` is scored correct for
+  the reference answer `3`.
+- **OpenAI grade-school-math** (GSM8K): `#### 30 … Wait, that is not right. … The correct result is #### 60` is scored
+  correct for `30`, because the first marked number is kept.
+- **Inspect AI** (`match_str`, numeric matching): `The answer is either 60 or 30.` is scored correct for `30`.
+- **TheoremQA**: when a number cannot be parsed, the output text is evaluated as Python code.
+
+[Confirmed defects](https://github.com/xzx34/RewardAudit/blob/main/docs/findings.md) lists 35 such cases in 30 projects, each linked to the code at the
+audited commit.
 
 ## Use it in your setup
 
@@ -188,6 +198,7 @@ correct.
 
 - [Usage guide](https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md): every option, how to read a report, the Python API and the limits.
 - [Reference](https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md): all 79 probes and 22 defects, with examples.
+- [Confirmed defects](https://github.com/xzx34/RewardAudit/blob/main/docs/findings.md): defects in named open-source checkers, each linked to the code.
 - [Examples](https://github.com/xzx34/RewardAudit/tree/main/examples): verl, TRL and question-answering rewards.
 - [Contributing](https://github.com/xzx34/RewardAudit/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/xzx34/RewardAudit/blob/main/CHANGELOG.md)
 

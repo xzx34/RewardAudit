@@ -120,7 +120,14 @@ RewardAudit 根据每道题的参考答案构造输出。其中一部分没有�
 ██████▉                          9  多个答案只读取其中一个
 ```
 
-我们不公开具体哪个 checker 存在哪个缺陷。
+其中几个例子：
+
+- **lm-evaluation-harness**（MGSM）：开启去除标点后，参考答案为 `3` 时，`Die Antwort lautet -3.` 被判为正确。
+- **OpenAI grade-school-math**（GSM8K）：参考答案为 `30` 时，`#### 30 … Wait, that is not right. … The correct result is #### 60` 被判为正确，因为它只保留第一个标记出的数字。
+- **Inspect AI**（`match_str`，数值匹配）：参考答案为 `30` 时，`The answer is either 60 or 30.` 被判为正确。
+- **TheoremQA**：数字解析失败时，会把输出文本当作 Python 代码执行。
+
+[已确认的缺陷](https://github.com/xzx34/RewardAudit/blob/main/docs/findings.md)列出了 30 个项目中的 35 个此类问题，每条都附有被审计版本的源码链接（英文）。
 
 ## 接入你的项目
 
@@ -157,6 +164,7 @@ RewardAudit 适用于针对单条输出、按参考答案打分的 checker。多
 
 - [使用指南](https://github.com/xzx34/RewardAudit/blob/main/docs/guide.md)：全部选项、报告解读、Python 接口和局限。
 - [参考文档](https://github.com/xzx34/RewardAudit/blob/main/docs/reference.md)：全部 79 个探针和 22 类缺陷，附示例。
+- [已确认的缺陷](https://github.com/xzx34/RewardAudit/blob/main/docs/findings.md)：具名开源 checker 中的缺陷，每条附源码链接。
 - [示例](https://github.com/xzx34/RewardAudit/tree/main/examples)：verl、TRL 和问答任务的奖励函数。
 - [贡献指南](https://github.com/xzx34/RewardAudit/blob/main/CONTRIBUTING.md) · [更新日志](https://github.com/xzx34/RewardAudit/blob/main/CHANGELOG.md)
 
