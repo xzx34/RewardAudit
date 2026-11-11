@@ -9,7 +9,6 @@ authors = [{ name = "Zixiang Xu" }]
 keywords = ["reinforcement-learning", "rlvr", "reward", "verifier", "audit", "evaluation"]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: POSIX",
   "Operating System :: MacOS",
   "Programming Language :: Python :: 3",
