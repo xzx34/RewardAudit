@@ -21,6 +21,7 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 - The guide explains equivalence dependencies, checker interfaces, stopped audits, Python callbacks, stability and coverage limits.
 - A generated reference describes every probe, defect and other reported id.
 - Runnable ten-row examples cover verl-style numeric rewards, TRL batch rewards and several accepted QA answers.
+- Contributor instructions, an issue template, citation metadata and a typing marker; CI checks macOS, default installs and wheel examples.
 
 ### Changed
 
@@ -30,6 +31,7 @@ the [usage guide](docs/guide.md#what-stays-the-same-across-versions).
 
 ### Fixed
 
+- Shortening a numeric hedge keeps both answers without the optional math packages, whichever answer comes first.
 - Checker imports exclude packages loaded by the tool's dataset equivalence checks.
 - Advice for answer-field checkers no longer asks them to accept surrounding prose.
 - A non-score return names the unsupported value and supported score types instead of saying the checker raised an error.

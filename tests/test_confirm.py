@@ -77,6 +77,13 @@ def test_a_hedge_is_cut_to_its_two_answers_not_to_the_right_one(quickstart):
     assert last_digits(short["completion"], gold) == 1.0
 
 
+def test_a_hedge_with_the_right_answer_first_keeps_both_answers():
+    d, _ = _one_defect(substring, "either 34 or 35")
+    short = d["confirmation"]["shortest_accepted"]
+    assert re.findall(r"\d+", short["completion"]) == ["34", "35"]
+    assert short["score"] == 1.0
+
+
 def test_a_single_wrong_answer_has_nothing_to_cut(quickstart):
     d = next(d for d in quickstart.defects if d["id"] == "D1")
     assert "shortest_accepted" not in d["confirmation"] and len(re.findall(r"\S+", d["example"]["completion"])) == 1

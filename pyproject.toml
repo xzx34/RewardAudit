@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Black-box audit of checkers (reward functions, verifiers) in RL environments with verifiable rewards."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 authors = [{ name = "Zixiang Xu" }]
 keywords = ["reinforcement-learning", "rlvr", "reward", "verifier", "audit", "evaluation"]
 classifiers = [
@@ -17,6 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
 ]
 dependencies = [
   "typer>=0.12",
@@ -34,6 +35,9 @@ rewardaudit = "rewardaudit.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/xzx34/rewardaudit"
+Documentation = "https://github.com/xzx34/rewardaudit/blob/main/docs/guide.md"
+Changelog = "https://github.com/xzx34/rewardaudit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/xzx34/rewardaudit/issues"
 
 [build-system]
 requires = ["hatchling"]

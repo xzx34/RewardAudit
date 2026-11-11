@@ -361,6 +361,7 @@ def test_a_checker_on_the_standard_library_imports_none(tmp_path):
 
 
 def test_dataset_equivalence_imports_are_not_the_checkers(tmp_path):
+    pytest.importorskip("math_verify")
     (tmp_path / "checker.py").write_text("import re\n\ndef score(completion, answer):\n    return float(completion.strip() == answer)\n")
     rows = [{"prompt": r"Expand \boxed{(x+1)^2}.", "answer": "x^2+2x+1"},
             {"prompt": r"Simplify \boxed{\sqrt{8}/2}.", "answer": r"\sqrt{2}"}]
@@ -385,6 +386,7 @@ def test_answer_field_advice_does_not_require_surrounding_prose():
 
 
 def test_what_reading_a_parquet_dataset_imports_is_not_the_checkers(tmp_path):
+    pytest.importorskip("pyarrow")
     import pyarrow as pa
     import pyarrow.parquet as pq
 

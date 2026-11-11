@@ -12,8 +12,8 @@ from typing import Any
 
 from rewardaudit.contract import Contract
 from rewardaudit.defects import RUN_AS_CODE
-from rewardaudit.equiv import states_the_answer
-from rewardaudit.goldtype import infer_gold_type
+from rewardaudit.equiv import equiv, extract_numbers, states_the_answer
+from rewardaudit.goldtype import infer_gold_type, is_numeric
 from rewardaudit.metrics import hit
 from rewardaudit.probes.registry import all_probes
 from rewardaudit.runner import RunnerPool
@@ -53,7 +53,9 @@ def _shortest_accepted(runner: RunnerPool, task: Task, ex: dict[str, Any], contr
             while i < len(pieces) and calls < MAX_CUT_CALLS:
                 rest = pieces[:i] + pieces[i + size:]
                 reply = "".join(rest).rstrip() if strip else "".join(rest)
-                if states_the_answer(reply, task.answer, gold_type, contract.derived):
+                if (states_the_answer(reply, task.answer, gold_type, contract.derived)
+                        or (is_numeric(gold_type) and len(numbers := extract_numbers(reply)) == 1
+                            and equiv(numbers[0], task.answer, gold_type))):
                     i += size
                     continue
                 calls += 1

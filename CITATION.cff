@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this information."
+type: software
+title: rewardaudit
+authors:
+  - given-names: Zixiang
+    family-names: Xu
+repository-code: "https://github.com/xzx34/rewardaudit"
+license: Apache-2.0
