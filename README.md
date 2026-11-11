@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/rewardaudit/"><img src="https://img.shields.io/pypi/v/rewardaudit?style=flat-square&color=14b8a6&label=pypi" alt="PyPI"></a>
-  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-334155?style=flat-square" alt="Python 3.11 to 3.13">
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-334155?style=flat-square" alt="Python 3.11 to 3.14">
   <a href="https://github.com/xzx34/RewardAudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/RewardAudit/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
   <a href="https://github.com/xzx34/RewardAudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
 </p>
@@ -51,7 +51,8 @@ def score(completion, answer):
     return 1.0 if numbers and numbers[-1] == answer.strip() else 0.0
 ```
 
-Each line of the dataset holds a task and its ground truth:
+Each line of the dataset holds a task and its ground truth. Here are the first two of the 40 lines of
+[`data.jsonl`](https://github.com/xzx34/RewardAudit/blob/main/examples/quickstart/data.jsonl):
 
 ```json
 {"question": "Gus has 23 apples and gets 11 more. How many apples does Gus have now?", "answer": "34"}
@@ -64,7 +65,7 @@ Run the audit:
 rewardaudit audit reward.py --dataset data.jsonl
 ```
 
-The complete example, with 40 tasks, is in [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart).
+Both files are in [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart).
 
 ## Reading the result
 

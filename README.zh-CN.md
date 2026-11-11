@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/rewardaudit/"><img src="https://img.shields.io/pypi/v/rewardaudit?style=flat-square&color=14b8a6&label=pypi" alt="PyPI"></a>
-  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-334155?style=flat-square" alt="Python 3.11 至 3.13">
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-334155?style=flat-square" alt="Python 3.11 至 3.14">
   <a href="https://github.com/xzx34/RewardAudit/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xzx34/RewardAudit/ci.yml?style=flat-square&label=tests" alt="测试"></a>
   <a href="https://github.com/xzx34/RewardAudit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-334155?style=flat-square" alt="Apache-2.0"></a>
 </p>
@@ -45,7 +45,7 @@ def score(completion, answer):
     return 1.0 if numbers and numbers[-1] == answer.strip() else 0.0
 ```
 
-数据集的每一行包含一道题目及其 Ground Truth：
+数据集的每一行包含一道题目及其 Ground Truth。下面是 [`data.jsonl`](https://github.com/xzx34/RewardAudit/blob/main/examples/quickstart/data.jsonl) 的前两行（共 40 行）：
 
 ```json
 {"question": "Gus has 23 apples and gets 11 more. How many apples does Gus have now?", "answer": "34"}
@@ -58,7 +58,7 @@ def score(completion, answer):
 rewardaudit audit reward.py --dataset data.jsonl
 ```
 
-完整的示例文件（共 40 道题）见 [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart)。
+两个文件都在 [`examples/quickstart`](https://github.com/xzx34/RewardAudit/tree/main/examples/quickstart) 目录下。
 
 ## 结果解读
 

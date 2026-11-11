@@ -17,7 +17,7 @@ from rewardaudit.errors import AuditError, WorkerError, short_error
 from rewardaudit.pipeline import AuditResult, exit_code
 from rewardaudit.report import ROWS, render_terminal, write_outputs
 
-app = typer.Typer(add_completion=False, no_args_is_help=True, help="Test the checker of an RL environment, without a model.",
+app = typer.Typer(add_completion=False, no_args_is_help=True, help="Test a rule-based checker for LLM evaluation or RLVR, without a model.",
                   pretty_exceptions_enable=False)
 console = Console()
 errors = Console(stderr=True)

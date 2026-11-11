@@ -1,4 +1,4 @@
-"""rewardaudit: black-box audit of checkers in RL environments with verifiable rewards.
+"""rewardaudit: automated testing of rule-based checkers for LLM evaluation and RLVR.
 
     from rewardaudit import audit
 

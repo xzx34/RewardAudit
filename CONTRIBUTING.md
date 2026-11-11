@@ -2,7 +2,7 @@
 
 ## Setup and checks
 
-Use Python 3.11–3.13 and [uv](https://docs.astral.sh/uv/). From the repository root:
+Use Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/). From the repository root:
 
 ```bash
 uv venv --python 3.12

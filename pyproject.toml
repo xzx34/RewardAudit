@@ -1,12 +1,12 @@
 [project]
 name = "RewardAudit"
 dynamic = ["version"]
-description = "Black-box audit of checkers (reward functions, verifiers) in RL environments with verifiable rewards."
+description = "Automated testing of rule-based verifiers (checkers, reward functions) for LLM evaluation and RLVR."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{ name = "Zixiang Xu" }, { name = "Yue Zhao" }]
-keywords = ["reinforcement-learning", "rlvr", "reward", "verifier", "audit", "evaluation"]
+keywords = ["llm", "evaluation", "benchmark", "reinforcement-learning", "rlvr", "reward", "verifier", "checker", "audit", "testing"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Operating System :: POSIX",
@@ -15,6 +15,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Typing :: Typed",
 ]
