@@ -5,5 +5,7 @@ title: RewardAudit
 authors:
   - given-names: Zixiang
     family-names: Xu
+  - given-names: Yue
+    family-names: Zhao
 repository-code: "https://github.com/xzx34/RewardAudit"
 license: Apache-2.0

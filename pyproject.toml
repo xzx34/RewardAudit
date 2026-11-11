@@ -5,7 +5,7 @@ description = "Black-box audit of checkers (reward functions, verifiers) in RL e
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-authors = [{ name = "Zixiang Xu" }]
+authors = [{ name = "Zixiang Xu" }, { name = "Yue Zhao" }]
 keywords = ["reinforcement-learning", "rlvr", "reward", "verifier", "audit", "evaluation"]
 classifiers = [
   "Development Status :: 4 - Beta",

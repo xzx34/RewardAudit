@@ -187,11 +187,8 @@ thresholds, and `rewardaudit compare` shows where two versions of a checker scor
 
 ## Limits
 
-RewardAudit is for checkers that score a single output against the ground truth. Multi-turn and tool-use
-environments and checkers that call a model are out of scope; in those cases it stops and explains why rather than
-print misleading numbers. If the same input receives different scores, it reports this and continues. Because it tests
-a fixed set of outputs, a clean result means only that these outputs were scored correctly, not that the checker is
-correct.
+RewardAudit audits rule-based checkers, which score an output against the ground truth. Checkers that ask a model
+for the score, such as LLM judges and reward models, are out of its scope.
 
 ## Documentation
 
@@ -205,8 +202,8 @@ correct.
 
 ```bibtex
 @software{rewardaudit,
-  author = {Xu, Zixiang},
-  title  = {RewardAudit: test the checker before you train on it},
+  author = {Xu, Zixiang and Zhao, Yue},
+  title  = {RewardAudit: Auditing the Checkers Behind Benchmarks and Verifiable Rewards},
   year   = {2026},
   url    = {https://github.com/xzx34/RewardAudit}
 }

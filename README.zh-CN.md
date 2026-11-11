@@ -158,7 +158,7 @@ Hub 上的环境是第三方代码，审计时会在你的机器上安装并运�
 
 ## 局限
 
-RewardAudit 适用于针对单条输出、按 Ground Truth 打分的 checker。多轮对话、工具调用环境以及调用模型打分的 checker 不在适用范围内；遇到这类情况时，它会停止并说明原因，而不会给出误导性的数字。如果同一输入得到不同的分数，它会报告这一情况并继续审计。由于测试的是一组固定的输出，审计结果干净只说明这些输出都得到了正确的分数，并不代表 checker 没有问题。
+RewardAudit 审计的是基于规则、按 Ground Truth 打分的 checker。LLM judge、奖励模型这类由模型打分的 checker 不在适用范围内。
 
 ## 文档
 
@@ -174,8 +174,8 @@ RewardAudit 适用于针对单条输出、按 Ground Truth 打分的 checker。�
 
 ```bibtex
 @software{rewardaudit,
-  author = {Xu, Zixiang},
-  title  = {RewardAudit: test the checker before you train on it},
+  author = {Xu, Zixiang and Zhao, Yue},
+  title  = {RewardAudit: Auditing the Checkers Behind Benchmarks and Verifiable Rewards},
   year   = {2026},
   url    = {https://github.com/xzx34/RewardAudit}
 }
